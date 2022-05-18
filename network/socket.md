@@ -36,9 +36,9 @@
     
 
 # TCP-CS
+![tcp_cs](img/tcp_cs.png)
 
-> Server
-> 
+## Server
 
 ```go
 func main(){
@@ -82,8 +82,7 @@ func main(){
 
 ---
 
-> Client
-> 
+## Client
 1. conn, err := net.Dial(”tcp”, IP + port)
 2. write data to server → conn.Write()
 3. Read server response data → conn.Read()
@@ -116,8 +115,7 @@ func main(){
 
 ---
 
-> Server - Concurrent
-> 
+## Server - Concurrent
 1. create listener → listener := net.Listen(”tcp”, IP + port)
 2. defer listener.Close()
 3. for loop blocking to listen client connection → conn := listener.Accept()
@@ -201,8 +199,7 @@ func main(){
 
 ---
 
-> Client - Concurrent
-> 
+## Client - Concurrent
 
 ```go
 func main(){
