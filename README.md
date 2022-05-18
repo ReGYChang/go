@@ -15,6 +15,7 @@
 - interface
 - goroutine, channel, buffer, select, mutex
 - defer, error, panic, recover
+- [anonymous function, closure]()
 ## Go Module
   - Learn Go dependency management tool
   - semantic versioning
@@ -93,7 +94,7 @@
   - Creational
   - Structural
   - Behavioral
-  - synchronization
+  - Synchronization
   - Concurrency
   - Messaging
   - Stability
