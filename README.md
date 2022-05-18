@@ -8,89 +8,89 @@
 
 # :penguin: AGENDA 
 ## Go
-    - go cmd
-    - var, const, type, function, package
-    - array, slice
-    - pointer, struct, method
-    - interface
-    - goroutine, channel, buffer, select, mutex
-    - defer, error, panic, recover
+- go cmd
+- var, const, type, function, package
+- array, slice
+- pointer, struct, method
+- interface
+- goroutine, channel, buffer, select, mutex
+- defer, error, panic, recover
 ## Go Module
-    - Learn Go dependency management tool
-    - semantic versioning
-    - version, scripts, repository and other properties
+  - Learn Go dependency management tool
+  - semantic versioning
+  - version, scripts, repository and other properties
 ## SQL fundamentals
 ## General Development Skills
-    - Git
-    - HTTP / HTTPS
-    - Data Structures and Algorithms
-    - Scrum, Kanban or other project strategies
-    - Basic Authentication, OAuth, JWT, etc
-    - SOLIC, YAGNI, KISS
+  - Git
+  - HTTP / HTTPS
+  - Data Structures and Algorithms
+  - Scrum, Kanban or other project strategies
+  - Basic Authentication, OAuth, JWT, etc
+  - SOLIC, YAGNI, KISS
 ## CLI
-    - cobra
+  - cobra
 ## Web Frameworks + Routers
-    - Echo
-    - Fiber
-    - Gin
+  - Echo
+  - Fiber
+  - Gin
 ## ORMs
-    - Gorm
+  - Gorm
 ## Database
-    - RDB
-        - PostgreSQL
-    - NoSQL
-        - MongoDB
-        - Redis
-    - Search Engines
-        - ElasticSearch
+  - RDB
+      - PostgreSQL
+  - NoSQL
+      - MongoDB
+      - Redis
+  - Search Engines
+      - ElasticSearch
 ## Caching
-    - GCache
-    - Distributed Cache
-        - Go-Redis
+  - GCache
+  - Distributed Cache
+      - Go-Redis
 ## Logging
-    - Log Frameworks
-        - Zap
+  - Log Frameworks
+      - Zap
 ## Real-Time Communication
-    - Melody
-    - Centrifugo
+  - Melody
+  - Centrifugo
 ## API Clients
-    - GraphQL
-    - REST
+  - GraphQL
+  - REST
 ## Testing
-    - Unit Testing
-        - Mocking
-            - GoMock
-        - Frameworks
-            - Testify
-        - Assertion
+  - Unit Testing
+      - Mocking
+          - GoMock
+      - Frameworks
+          - Testify
+      - Assertion
 ## Good to Know Libraries
-    - Validator
-    - Glow
-    - GJson
-    - Authboss
-    - Go-Underscore
-    - MicroServices
-        - Message-Broker
-            - Kafka
-            - RabbitMQ
-        - Frameworks
-            - rpcx
-            - Go-kit
-            - Micro
-            - go-zero
-        - Building event-driven
-            - Watermill
-        - RPC
-            - Protocol Buffers
-            - gRPC-Go
-            - gRPC-gateway
-    - Task Scheduling
-        - gron
+  - Validator
+  - Glow
+  - GJson
+  - Authboss
+  - Go-Underscore
+  - MicroServices
+      - Message-Broker
+          - Kafka
+          - RabbitMQ
+      - Frameworks
+          - rpcx
+          - Go-kit
+          - Micro
+          - go-zero
+      - Building event-driven
+          - Watermill
+      - RPC
+          - Protocol Buffers
+          - gRPC-Go
+          - gRPC-gateway
+  - Task Scheduling
+      - gron
 ## Go Patterns
-    - Creational
-    - Structural
-    - Behavioral
-    - synchronization
-    - Concurrency
-    - Messaging
-    - Stability
+  - Creational
+  - Structural
+  - Behavioral
+  - synchronization
+  - Concurrency
+  - Messaging
+  - Stability
