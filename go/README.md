@@ -4,6 +4,7 @@
 # Go
 - go cmd
 - var, const, type, function, package
+- [code blocks, scopes](code_blocks_scopes.md)
 - array, slice
 - pointer, struct, method
 - interface

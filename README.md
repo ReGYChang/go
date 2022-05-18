@@ -10,6 +10,7 @@
 ## [Go](go/README.md)
 - go cmd
 - var, const, type, function, package
+- [code blocks, scopes](go/code_blocks_scopes.md)
 - array, slice
 - pointer, struct, method
 - interface
