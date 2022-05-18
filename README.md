@@ -6,8 +6,8 @@
   <a href="https://github.com/ReGYChang/LeetCode"><img src="https://img.shields.io/badge/algo-leetcode-brightgreen.svg" alt="leetcode"></a>
 </p>
 
-## :penguin: AGENDA 
-- Go
+# :penguin: AGENDA 
+## Go
     - go cmd
     - var, const, type, function, package
     - array, slice
@@ -15,27 +15,27 @@
     - interface
     - goroutine, channel, buffer, select, mutex
     - defer, error, panic, recover
-- Go Module
+## Go Module
     - Learn Go dependency management tool
     - semantic versioning
     - version, scripts, repository and other properties
-- SQL fundamentals
-- General Development Skills
+## SQL fundamentals
+## General Development Skills
     - Git
     - HTTP / HTTPS
     - Data Structures and Algorithms
     - Scrum, Kanban or other project strategies
     - Basic Authentication, OAuth, JWT, etc
     - SOLIC, YAGNI, KISS
-- CLI
+## CLI
     - cobra
-- Web Frameworks + Routers
+## Web Frameworks + Routers
     - Echo
     - Fiber
     - Gin
-- ORMs
+## ORMs
     - Gorm
-- Database
+## Database
     - RDB
         - PostgreSQL
     - NoSQL
@@ -43,27 +43,27 @@
         - Redis
     - Search Engines
         - ElasticSearch
-- Caching
+## Caching
     - GCache
     - Distributed Cache
         - Go-Redis
-- Logging
+## Logging
     - Log Frameworks
         - Zap
-- Real-Time Communication
+## Real-Time Communication
     - Melody
     - Centrifugo
-- API Clients
+## API Clients
     - GraphQL
     - REST
-- Testing
+## Testing
     - Unit Testing
         - Mocking
             - GoMock
         - Frameworks
             - Testify
         - Assertion
-- Good to Know Libraries
+## Good to Know Libraries
     - Validator
     - Glow
     - GJson
@@ -86,7 +86,7 @@
             - gRPC-gateway
     - Task Scheduling
         - gron
-- Go Patterns
+## Go Patterns
     - Creational
     - Structural
     - Behavioral
