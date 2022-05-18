@@ -29,10 +29,13 @@
   - SOLIC, YAGNI, KISS
 ## CLI
   - cobra
-## Web Frameworks + Routers
+## Web Frameworks & Routers
   - Echo
   - Fiber
   - Gin
+## Network
+  - net/http
+  - socket
 ## ORMs
   - Gorm
 ## Database
