@@ -18,11 +18,10 @@
 - defer, error, panic, recover
 - [anonymous function, closure](go/anonymouse_closure.md)
 - [higher-order function](go/higher_order_func.md)
+- [Learn Go dependency management tool](go/pkg_tools.md)
+- semantic versioning
+- version, scripts, repository and other properties
 
-## Go Module
-  - Learn Go dependency management tool
-  - semantic versioning
-  - version, scripts, repository and other properties
 ## SQL fundamentals
 ## General Development Skills
   - Git

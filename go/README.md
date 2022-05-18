@@ -12,3 +12,6 @@
 - defer, error, panic, recover
 - [anonymous function & closure](anonymouse_closure.md)
 - [higher-order function](go/higher_order_func.md)
+- [Learn Go dependency management tool](pkg_tools.md)
+- semantic versioning
+- version, scripts, repository and other properties
