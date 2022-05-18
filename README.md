@@ -7,7 +7,7 @@
 </p>
 
 # :penguin: AGENDA 
-## Go
+## [Go](go/README.md)
 - go cmd
 - var, const, type, function, package
 - array, slice
@@ -15,7 +15,9 @@
 - interface
 - goroutine, channel, buffer, select, mutex
 - defer, error, panic, recover
-- [anonymous function, closure]()
+- [anonymous function, closure](go/anonymouse_closure.md)
+- [higher-order function](go/higher_order_func.md)
+
 ## Go Module
   - Learn Go dependency management tool
   - semantic versioning
