@@ -12,6 +12,8 @@
 		- [Broadcast user messages](#broadcast-user-messages)
 		- [Search online users](#search-online-users)
 		- [Rename user name](#rename-user-name)
+		- [User exit](#user-exit)
+		- [User Timeout](#user-timeout)
 
 # Socket
 ![socket_conn](img/socket_conn.png)
@@ -315,6 +317,17 @@ func main(){
 - update onlineMap
 - reponse 修改成功 - conn.Write
 
+### User exit
+- after user login successfully create channel isQuit to listen event
+- 當 conn.Read == 0, isQuit <- true
+- 在 HandlerConnect 結尾 for loop 增加 select 監聽 <- isQuit
+- 滿足條件將 user remove from online map and broadcast to other users
+
+### User Timeout
+- 在 select 中監聽定時器 - time.After() 到達將 user remove from online map and broadcast
+- create isActive channel 判斷 user 是否 active - isActive <- true
+- select 中添加監聽 <- isActive - 條件滿足不做任何動作以重置計時器
+
 
 ```go
 package main
@@ -323,6 +336,7 @@ import (
 	"fmt"
 	"net"
 	"strings"
+	"time"
 )
 
 // Client user struct type
@@ -353,6 +367,8 @@ func WriteMsgToClient(client Client, conn net.Conn) {
 func HandlerConnect(conn net.Conn) {
 	defer conn.Close()
 
+	isActive := make(chan bool)
+
 	// get user address info
 	userAddr := conn.RemoteAddr().String()
 
@@ -372,12 +388,15 @@ func HandlerConnect(conn net.Conn) {
 	// send user online message to global channel
 	messages <- NewMsg(client, "login!")
 
+	isQuit := make(chan bool)
+
 	// create anonymous goroutine to handle user's message
 	go func() {
 		for {
 			buf := make([]byte, 4096)
 			n, err := conn.Read(buf)
 			if n == 0 {
+				isQuit <- true
 				fmt.Printf("Check client: %s exit...\n", client.Name)
 				return
 			}
@@ -415,13 +434,30 @@ func HandlerConnect(conn net.Conn) {
 				// broadcast user message and write into global channel
 				messages <- NewMsg(client, msg)
 			}
+			isActive <- true
 
 		}
 	}()
 
 	// blocking
 	for {
-
+		// listen channel data flow
+		select {
+		case <-isQuit:
+			// terminate WriteMsgToClient goroutine
+			close(client.C)
+			// delete user from online map
+			delete(onlineMap, client.Addr)
+			messages <- NewMsg(client, "logout")
+			return
+		case <-isActive:
+			// reset timeout
+		case <-time.After(time.Second * 10):
+			messages <- NewMsg(client, "timeout")
+			time.Sleep(time.Second * 2)
+			delete(onlineMap, client.Addr)
+			return
+		}
 	}
 }
 
@@ -464,4 +500,5 @@ func main() {
 		go HandlerConnect(conn)
 	}
 }
+
 ```
