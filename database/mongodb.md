@@ -32,10 +32,32 @@
   - [Authentication](#authentication)
     - [Replica Set](#replica-set-1)
     - [Sharded Cluster](#sharded-cluster-1)
-  - [Backup](#backup)
-    - [Feature](#feature-1)
-    - [Methods](#methods)
   - [Auditing](#auditing)
+  - [TLS/SSL](#tlsssl)
+    - [Create SSL/TLS Certificate](#create-ssltls-certificate)
+    - [SSL/TLS Communication](#ssltls-communication)
+      - [Authentication Phase](#authentication-phase)
+      - [Key Exchage Phase](#key-exchage-phase)
+      - [Encrypted Data Transfer (Record) Phase](#encrypted-data-transfer-record-phase)
+    - [Certificate Requirement](#certificate-requirement)
+    - [Configure Internal X.509 certificate-based Encryption](#configure-internal-x509-certificate-based-encryption)
+    - [Configure TLS Connections to Ops Manager](#configure-tls-connections-to-ops-manager)
+      - [Configure Ops Manager Application for TLS](#configure-ops-manager-application-for-tls)
+      - [Configure MongoDB Agent to Use TLS](#configure-mongodb-agent-to-use-tls)
+    - [Enable TLS for a Deployment](#enable-tls-for-a-deployment)
+      - [Enable TLS for the project](#enable-tls-for-the-project)
+      - [Set Existing Deployments to Use TLS](#set-existing-deployments-to-use-tls)
+    - [OTHER](#other)
+      - [Enable x.509 Authentication](#enable-x509-authentication)
+      - [Credential Encrypted](#credential-encrypted)
+      - [MongoDB Driver TLS Connection String](#mongodb-driver-tls-connection-string)
+    - [Config MongoDB Java Driver (v3.9)](#config-mongodb-java-driver-v39)
+      - [Convert Certificate Format To JVM Compatible](#convert-certificate-format-to-jvm-compatible)
+    - [FAQ](#faq)
+      - [Should use the correct SAN(subject alternative name) to establish connection over TLS](#should-use-the-correct-sansubject-alternative-name-to-establish-connection-over-tls)
+- [Backup](#backup)
+  - [Feature](#feature-1)
+  - [Methods](#methods)
 - [Indexes](#indexes)
   - [Performance Tips](#performance-tips-1)
 - [Storage Engine - WiredTiger](#storage-engine---wiredtiger)
@@ -53,17 +75,7 @@
   - [Rollback](#rollback)
 - [Document Design Patterns](#document-design-patterns)
 - [No Usage](#no-usage)
-- [Ref](#ref)
-- [mongod.conf](#mongodconf)
-- [for documentation of all options, see:](#for-documentation-of-all-options-see)
-- [http://docs.mongodb.org/manual/reference/configuration-options/](#httpdocsmongodborgmanualreferenceconfiguration-options)
-- [where to write logging data.](#where-to-write-logging-data)
-- [Where and how to store data.](#where-and-how-to-store-data)
-- [engine:](#engine)
-- [wiredTiger:](#wiredtiger)
-- [how the process runs](#how-the-process-runs)
-- [network interfaces](#network-interfaces)
-  - [Enterprise-Only Options](#enterprise-only-options)
+- [Reference](#reference)
 - [Official Tips](#official-tips)
 
 # Introduction
@@ -400,7 +412,7 @@ To see what the hashed value would be for a key, see convertShardKeyToHashed().
 - Security between connecting clients and the replica set using User Access Controls.
 
 
-💭 When possible, use a logical DNS hostname instead of an ip address, particularly when configuring replica set members or sharded cluster members. The use of logical DNS hostnames avoids configuration changes due to ip address changes.
+>💭 When possible, use a logical DNS hostname instead of an ip address, particularly when configuring replica set members or sharded cluster members. The use of logical DNS hostnames avoids configuration changes due to ip address changes.
 
 
 
@@ -426,15 +438,625 @@ X.509 Certificate-Based Authentication
 
 ### Sharded Cluster
 
-## Backup
+## Auditing
 
-### Feature
+- edit config file (mongod.conf):
+    - auditLog
+        - destination - syslog/file/console
+        - format - JSON/BSON
+        - path
+        - (option)filter
+
+## TLS/SSL
+
+### Create SSL/TLS Certificate
+
+![Untitled](img/tls.png)
+
+### SSL/TLS Communication
+
+![Untitled](img/tls%201.png)
+
+![Untitled](img/tls%202.png)
+
+- Authentication (Handshake): Public/Asymmetric Key Encryption Algorithms
+- Key Exchange (Handshake): Public/Asymmetric Key Encryption Algorithms / Key Exchange protocol
+- Encrypted Data Transfer (Record): Private/Symmetric Key Encryption Algorithms
+
+#### Authentication Phase
+
+Step 1
+
+- Client → Client hello to server
+- include cipher suites in SSL session
+    
+    ![Untitled](img/tls%203.png)
+    
+    1. Transport Layer Protocal: SSL / TLS
+    2. Session key exchange algorithms: 其他如 RSA, DH, DHE, 用於決定 client / server 間 handshake 時如何進行身分驗證
+    3. 憑證 PKI 類型: 其他如 DSS (Digital Signature Standard)
+    4. Symmetric Key Encryption Algorithm: 其他如 RC4, 3DES, CAMELLIA, ARIA, GCM
+    5. Cryptographic hash function(*Message**Digest*): MD5, SHA2
+- client hello 也包含使用哪種資料壓縮方法
+- 若金鑰交換階段使用 RSA 演算法則會再生成一個隨機數，用於金鑰交換階段生成對稱式金鑰匙 (client's random number)
+
+Step 2
+
+- 收到 client hello 後 server 會回傳 server hello 訊息，包含 SSL version, cipher suite, server 支援且同意的資料壓縮方法, Server SSL certificate
+- 若之後金鑰交換階段要採用 RSA 演算法則還會再生成一個隨機數，用於金鑰交換階段生成對稱式金鑰匙 (server's random number)
+- Server hello 有一個選填欄位，主要用來提醒 client 是否需要將 client 的憑證送回 server 以實現雙向驗證
+- server hello 結尾會有一個 server hello done 表示段落訊息結束
+
+Step 3
+
+- client 驗證 server  SSL certificate
+- Browser → CA → Get CA public key from cert store → **Verify CA** D**igital Signature**
+- 若驗證未通過代表可能出現 Man-in-the-middle attack
+
+Step 4
+
+- 若 server 有在 server hello 中要求 client certificate 則 client 會將 certificate 送給 server
+- server 驗證 client certificate 並完成 SSL handshake authentication phase
+
+#### Key Exchage Phase
+
+- client 生成一個 random number 並使用 server public key 加密作為 pre-master secret 並送給 server
+- 透過 PMS 及前面 client/server 提供的 random numbers 計算出 master secret
+
+#### Encrypted Data Transfer (Record) Phase
+
+- 透過 master secret 對資料進行 symmetric key encryption
+- Record protocol 主要確保 confidentiality and integrity
+
+### Certificate Requirement
+
+---
+
+
+>⛔ Starting in version 4.0, MongoDB disables support for TLS 1.0 encryption on systems where TLS 1.1+ is available. For more details, see Disable TLS 1.0
+
+- any certificate needs to be signed by the same CA
+- the common name (CN) required during the certificate creation must correspond to the hostname of the host
+- any other field requested in the certificate creation should be a non-empty value and, hopefully, should reflect our organization details
+- it is also very important that all the fields, except the CN, should match those from the certificates for the other cluster members
+
+### Configure Internal X.509 certificate-based Encryption
+
+---
+
+> Configure example-ca.conf
+
+```bash
+# For the CA policy
+[ policy_match ]
+countryName = match
+stateOrProvinceName = match
+organizationName = match
+organizationalUnitName = optional
+commonName = supplied
+emailAddress = optional
+
+[ req ]
+default_bits = 4096
+default_keyfile = example-ca.pem    ## The default private key file name.
+default_md = sha256                           ## Use SHA-256 for Signatures
+distinguished_name = req_dn
+req_extensions = v3_req
+x509_extensions = v3_ca # The extentions to add to the self signed cert
+
+[ v3_req ]
+subjectKeyIdentifier  = hash
+basicConstraints = CA:FALSE
+keyUsage = critical, digitalSignature, keyEncipherment
+nsComment = "OpenSSL Generated Certificate for TESTING only.  NOT FOR PRODUCTION USE."
+extendedKeyUsage  = serverAuth, clientAuth
+
+[ req_dn ]
+countryName = Country Name (2 letter code)
+countryName_default = TW
+
+countryName_min = 2
+countryName_max = 2
+
+stateOrProvinceName = State or Province Name (full name)
+stateOrProvinceName_default = TW
+stateOrProvinceName_max = 64
+
+localityName = Locality Name (eg, city)
+localityName_default = Taipei
+localityName_max = 64
+
+organizationName = Organization Name (eg, company)
+organizationName_default = Omniwaresoft
+organizationName_max = 64
+
+organizationalUnitName = Organizational Unit Name (eg, section)
+organizationalUnitName_default = no-sql
+organizationalUnitName_max = 64
+
+commonName = Common Name (eg, YOUR name)
+commonName_max = 64
+
+[ v3_ca ]
+# Extensions for a typical CA
+
+subjectKeyIdentifier=hash
+basicConstraints = critical,CA:true
+authorityKeyIdentifier=keyid:always,issuer:always
+```
+
+> Connect to one of the hosts and generate a new private key using openssl
+> 
+
+```bash
+# created a new 8192-bit private key and saved it in the file example-ca.key
+$ openssl genrsa -out example-ca.key -aes256 8192
+```
+
+> Sign a new CA certificate
+> 
+
+```bash
+# Creating certificate and filling out some fields correspond to our org's details
+$ openssl req -x509 -new -extensions v3_ca -key mongoCA.key -days 365 -out mongoCA.crt
+
+#####################################################################################################################################
+# v0.0.2
+[root@mongodb-regy-4 tls]# openssl req -x509 -new -extensions v3_ca -key example-ca.key -days 365 -out example-ca-pub.crt -config example-ca.conf
+Enter pass phrase for example-ca.key:
+You are about to be asked to enter information that will be incorporated
+into your certificate request.
+What you are about to enter is what is called a Distinguished Name or a DN.
+There are quite a few fields but you can leave some blank
+For some fields there will be a default value,
+If you enter '.', the field will be left blank.
+-----
+Country Name (2 letter code) [XX]:TW
+State or Province Name (full name) []:TW
+Locality Name (eg, city) [Default City]:Taipei
+Organization Name (eg, company) [Default Company Ltd]:Omniwaresoft
+Organizational Unit Name (eg, section) []:no-sql
+Common Name (eg, your name or your server's hostname) []:mongodb-regy-4.c.omnilabs-1281.internal
+Email Address []:regy.chang@omniwaresoft.com.tw
+```
+
+> Configure mongod_cert.conf
+> 
+
+
+💡 The most important part is [ alt_names ]. As explained before, the DNS must include include both internal endpoints and external endpoints:
+
+
+
+```bash
+# Could check your Ops Manager Host Mappings as well
+
+[ alt_names ]
+DNS.1 = mongodb-regy-4.c.omnilabs-1281.internal
+DNS.2 = mongodb-regy-4
+```
+
+mongod_cert.conf:
+
+```bash
+[ req ]
+default_bits = 4096
+default_md = sha256
+distinguished_name = req_dn
+req_extensions = v3_req
+
+[ v3_req ]
+subjectKeyIdentifier  = hash
+basicConstraints = CA:FALSE
+keyUsage = critical, digitalSignature, keyEncipherment
+nsComment = "OpenSSL Generated Certificate for TESTING only.  NOT FOR PRODUCTION USE."
+extendedKeyUsage  = serverAuth, clientAuth
+subjectAltName = @alt_names
+
+[ alt_names ]
+DNS.1 =         ##TODO: Enter the DNS names. The DNS names should match the server names.
+DNS.2 =         ##TODO: Enter the DNS names. The DNS names should match the server names.
+IP.1 =          ##TODO: Enter the IP address. SAN matching by IP address is available starting in MongoDB 4.2
+IP.2 =          ##TODO: Enter the IP address. SAN matching by IP address is available starting in MongoDB 4.2
+
+[ req_dn ]
+countryName = Country Name (2 letter code)
+countryName_default = TW
+
+countryName_min = 2
+countryName_max = 2
+
+stateOrProvinceName = State or Province Name (full name)
+stateOrProvinceName_default = TW
+stateOrProvinceName_max = 64
+
+localityName = Locality Name (eg, city)
+localityName_default = Taipei
+localityName_max = 64
+
+organizationName = Organization Name (eg, company)
+organizationName_default = Omniwaresoft
+organizationName_max = 64
+
+organizationalUnitName = Organizational Unit Name (eg, section)
+organizationalUnitName_default = no-sql
+organizationalUnitName_max = 64
+
+commonName = Common Name (eg, YOUR name)
+commonName_max = 64
+```
+
+> Issue self-signed certificates for all the nodes
+
+
+>⚠️ fill out all the fields requested the same for each host, but remember to fill out a different common name (CN) that must correspond to the hostname.
+
+
+
+```bash
+# generate a certificate request and sign it using the CA certificate
+$ openssl req -new -nodes -newkey rsa:4096 -keyout mongotls1.key -out mongotls1.csr
+
+$ openssl x509 -CA mongoCA.crt -CAkey mongoCA.key -CAcreateserial -req -days 365 -in mongotls1.csr -out mongotls1.crt
+
+$ cat mongotls1.key mongotls1.crt > mongotls1.pem
+
+# apply the same thing for the second and third nodes
+
+#####################################################################################################################################
+# v0.0.2
+
+# generate a certificate request and sign it using the CA certificate
+# generate sever key & csr
+openssl genrsa -aes256 -passout pass:regy0415 -out mongod.key 2048
+openssl req -new -key mongod.key -out mongod.csr -config mongod_cert.conf
+
+# signed by the Root CA
+openssl x509 -req -days 3650 -in mongod.csr -CA example-ca-pub.crt -CAkey example-ca.key -passin pass:regy0415@ -CAcreateserial -out mongod.crt -extfile mongod_cert.conf -extensions v3_req
+
+# concate the key & crt file to pem
+cat mongod.crt mongod.key > mongod.pem
+
+# Verify key by CA
+openssl verify -CAfile example-ca-pub.crt mongod.pem
+
+# Repeat the above process and replace mongod
+```
+
+> Verify Certificates
+> 
+
+```bash
+# Verify Server Certificate
+openssl verify -CAfile example-ca-pub.crt mongod.pem
+mongod.pem: OK
+
+# Verify CA itself:
+openssl verify -CAfile example-ca-pub.crt example-ca-pub.crt
+example-ca-pub.crt: OK
+
+```
+
+> View Certificate Detail
+> 
+
+```bash
+# check altnames in certificate
+openssl x509 -text -noout -in mongod.pem
+...
+	X509v3 Subject Alternative Name:
+			DNS:mongodb-regy-4.c.omnilabs-1281.internal, DNS:mongodb-regy-4, IP Address:xx.xx.xx.xx, IP Address:xx.xx.xx.xx
+...
+```
+
+> Place the files
+> 
+
+```bash
+# Create on each member a directory that only the MongoDB user can read, and copy both files there
+$ sudo mkdir -p /etc/mongodb/tls
+$ sudo chmod 700 /etc/mongodb/tls
+$ sudo chown -R mongod:mongod /etc/mongodb
+
+# Copy each self signed certifcate **<hostname>.pem** into the relative member
+$ sudo cp mongod.pem /etc/mongodb/tls
+
+# Copy to each node the CA certifcate file
+$ sudo cp example-ca-pub.crt /etc/mongodb/tls
+```
+
+> Configure mongod
+> 
+
+```bash
+# Change the configuration file /etc/mongod.conf on each host adding the following rows
+net:
+    tls:
+       mode: requireTLS
+       PEMKeyFile: /etc/mongodb/tls/mongod.pem
+       CAFile: /etc/mongodb/tls/example-ca-pub.crt
+
+# Restart Mongod Daemon
+$ systemctl restart mongod
+
+# checking configured replica set using encrypted connections
+$ mongo --authenticationDatabase "admin" --host mongod:27017 --tls --tlsCAFile /etc/tls/example-ca-pub.crt --tlsPEMKeyFile /etc/mongodb/tls/mongod.pem -u dbuser -p passw0rd1
+```
+
+### Configure TLS Connections to Ops Manager
+
+---
+
+#### Configure Ops Manager Application for TLS
+
+- Ops Manager Config
+    - URL To Access Ops Manger
+        
+        
+        💡 including port 8443
+        
+        
+        
+    - HTTPS PEM Key File
+        
+        
+        💡 Private key & certificate(.pem file) for Ops Manager Host
+        
+        
+        
+    - Client Certificate Mode
+        
+        
+        💡 Select if client applications or MongoDB Agents must present a TLS certificate when connecting to a TLS-enabled Ops Manager. Ops Manager checks for certificates from these client hosts when they try to connect. If you choose to require the client TLS certificates, make sure they are valid.
+        
+        
+        
+        Accepted values are:
+        
+        - **None**
+        - **Required for Agents Only**
+        - **Required for All Requests**
+        
+
+#### Configure MongoDB Agent to Use TLS
+
+- Open MongoDB Agent configuration file
+    
+    ```bash
+    vim /etc/mongodb-mms/automation-agent.config
+    ```
+    
+- Set or add the following properties where needed
+    - mmsBaseUrl=https://example.opsm.com:8443
+    - tlsRequireValidMMSServerCertificates
+        
+        
+        >💡 The agent to validate TLS certificates of Ops Manager
+        < - If you set this value to true, you must set httpsCAFile - >
+        
+        
+        
+    - httpsCAFile
+        
+        
+        >⚠️ This Certificate Authority file must be in the same location on each MongoDB host in the same sharded cluster or replica set. Any MongoDB host that does not have the file in the same file location as the others may become unaccessible.
+        
+        
+        
+    - tlsMMSServerClientCertificate
+        
+        
+        >⚠️ certificate of automation-agent
+        
+        
+        
+    - tlsMMSServerClientCertificatePassword
+        
+        
+        >💡 Use the tlsMMSServerClientCertificatePasswordExec option instead of tlsMMSServerClientCertificatePassword to specify the password from a shell command.
+        
+        
+        
+    - automation-agent.config
+        
+        ```bash
+        # Hostname of the Ops Manager web server. The hostname will match what is used
+        # to access the Ops Manager UI. The default port for an Ops Manager install
+        # is 8080.
+        #
+        # ex. http://opsmanaager.<company>.com:8080
+        mmsBaseUrl=https://mongom-regy.c.omnilabs-1281.internal:8443
+        
+        # optional
+        tlsRequireValidMMSServerCertificates=true
+        
+        httpsCAFile=/mongo/tls/example-ca-pub.crt
+        
+        tlsMMSServerClientCertificate=/mongo/tls/automation-agent.pem
+        
+        tlsMMSServerClientCertificatePassword=xxxxxxx
+        ```
+        
+- Restart automation-agent
+    
+    ```bash
+    systemctl restart mongodb-mms-automation-agent
+    ```
+    
+
+### Enable TLS for a Deployment
+
+---
+
+
+>💡 With the Client Certificate Mode setting, you can set if the client must present a TLS certificate to connect to the deployments in your project. If you enable TLS for your project, all deployment must use TLS.
+
+
+
+#### Enable TLS for the project
+
+- Security Tab
+- Authentication & TLS Settings
+- EDIT SETTINGS
+- (Authentication Mechanisms)
+- Specify the TLS Settings
+    - Enable TLS
+    - TLS CA File Path
+    - Client Certificate Mode
+        - OPTIONAL
+            
+            
+            >💡 Every client may present a valid TLS certificate when connecting to MongoDB deployments. MongoDB Agents might use TLS certificates if you don’t set the mongod tlsMode to None.
+            
+            
+            
+        - REQUIRED
+            
+            
+            >💡 Every MongoDB deployment in this project starts with TLS-encrypted network connections. All Agents must use TLS to connect to any MongoDB deployment.
+            
+            
+            
+
+#### Set Existing Deployments to Use TLS
+
+
+>⚠️ If the project have not been enabled that will get an alert as below:
+
+
+
+![img/tls%204.png](img/tls%204.png)
+
+- Modify Processes
+- Expand the Advanced Configuration Options section
+- Set the TLS/SSL startup options
+    - tlsMode
+    - tlsCertificateKeyFile
+    - tlsCertificateKeyFilePassword
+    - tlsFIPSMode(Optional)
+    
+
+### OTHER
+
+---
+
+#### Enable x.509 Authentication
+
+#### Credential Encrypted
+
+#### MongoDB Driver TLS Connection String
+
+### Config MongoDB Java Driver (v3.9)
+
+---
+
+可透過建立 MongoClientURI 實體時指定連線參數 **ssl=true**
+
+```java
+new MongoClientURI("mongodb://localhost/?ssl=true")
+```
+
+或透過建立 MongoClientOptions 實體時設定屬性 **sslEnabled** 為 **true**
+
+```java
+import com.mongodb.MongoClientOptions;
+import com.mongodb.MongoClient;
+
+MongoClientOptions options = MongoClientOptions.builder()
+        .sslEnabled(true)
+        .build();
+MongoClient client = new MongoClient("localhost", options);
+```
+
+使用 JDK keytool command 匯入 CA 憑證並輸出 keystore 檔
+
+```java
+keytool -importcert -trustcacerts -file <path to certificate authority file> -keystore <path to trust store> -storepass <password>
+```
+
+設定 JVM 系統屬性：
+
+- `javax.net.ssl.trustStore`: the path to a trust store containing the certificate of the signing authority
+- `javax.net.ssl.trustStorePassword`: the password to access this trust store
+- `javax.net.ssl.keyStore`: the path to a key store containing the client’s SSL certificates
+- `javax.net.ssl.keyStorePassword`: the password to access this key store
+
+#### Convert Certificate Format To JVM Compatible
+
+CA Certificate
+
+```powershell
+keytool -importcert -trustcacerts -file example-ca-pub.crt -keystore cacert -storepass storepass
+```
+
+Client Certificate
+
+```powershell
+openssl pkcs12 -inkey mongod.key -in mongod.crt -export -out mongod.p12
+
+keytool -importkeystore -srckeystore mongod.p12 -srcstoretype PKCS12 -destkeystore keystore
+```
+
+### FAQ
+
+---
+
+#### Should use the correct SAN(subject alternative name) to establish connection over TLS
+
+- Error between automation-agent and Ops Manager
+    
+    ```bash
+    [root@mongodb-regy-4 mongodb-mms]# curl  https://10.140.0.3:8443
+    curl: (51) Unable to communicate securely with peer: requested domain name does not match the server's certificate.
+    [root@mongodb-regy-4 mongodb-mms]# curl -v  https://10.140.0.3:8443
+    * About to connect() to 10.140.0.3 port 8443 (#0)
+    *   Trying 10.140.0.3...
+    * Connected to 10.140.0.3 (10.140.0.3) port 8443 (#0)
+    * Initializing NSS with certpath: sql:/etc/pki/nssdb
+    *   CAfile: /etc/pki/tls/certs/ca-bundle.crt
+      CApath: none
+    * Server certificate:
+    *       subject: E=regy.chang@omniwaresoft.com.tw,CN=mongom-regy.c.omnilabs-1281.internal,OU=no-sql,O=Omniwaresoft,L=Taipei,ST=TW,C=TW
+    *       start date: May 17 08:47:46 2021 GMT
+    *       expire date: Jun 16 08:47:46 2021 GMT
+    *       common name: mongom-regy.c.omnilabs-1281.internal
+    *       issuer: E=regy.chang@omniwaresoft.com.tw,CN=mongodb-regy-4.c.omnilabs-1281.internal,OU=no-sql,O=Omniwaresoft,L=Taipei,ST=TW,C=TW
+    * NSS error -12276 (SSL_ERROR_BAD_CERT_DOMAIN)
+    * Unable to communicate securely with peer: requested domain name does not match the server's certificate.
+    * Closing connection 0
+    curl: (51) Unable to communicate securely with peer: requested domain name does not match the server's certificate.
+    ```
+    
+
+- Error between automation-agent and MongoDB instances - mongodb.log
+    
+    ```bash
+    2021-05-20T07:59:42.178+0000 I  CONNPOOL [Replication] Connecting to mongodb-regy-4.c.omnilabs-1281.internal:27021
+    2021-05-20T07:59:42.184+0000 E  NETWORK  [Replication] SSL peer certificate validation failed: self signed certificate
+    2021-05-20T07:59:42.188+0000 E  NETWORK  [Replication] SSL peer certificate validation failed: self signed certificate
+    2021-05-20T07:59:42.194+0000 E  NETWORK  [Replication] SSL peer certificate validation failed: self signed certificate
+    2021-05-20T07:59:42.194+0000 I  REPL_HB  [replexec-2] Heartbeat to mongodb-regy-4.c.omnilabs-1281.internal:27021 failed after 2 retries, response status: HostUnreachable: Error connecting to mongodb-regy-4.c.omnilabs-1281.internal:27021 (10.140.0.12:27021) :: caused by :: SSL peer certificate validation failed: self signed certificate
+    2021-05-20T07:59:42.234+0000 I  NETWORK  [listener] connection accepted from 10.140.0.12:60388 #2063 (4 connections now open)
+    2021-05-20T07:59:42.238+0000 E  NETWORK  [conn2063] SSL peer certificate validation failed: self signed certificate
+    2021-05-20T07:59:42.238+0000 I  NETWORK  [conn2063] Error receiving request from client: SSLHandshakeFailed: SSL peer certificate validation failed: self signed certificate. Ending connection from 10.140.0.12:60388 (connection id: 2063)
+    ```
+    
+- Error between automation-agent and MongoDB instances - automation-agent.log
+    
+    ```bash
+    [2021/05/20 12:30:14.170] [.error] [cm/mongoclientservice/mongoclientservice.go:sendClientToRequesters:609] [12:30:14.170] Error getting client ready for conn params = mongodb-regy-4.c.omnilabs-1281.internal:27020 (local=false).  Informing all requests and disposing of client (0x0).  requests=[ 0xc000db5500 ] : [12:30:14.170] Error dialing to connParams=mongodb-regy-4.c.omnilabs-1281.internal:27020 (local=false): tried 3 identities, but none of them worked.  They were (__system@local[[MONGODB-CR/SCRAM-SHA-1 SCRAM-SHA-256]][1024], regy@$external[[MONGODB-X509]][0], )
+    [2021/05/20 12:30:14.170] [.error] [cm/mongoclientservice/mongoclientservice.go:withClientForHelper:403] <hardwareMetricsCollector> [12:30:14.170] Error checking out client (0x0) for connParam=mongodb-regy-4.c.omnilabs-1281.internal:27020 (local=false) connectMode=SingleConnect : [12:30:14.170] Error dialing to connParams=mongodb-regy-4.c.omnilabs-1281.internal:27020 (local=false): tried 3 identities, but none of them worked.  They were (__system@local[[MONGODB-CR/SCRAM-SHA-1 SCRAM-SHA-256]][1024], regy@$external[[MONGODB-X509]][0], )
+    ```
+
+# Backup
+
+## Feature
 
 - 防止人為誤刪資料
 - 時間回朔
 - 法遵監管
 
-### Methods
+## Methods
 
 **File System Snapshot (LVM, Amazon's EBS storage system for EC2)**
 
@@ -447,7 +1069,7 @@ X.509 Certificate-Based Authentication
 **mongodump / mongorestore (BSON)**
 
 
-⛔ MongoDB 4.2 起不能將 mongodump or mongorestore 用來作為備份分片叢集策略，這些工具無法保證跨分片交易的原子性
+>⛔ MongoDB 4.2 起不能將 mongodump or mongorestore 用來作為備份分片叢集策略，這些工具無法保證跨分片交易的原子性
 
 
 
@@ -469,15 +1091,6 @@ X.509 Certificate-Based Authentication
         - At secondary
         - N
     - Filesystem Snapshot
-
-## Auditing
-
-- edit config file (mongod.conf):
-    - auditLog
-        - destination - syslog/file/console
-        - format - JSON/BSON
-        - path
-        - (option)filter
 
 # Indexes
 
@@ -610,9 +1223,9 @@ X.509 Certificate-Based Authentication
 - 非前綴匹配的模糊查詢
 - 全文檢索
 
-# Ref
+# Reference
 
-bash
+```bash
 # mongod.conf
 
 # for documentation of all options, see:
@@ -656,7 +1269,7 @@ net:
 #auditLog:
 
 #snmp:
-
+```
 
 (mongodb replicaset安裝教學影片)
 [https://youtu.be/lTt-pwJ4jvE](https://youtu.be/lTt-pwJ4jvE)
