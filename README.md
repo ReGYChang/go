@@ -14,11 +14,11 @@
 - array, slice
 - pointer, struct, method
 - interface
-- goroutine, channel, buffer, select, mutex
+- [goroutine, channel, buffer, select, mutex](go/go_channel_buffer_select_mutex.md)
 - defer, error, panic, recover
 - [anonymous function, closure](go/anonymouse_closure.md)
 - [higher-order function](go/higher_order_func.md)
-- [Learn Go dependency management tool](go/pkg_tools.md)
+- [learn Go dependency management tool](go/pkg_tools.md)
 - semantic versioning
 - version, scripts, repository and other properties
 
@@ -38,7 +38,7 @@
   - Gin
 ## Network
   - net/http
-  - socket
+  - [socket](network/socket.md)
 ## ORMs
   - Gorm
 ## Database
