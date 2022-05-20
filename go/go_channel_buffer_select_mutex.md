@@ -1,3 +1,13 @@
+- [channel](#channel)
+  - [Introduction](#introduction)
+  - [Unbuffered channel](#unbuffered-channel)
+  - [Buffered channel](#buffered-channel)
+  - [Close channel](#close-channel)
+    - [Check if channel be closed](#check-if-channel-be-closed)
+  - [One-way channel](#one-way-channel)
+    - [One-way channel features](#one-way-channel-features)
+    - [One-way channel as parm in the function](#one-way-channel-as-parm-in-the-function)
+
 # channel
 
 ## Introduction
@@ -212,3 +222,76 @@ func main() {
 - 資料沒發完不應該關閉
 - 已經關閉的 channel 不能再向其寫資料 -> panic
 - 寫端已經關閉 channel 依然可以從中讀取資料, int 默認 0
+
+## One-way channel
+
+```go
+// default channel 是雙向的 -> make(chan type)
+var ch chan int
+ch = make(chan int)
+
+// single-side write channel
+// can not read operation
+var sendCh chan<- int
+sendCh = make(chan<- int)
+
+// single-side read channel
+// can not write operation
+var recvCh <-chan int
+recvCh = make(<-chan int)
+
+// convert
+// 雙向 channel 可以隱式轉換為任意一種單向 channel
+sendCh = ch
+
+// 單向 channel 不能轉換為雙向 channel
+ch = sendCh / recvCh -> error
+
+// call by reference
+```
+
+### One-way channel features
+
+```go
+func main() {
+	// 雙向 channel
+	ch := make(chan int)
+
+	var sendCh chan<- int = ch
+	sendCh<- 789
+    // error
+	//num := <-sendCh
+
+	var recvCh <-chan int = ch
+	num := <-recvCh
+	fmt.Println(num)
+    // error
+    //recvCh<- 789
+
+	// 反向賦值 - error
+	//var ch2 chan int = sendCh
+}
+```
+
+### One-way channel as parm in the function
+```go
+func send(out chan<- int) {
+	out <- 89
+	close(out)
+}
+
+func recv(in <-chan int) {
+	n := <-in
+	fmt.Print("Read int: ", n)
+}
+
+func main() {
+	ch := make(chan int)
+	go func() {
+		// 雙向 channel 轉換為 write channel
+		send(ch)
+	}()
+
+	recv(ch)
+}
+```
