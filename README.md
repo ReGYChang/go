@@ -1,4 +1,4 @@
-<h1 align="center"> Backend Developer in go
+<h1 align="center"> Backend Developer in Go
 
 <p align="center">
   <a href="#Go"><img src="https://img.shields.io/badge/language-Go-blue.svg" alt="Go"></a>
