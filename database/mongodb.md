@@ -53,7 +53,7 @@
   - [Rollback](#rollback)
 - [Document Design Patterns](#document-design-patterns)
 - [No Usage](#no-usage)
-- [Reference](#reference)
+- [Ref](#ref)
 - [Official Tips](#official-tips)
 
 # Introduction
@@ -69,8 +69,6 @@
 | High Scalability  |                             Native Sharding                             | Partition or third-party plugins |
 | Index             | B+Tree、MultiKey、Geospatial、Text Indexes、Hashed Indexes、TTL indexes |                          B+ Tree |
 | Data Volume       |                                 Unlimit                                 |                               TB |
-
-
 
 ## Document-base Feature
 
@@ -99,9 +97,9 @@
 
 # Replica Set
 
-![https://s3-us-west-2.amazonaws.com/secure.notion-static.com/29bd2dac-f37e-4df3-9a2b-ae67fea884af/Untitled.png](https://s3-us-west-2.amazonaws.com/secure.notion-static.com/29bd2dac-f37e-4df3-9a2b-ae67fea884af/Untitled.png)
+![img/Untitled.png](img/Untitled.png)
 
-![https://s3-us-west-2.amazonaws.com/secure.notion-static.com/2c97a6e8-7e12-4b3a-9a11-cbcf2fa5d823/Untitled.png](https://s3-us-west-2.amazonaws.com/secure.notion-static.com/2c97a6e8-7e12-4b3a-9a11-cbcf2fa5d823/Untitled.png)
+![img/Untitled%201.png](img/Untitled%201.png)
 
 ## Feature
 
@@ -133,10 +131,10 @@
 - Does not have a copy of data set and cannot become a primary
 - Participates in elections for primary. An arbiter has exactly 1 election vote
 
-
+<aside>
 ⚠️ Changed in version 3.6: Starting in MongoDB 3.6, arbiters have priority 0. When you upgrade a replica set to MongoDB 3.6, if the existing configuration has an arbiter with priority 1, MongoDB 3.6 reconfigures the arbiter to have priority 0.
 
-
+</aside>
 
 ## How Replica Set Work
 
@@ -169,22 +167,22 @@
 - The replica set can continue to serve read queries if such queries are configured to run on secondaries while the primary is offline
 - Starting in MongoDB 3.6 providing additional built-in handling of automatic failovers and elections:
     - MongoDB 4.2-compatible drivers enable retryable writes by default
-    - MongoDB 4.0 and 3.6-compatible drivers must explicitly enable retryable writes by including **[retryWrites=true](https://docs.mongodb.com/manual/reference/connection-string/#urioption.retryWrites)** in the [connection string](https://docs.mongodb.com/manual/reference/connection-string/#mongodb-uri).
+    - MongoDB 4.0 and 3.6-compatible drivers must explicitly enable retryable writes by including `[retryWrites=true](https://docs.mongodb.com/manual/reference/connection-string/#urioption.retryWrites)` in the [connection string](https://docs.mongodb.com/manual/reference/connection-string/#mongodb-uri).
     
+    <aside>
+    💡 Starting in version 4.4, MongoDB provides [#mirrored reads](https://www.notion.so/MongoDB-1c59d82feff7495384b6582411565283) to pre-warm electable secondary members’ cache with the most recently accessed data. Pre-warming the cache of a secondary can help restore performance more quickly after an election.
     
-    > Starting in version 4.4, MongoDB provides [#mirrored reads](https://www.notion.so/MongoDB-1c59d82feff7495384b6582411565283) to pre-warm electable secondary members’ cache with the most recently accessed data. Pre-warming the cache of a secondary can help restore performance more quickly after an election.
-    
-    
+    </aside>
     
 - MongoDB failover process:
     - [Replica Set Elections](https://docs.mongodb.com/manual/core/replica-set-elections/#replica-set-elections)
     - [Retryable Writes](https://docs.mongodb.com/manual/core/retryable-writes/#retryable-writes)
     - [Rollbacks During Replica Set Failover](https://docs.mongodb.com/manual/core/replica-set-rollbacks/#replica-set-rollback)
         
+        <aside>
+        ⚠️ Rollback is necessary only if the primary had accepted write operations that the secondaries had not successfully replicated before the primary stepped down
         
-    > ⚠️ Rollback is necessary only if the primary had accepted write operations that the secondaries had not successfully replicated before the primary stepped down
-        
-        
+        </aside>
         
     
 
@@ -210,13 +208,13 @@
 
 ## Replica Set Elections
 
-![https://s3-us-west-2.amazonaws.com/secure.notion-static.com/1203e329-bab2-44e4-8526-fc83715f3f26/Untitled.png](https://s3-us-west-2.amazonaws.com/secure.notion-static.com/1203e329-bab2-44e4-8526-fc83715f3f26/Untitled.png)
+![img/Untitled%202.png](img/Untitled%202.png)
 
 Normal startup process:
 
 - 節點初始化為 Startup 狀態, 加載 Replica Set Config 後啟動 Heartbeat, 狀態切換為 Startup2 成為 Follower
-- 節點開始初始化數據同步, 狀態切換為 Recovering, 當數據同步到集群的最小一致性時間戳(**minValid**)後切換到 Secondary
-- 當 Secondary / Follower heartbeat process 發現一定時間後(**electionTimeoutMillis**) , 當前 Replica Set 中沒有 Primary / Leader 時, 會切換為 Secondary / Follower 發起選舉
+- 節點開始初始化數據同步, 狀態切換為 Recovering, 當數據同步到集群的最小一致性時間戳(`minValid`)後切換到 Secondary
+- 當 Secondary / Follower heartbeat process 發現一定時間後(`electionTimeoutMillis`) , 當前 Replica Set 中沒有 Primary / Leader 時, 會切換為 Secondary / Follower 發起選舉
 - 選舉分為兩部分: dry-run election & real election
     - Dry-run Election: Candidate 構造 replSetVoteRequest 命令發送到其他節點, 試探自己能否赢贏得選舉, 這個過程不增加任期, 如果有 primary 收到 replSetVoteRequest 發現任期比自身新，就會開始 stepdown
     - Real Election: Candidate 贏得 dry-run election後, 就會發起正式選舉, 首先增加任期並給自己投票, 然後發起 replSetVoteRequest 命令發送到其他節點, 獲得大多數投票成為 Leader
@@ -230,9 +228,9 @@ Normal startup process:
 Replica sets can trigger an election in response to a variety of events, such as:
 
 - Adding a new node to the replica set,
-- **[initiating a replica set](https://docs.mongodb.com/manual/reference/method/rs.initiate/#rs.initiate)**,
-- performing replica set maintenance using methods such as **[rs.stepDown()](https://docs.mongodb.com/manual/reference/method/rs.stepDown/#rs.stepDown)** or **[rs.reconfig()](https://docs.mongodb.com/manual/reference/method/rs.reconfig/#rs.reconfig)**, and
-- the [secondary](https://docs.mongodb.com/manual/reference/glossary/#term-secondary) members losing connectivity to the primary for more than the configured **[timeout](https://docs.mongodb.com/manual/reference/replica-configuration/#rsconf.settings.electionTimeoutMillis)** (10 seconds by default).
+- `[initiating a replica set](https://docs.mongodb.com/manual/reference/method/rs.initiate/#rs.initiate)`,
+- performing replica set maintenance using methods such as `[rs.stepDown()](https://docs.mongodb.com/manual/reference/method/rs.stepDown/#rs.stepDown)` or `[rs.reconfig()](https://docs.mongodb.com/manual/reference/method/rs.reconfig/#rs.reconfig)`, and
+- the [secondary](https://docs.mongodb.com/manual/reference/glossary/#term-secondary) members losing connectivity to the primary for more than the configured `[timeout](https://docs.mongodb.com/manual/reference/replica-configuration/#rsconf.settings.electionTimeoutMillis)` (10 seconds by default).
 
 > Factors and Conditions that Affect Elections
 > 
@@ -242,24 +240,27 @@ Replica sets can trigger an election in response to a variety of events, such as
     - Ref: [Replica Set Protocol Version](https://docs.mongodb.com/manual/reference/replica-set-protocol-versions/)
 - Heartbeats
     
+    <aside>
+    💡 Replica set members send heartbeats (pings) to each other every two seconds. If a heartbeat does not return within 10 seconds, the other members mark the delinquent member as inaccessible.
     
-    >Replica set members send heartbeats (pings) to each other every two seconds. If a heartbeat does not return within 10 seconds, the other members mark the delinquent member as inaccessible.
+    </aside>
     
-  - Member Priority
-  - Mirrored Reads
-  - Loss of a Data Center
-  - Network Partition
+- Member Priority
+- Mirrored Reads
+- Loss of a Data Center
+- Network Partition
 
 > Voting Members
-- Non-voting (i.e. **[votes](https://docs.mongodb.com/manual/reference/replica-configuration/#rsconf.members[n].votes)** is **0**) members must have **[priority](https://docs.mongodb.com/manual/reference/replica-configuration/#rsconf.members[n].priority)** of 0.
-- Members with **[priority](https://docs.mongodb.com/manual/reference/replica-configuration/#rsconf.members[n].priority)** greater than 0 cannot have 0 **[votes](https://docs.mongodb.com/manual/reference/replica-configuration/#rsconf.members[n].votes)**.
+> 
+- Non-voting (i.e. `[votes](https://docs.mongodb.com/manual/reference/replica-configuration/#rsconf.members[n].votes)` is `0`) members must have `[priority](https://docs.mongodb.com/manual/reference/replica-configuration/#rsconf.members[n].priority)` of 0.
+- Members with `[priority](https://docs.mongodb.com/manual/reference/replica-configuration/#rsconf.members[n].priority)` greater than 0 cannot have 0 `[votes](https://docs.mongodb.com/manual/reference/replica-configuration/#rsconf.members[n].votes)`.
 - Only voting members in the following states are eligible to vote:
-    - **[PRIMARY](https://docs.mongodb.com/manual/reference/replica-states/#replstate.PRIMARY)**
-    - **[SECONDARY](https://docs.mongodb.com/manual/reference/replica-states/#replstate.SECONDARY)**
-    - **[STARTUP2](https://docs.mongodb.com/manual/reference/replica-states/#replstate.STARTUP2)**
-    - **[RECOVERING](https://docs.mongodb.com/manual/reference/replica-states/#replstate.RECOVERING)**
-    - **[ARBITER](https://docs.mongodb.com/manual/reference/replica-states/#replstate.ARBITER)**
-    - **[ROLLBACK](https://docs.mongodb.com/manual/reference/replica-states/#replstate.ROLLBACK)**
+    - `[PRIMARY](https://docs.mongodb.com/manual/reference/replica-states/#replstate.PRIMARY)`
+    - `[SECONDARY](https://docs.mongodb.com/manual/reference/replica-states/#replstate.SECONDARY)`
+    - `[STARTUP2](https://docs.mongodb.com/manual/reference/replica-states/#replstate.STARTUP2)`
+    - `[RECOVERING](https://docs.mongodb.com/manual/reference/replica-states/#replstate.RECOVERING)`
+    - `[ARBITER](https://docs.mongodb.com/manual/reference/replica-states/#replstate.ARBITER)`
+    - `[ROLLBACK](https://docs.mongodb.com/manual/reference/replica-states/#replstate.ROLLBACK)`
 
 > Non-Voting Members
 > 
@@ -283,16 +284,16 @@ Allows read operations on secondary members for the MongoDB connection.
 ## Sharded Cluster
 
 - [shard](https://docs.mongodb.com/manual/core/sharded-cluster-shards/): Each shard contains a subset of the sharded data. Each shard can be deployed as a [replica set](https://docs.mongodb.com/manual/reference/glossary/#term-replica-set).
-- [mongos](https://docs.mongodb.com/manual/core/sharded-cluster-query-router/): The **mongos** acts as a query router, providing an interface between client applications and the sharded cluster. Starting in MongoDB 4.4, **mongos** can support [hedged reads](https://docs.mongodb.com/manual/core/sharded-cluster-query-router/#mongos-hedged-reads) to minimize latencies.
+- [mongos](https://docs.mongodb.com/manual/core/sharded-cluster-query-router/): The `mongos` acts as a query router, providing an interface between client applications and the sharded cluster. Starting in MongoDB 4.4, `mongos` can support [hedged reads](https://docs.mongodb.com/manual/core/sharded-cluster-query-router/#mongos-hedged-reads) to minimize latencies.
 
+<aside>
+💡 Recommend at least 2 node
 
-> Recommend at least 2 node
-
-
+</aside>
 
 - [config servers](https://docs.mongodb.com/manual/core/sharded-cluster-config-servers/): Config servers store metadata and configuration settings for the cluster.
 
-![https://s3-us-west-2.amazonaws.com/secure.notion-static.com/b65a23b1-9bea-435b-99e6-11b131c6d122/Untitled.png](https://s3-us-west-2.amazonaws.com/secure.notion-static.com/b65a23b1-9bea-435b-99e6-11b131c6d122/Untitled.png)
+![img/Untitled%203.png](img/Untitled%203.png)
 
 ---
 
@@ -314,18 +315,20 @@ Allows read operations on secondary members for the MongoDB connection.
 - Default sharding methodology
 - Dividing data into contiguous ranges determined by the shard key values
 
-![https://s3-us-west-2.amazonaws.com/secure.notion-static.com/05c41819-7472-43fd-ad02-730be723425d/Untitled.png](https://s3-us-west-2.amazonaws.com/secure.notion-static.com/05c41819-7472-43fd-ad02-730be723425d/Untitled.png)
+![img/Untitled%204.png](img/Untitled%204.png)
 
 ### Hashed Sharding
 
 - Uses either a single field hashed index or a compound hashed index (New in 4.4) as the shard key to partition data across your cluster
 
-
-> ⚠️ MongoDB hashed indexes truncate floating point numbers to 64-bit integers before hashing. For example, a hashed index would store the same value for a field that held a value of 2.3, 2.2, and 2.9. To prevent collisions, do not use a hashed index for floating point numbers that cannot be reliably converted to 64-bit integers (and then back to floating point). MongoDB hashed indexes do not support floating point values larger than 253.
+<aside>
+⚠️ MongoDB hashed indexes truncate floating point numbers to 64-bit integers before hashing. For example, a hashed index would store the same value for a field that held a value of 2.3, 2.2, and 2.9. To prevent collisions, do not use a hashed index for floating point numbers that cannot be reliably converted to 64-bit integers (and then back to floating point). MongoDB hashed indexes do not support floating point values larger than 253.
 
 To see what the hashed value would be for a key, see convertShardKeyToHashed().
 
-![https://s3-us-west-2.amazonaws.com/secure.notion-static.com/cb071c34-d9f7-41fe-8eba-66325d0cd0ef/Untitled.png](https://s3-us-west-2.amazonaws.com/secure.notion-static.com/cb071c34-d9f7-41fe-8eba-66325d0cd0ef/Untitled.png)
+</aside>
+
+![img/Untitled%205.png](img/Untitled%205.png)
 
 ### Zones / Tag
 
@@ -386,10 +389,10 @@ To see what the hashed value would be for a key, see convertShardKeyToHashed().
 - Security between members of the replica set using Internal Authentication, and
 - Security between connecting clients and the replica set using User Access Controls.
 
+<aside>
+💭 When possible, use a logical DNS hostname instead of an ip address, particularly when configuring replica set members or sharded cluster members. The use of logical DNS hostnames avoids configuration changes due to ip address changes.
 
-> 💭 When possible, use a logical DNS hostname instead of an ip address, particularly when configuring replica set members or sharded cluster members. The use of logical DNS hostnames avoids configuration changes due to ip address changes.
-
-
+</aside>
 
 > Keyfile Security
 > 
@@ -400,7 +403,7 @@ To see what the hashed value would be for a key, see convertShardKeyToHashed().
 > x.509 Certification
 > 
 
-![https://s3-us-west-2.amazonaws.com/secure.notion-static.com/dd299194-6aee-4f05-a04a-7fa3714c9d98/Untitled.png](https://s3-us-west-2.amazonaws.com/secure.notion-static.com/dd299194-6aee-4f05-a04a-7fa3714c9d98/Untitled.png)
+![img/Untitled%206.png](img/Untitled%206.png)
 
 X.509 Certificate-Based Authentication
 
@@ -433,19 +436,19 @@ X.509 Certificate-Based Authentication
 
 **mongodump / mongorestore (BSON)**
 
+<aside>
+⛔ MongoDB 4.2 起不能將 mongodump or mongorestore 用來作為備份分片叢集策略，這些工具無法保證跨分片交易的原子性
 
-> ⛔ MongoDB 4.2 起不能將 mongodump or mongorestore 用來作為備份分片叢集策略，這些工具無法保證跨分片交易的原子性
-
-
+</aside>
 
 **Delayed Replica Set Members**
 
-![https://s3-us-west-2.amazonaws.com/secure.notion-static.com/0a15d6f4-d447-4092-9a20-8bbf10e73119/Untitled.png](https://s3-us-west-2.amazonaws.com/secure.notion-static.com/0a15d6f4-d447-4092-9a20-8bbf10e73119/Untitled.png)
+![img/Untitled%207.png](img/Untitled%207.png)
 
+<aside>
+💡 Safe scope random point status = delayed secondary status + oplog
 
->Safe scope random point status = delayed secondary status + oplog
-
-
+</aside>
 
 - 全量備份 + Oplog
 - 常見全量備份方式:
@@ -503,10 +506,10 @@ X.509 Certificate-Based Authentication
 - storage.wiredTiger.engineConfig.journalCompressor
 - Every 100ms since last sync
 
+<aside>
+⚠️ Starting in MongoDB 4.0, you cannot specify --nojournal option or storage.journal.enabled: false for replica set members that use the WiredTiger storage engine.
 
-> ⚠️ Starting in MongoDB 4.0, you cannot specify --nojournal option or storage.journal.enabled: false for replica set members that use the WiredTiger storage engine.
-
-
+</aside>
 
 ## Compression
 
@@ -577,10 +580,10 @@ X.509 Certificate-Based Authentication
 
 ## Rollback
 
-
+<aside>
 💡 The primary had accepted write operations that the secondaries had not successfully replicated before the primary stepped down
 
-
+</aside>
 
 - Server 開始與另一個 Member 同步，並發現無法在同步來源上找到最新動作
 - 進入 ROLLBACK 狀態開始 ROLLBACK Process
@@ -597,9 +600,9 @@ X.509 Certificate-Based Authentication
 - 非前綴匹配的模糊查詢
 - 全文檢索
 
-# Reference
+# Ref
 
-```
+```bash
 # mongod.conf
 
 # for documentation of all options, see:
