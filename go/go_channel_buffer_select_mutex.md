@@ -66,3 +66,149 @@ Unbuffered channel 是指接收前沒有能力保存任何值的 channel
 block: 由於某種原因資料未到達, 當前 goroutine 持續處於等待狀態直到滿足條件
 
 sync: 在兩個或多個 goroutine 之間保持資料內容一致性
+
+特性：
+- channel capacity = 0, len = 0
+- 需應用在至少 2 個 goroutine, 一個 read 一個 write, 否則會造成 deadlock
+- 讀寫要求同步
+
+```go
+package main
+
+import "fmt"
+
+func main() {
+	// unbuffered channel
+	ch := make(chan int)
+
+	go func() {
+		for i := 0; i < 5; i++ {
+			fmt.Println("goroutine i = ", i)
+			ch <- i
+		}
+	}()
+
+	for i := 0; i < 5; i++ {
+		num := <-ch
+		// io operation -> 較耗時所以 goroutine 又搶到 cpu 並寫入 channel
+		fmt.Println("main read i = ", num)
+	}
+}
+```
+```
+output:
+
+goroutine i =  0
+goroutine i =  1
+main read i =  0
+main read i =  1
+goroutine i =  2
+goroutine i =  3
+main read i =  2
+main read i =  3
+goroutine i =  4
+main read i =  4
+```
+
+## Buffered channel
+特性：
+- channel capacity > 0
+- 緩衝區可以進行資料存儲, 至容量上限則 blocking
+- 具備 async communication 能力, 不需同時操作緩衝區
+
+```go
+package main
+
+import (
+	"fmt"
+	"time"
+)
+
+func main() {
+	// 存滿 3 個 element 之前不會 blocking
+	ch := make(chan int, 3)
+	fmt.Println("len= ", len(ch), "cap= ", cap(ch))
+
+	go func() {
+		for i := 0; i < 8; i++ {
+			ch <- i
+			fmt.Println("goroutine: i= ", i, "len= ", len(ch), "cap= ", cap(ch))
+		}
+	}()
+
+	time.Sleep(time.Second * 3)
+
+	for i := 0; i < 8; i++ {
+		num := <-ch
+		fmt.Println("main read: ", num)
+	}
+}
+```
+
+## Close channel
+- 使用 close(ch) 關閉 channel
+- 讀端可以判斷 channel 是否關閉
+
+```go
+if num, of := <-ch; ok == true {
+    //  channel 關閉 return false, num == nil
+    //  channel 未關閉 return true, num == <-ch
+}
+```
+
+### Check if channel be closed
+ok:
+```go
+package main
+
+import "fmt"
+
+func main() {
+	ch := make(chan int)
+
+	go func() {
+		for i := 0; i < 8; i++ {
+			ch<- i
+		}
+		// write side close channel
+		close(ch)
+	}()
+
+	for {
+		if num, ok := <-ch; ok == true {
+			fmt.Println("Read the data: ", num)
+		} else {
+			break
+		}
+	}
+}
+```
+
+range:
+
+```go
+package main
+
+import "fmt"
+
+func main() {
+	ch := make(chan int)
+
+	go func() {
+		for i := 0; i < 8; i++ {
+			ch<- i
+		}
+		// write side close channel
+		close(ch)
+	}()
+
+	for num := range ch {
+        fmt.Println("Read num: ", num)
+	}
+}
+```
+
+> Summary
+- 資料沒發完不應該關閉
+- 已經關閉的 channel 不能再向其寫資料 -> panic
+- 寫端已經關閉 channel 依然可以從中讀取資料, int 默認 0
