@@ -455,9 +455,9 @@ X.509 Certificate-Based Authentication
 
 ### SSL/TLS Communication
 
-![Untitled](img/tls%201.png)
+![Untitled](img/tls_1.png)
 
-![Untitled](img/tls%202.png)
+![Untitled](img/tls_2.png)
 
 - Authentication (Handshake): Public/Asymmetric Key Encryption Algorithms
 - Key Exchange (Handshake): Public/Asymmetric Key Encryption Algorithms / Key Exchange protocol
@@ -470,7 +470,7 @@ Step 1
 - Client → Client hello to server
 - include cipher suites in SSL session
     
-    ![Untitled](img/tls%203.png)
+    ![Untitled](img/tls_3.png)
     
     1. Transport Layer Protocal: SSL / TLS
     2. Session key exchange algorithms: 其他如 RSA, DH, DHE, 用於決定 client / server 間 handshake 時如何進行身分驗證
@@ -925,7 +925,7 @@ $ mongo --authenticationDatabase "admin" --host mongod:27017 --tls --tlsCAFile /
 
 
 
-![img/tls%204.png](img/tls%204.png)
+![img/tls_4.png](img/tls_4.png)
 
 - Modify Processes
 - Expand the Advanced Configuration Options section
