@@ -1,5 +1,12 @@
-- [channel](#channel)
-  - [Introduction](#introduction)
+- [Goroutine](#goroutine)
+  - [create goroutine](#create-goroutine)
+  - [goroutine features](#goroutine-features)
+  - [runtime package](#runtime-package)
+    - [Gosched](#gosched)
+    - [Goexit](#goexit)
+    - [GOMAXPROCS](#gomaxprocs)
+    - [Other](#other)
+- [Channel](#channel)
   - [Unbuffered channel](#unbuffered-channel)
   - [Buffered channel](#buffered-channel)
   - [Close channel](#close-channel)
@@ -20,9 +27,296 @@
   - [RWMutex](#rwmutex)
   - [sync.Cond](#synccond)
 
-# channel
+# Goroutine
 
-## Introduction
+goroutine 主要被設計用來處理 concurrency, loading 較
+thread 更輕, go 在語言層面實現了 goroutine 之間的 communication
+
+## create goroutine
+
+```go
+package main
+
+import (
+    "fmt"
+    "time"
+)
+
+func foo() {
+    i := 0
+    for true {
+        i++
+        fmt.Println("new goroutine: i = ", i)
+        time.Sleep(time.Second)
+    }
+}
+
+func main() {
+    // create goroutine, start a new task
+    go foo()
+
+    i := 0
+    for true {
+        i++
+        fmt.Println("main goroutine: i = ", i)
+        time.Sleep(time.Second)
+    }
+}
+```
+
+output
+```go
+main goroutine: i =  1
+new goroutine: i =  1
+new goroutine: i =  2
+main goroutine: i =  2
+main goroutine: i =  3
+new goroutine: i =  3
+...
+```
+## goroutine features
+
+main goroutine 退出後, 其他子 goroutine 也會自動退出
+
+```go
+package main
+
+import (
+    "fmt"
+    "time"
+)
+
+func foo() {
+    i := 0
+    for true {
+        i++
+        fmt.Println("new goroutine: i = ", i)
+        time.Sleep(time.Second)
+    }
+}
+
+func main() {
+    // create goroutine, start a new task
+    go foo()
+
+    time.Sleep(time.Second * 3)
+
+    fmt.Println("main goroutine exit")
+}
+```
+
+output
+
+```go
+new goroutine: i =  1
+new goroutine: i =  2
+new goroutine: i =  3
+main goroutine exit
+```
+
+## runtime package
+
+### Gosched
+
+`runtime.Gosched()` 用於讓出當前 goroutine 佔用的 CPU 時間, 並讓出當前 goroutine 執行權限, 由 scheduler 安排其他等待的任務運行, 並在下次再次獲得 CPU 時間時從讓出 CPU 的位置恢復執行
+
+```go
+package main
+
+import (
+    "fmt"
+    "runtime"
+    "time"
+)
+
+func main() {
+    // create goroutine
+    go func(s string) {
+        for i := 0; i < 2; i++ {
+            fmt.Println(s)
+        }
+    }("world")
+
+    for i := 0; i < 2; i++ {
+        runtime.Gosched()
+        fmt.Println("hello")
+    }
+    time.Sleep(time.Second * 3)
+}
+```
+
+output
+
+```go
+world
+world
+hello
+hello
+```
+
+若無 `runtime.Gosched()` 結果如下
+```go
+hello
+hello
+world
+world
+```
+
+>❗️ `runtime.Gosched()` 僅讓出一次 CPU 時間
+
+```go
+package main
+
+import (
+    "fmt"
+    "runtime"
+    "time"
+)
+
+func main() {
+    // create goroutine
+    go func(s string) {
+        for i := 0; i < 2; i++ {
+            fmt.Println(s)
+            time.Sleep(time.Second)
+        }
+    }("world")
+
+    for i := 0; i < 2; i++ {
+        runtime.Gosched()
+        fmt.Println("hello")
+    }
+}
+```
+
+output -> main goroutine 退出後其他 goroutine 也自動結束
+
+```go
+world
+hello
+hello
+```
+
+### Goexit
+
+調用 `runtime.Goexit()` 將立即中止 goroutine 執行, scheduler 確保所有 defer 調用執行
+
+與 `return` 不同在於, `return` 是返回當前函式調用給調用者
+
+```go
+package main
+
+import (
+    "fmt"
+    "runtime"
+    "time"
+)
+
+func main() {
+    go func() {
+        defer fmt.Println("A.defer")
+        func() {
+            defer fmt.Println("B.defer")
+            runtime.Goexit() // terminate this goroutine
+            fmt.Println("B") // no exec
+        }()
+        fmt.Println("A") // no exec
+    }() 
+
+    time.Sleep(time.Second * 3)
+}
+```
+
+output
+
+```
+B.defer
+A.defer
+```
+
+### GOMAXPROCS
+
+調用 `runtime.GOMAXPROCS()` 用來設置 concurrency 計算的 CPU cores 最大值並返回上一次設定值
+
+```go
+package main
+
+import (
+    "fmt"
+    "runtime"
+)
+
+func main() {
+    runtime.GOMAXPROCS(1)  // single core
+
+    for true {
+        go fmt.Print(0)
+        fmt.Print(1)
+    }
+}
+```
+
+output
+
+```go
+111111 ... 1000000 ... 0111 ...
+```
+
+執行 `runtime.GOMAXPROCS(1)` 時最多同時只能由一個 goroutine 被執行, 故會打印很多1. 一段時間後 go sheduler 會將其休眠並喚醒另一個 goroutine, 就開始打印出0. 打印時 goroutine 是被調度到 os thread 上
+
+```go
+package main
+
+import (
+    "fmt"
+    "runtime"
+)
+
+func main() {
+    runtime.GOMAXPROCS(2)
+
+    for true {
+        go fmt.Print(0)
+        fmt.Print(1)
+    }
+}
+```
+
+output
+
+```go
+111111111111111000000000000000111111111111111110000000000000000011111111100000...
+```
+
+### Other
+
+```go
+func GOROOT() string
+```
+
+GOROOT 返回 go root path. 若存在 GOROOT 環境變數則返回; 否則返回創建 go 時的 root path
+
+```go
+func Version() string
+```
+
+返回 go version
+
+```go
+func NumCPU() int
+```
+
+返回 server 邏輯 CPU cores
+
+```go
+func GC()
+```
+
+調用觸發 GC 執行
+
+
+
+# Channel
 
 channel 為 go 中的一種資料類型，主要用來解決 goroutine 的同步問題以及資料共享(message passing)的問題
 
