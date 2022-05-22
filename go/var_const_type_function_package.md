@@ -4,6 +4,7 @@
   - [Literal Constants(unnamed constants)](#literal-constantsunnamed-constants)
   - [iota](#iota)
 - [Type](#type)
+- [Function](#function)
 
 # Variable
 
@@ -318,3 +319,28 @@ func main(){
 - alias
   - `byte` 是 `uint8` alias, 表示 ASCII 中一個字符 (1 byte)
   - `rune` 是 `int32` alias, 表示一個 UTF-8 字符, 處理中文日文或其他特殊字符 (4 bytes)
+
+# Function
+
+function 宣告使用關鍵字 `func`, 可有多個參數及多個返回值. package main 中的 func main() 約定為可執行程式的入口
+
+```go
+func funcName(param1 Type1, param2 Type2, ...) (return1 Type3, ...) {
+    // body
+}
+```
+
+```go
+func add(num1 int, num2 int) int {
+	return num1 + num2
+}
+
+func div(num1 int, num2 int) (int, int) {
+	return num1 / num2, num1 % num2
+}
+func main() {
+	quo, rem := div(100, 17)
+	fmt.Println(quo, rem)     // 5 15
+	fmt.Println(add(100, 17)) // 117
+}
+```
