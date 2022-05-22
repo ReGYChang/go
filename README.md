@@ -1,4 +1,4 @@
-<h1 align="center"> Backend Developer in Go
+<h1 align="center"> :penguin: Backend Developer in Go
 
 <p align="center">
   <a href="#Go"><img src="https://img.shields.io/badge/language-Go-blue.svg" alt="Go"></a>
@@ -6,8 +6,7 @@
   <a href="https://github.com/ReGYChang/LeetCode"><img src="https://img.shields.io/badge/algo-leetcode-brightgreen.svg" alt="leetcode"></a>
 </p>
 
-# :penguin: AGENDA 
-## [Go](go/README.md)
+# [Go](go/README.md)
 - go cmd
 - [var, const, type, function, package](go/var_const_type_function_package.md)
 - [code blocks, scopes](go/code_blocks_scopes.md)
@@ -22,26 +21,26 @@
 - semantic versioning
 - version, scripts, repository and other properties
 
-## SQL fundamentals
-## General Development Skills
+# SQL fundamentals
+# General Development Skills
   - Git
   - HTTP / HTTPS
   - Data Structures and Algorithms
   - Scrum, Kanban or other project strategies
   - Basic Authentication, OAuth, JWT, etc
   - SOLIC, YAGNI, KISS
-## CLI
+# CLI
   - cobra
-## Web Frameworks & Routers
+# Web Frameworks & Routers
   - Echo
   - Fiber
   - Gin
-## Network
+# Network
   - net/http
   - [socket](network/socket.md)
-## ORMs
+# ORMs
   - Gorm
-## Database
+# Database
   - RDB
       - PostgreSQL
   - NoSQL
@@ -49,30 +48,30 @@
       - Redis
   - Search Engines
       - ElasticSearch
-## Caching
+# Caching
   - GCache
   - Distributed Cache
       - Go-Redis
-## Logging
+# Logging
   - Log Frameworks
       - Zap
-## Real-Time Communication
+# Real-Time Communication
   - Melody
   - Centrifugo
-## API Clients
+# API Clients
   - GraphQL
   - REST
-## Testing
+# Testing
   - Unit Testing
       - Mocking
           - GoMock
       - Frameworks
           - Testify
       - Assertion
-## Virtualizaion
+# Virtualizaion
   - [Docker](virtualization/docker.md)
   - Kubernetes
-## Good to Know Libraries
+# Good to Know Libraries
   - Validator
   - Glow
   - GJson
@@ -95,7 +94,7 @@
           - gRPC-gateway
   - Task Scheduling
       - gron
-## Go Patterns
+# Go Patterns
   - Creational
   - Structural
   - Behavioral
