@@ -14,6 +14,11 @@
 - [Select](#select)
   - [select implement fibonacci sequence](#select-implement-fibonacci-sequence)
   - [Timeout](#timeout)
+- [Lock](#lock)
+  - [Deadlock](#deadlock)
+  - [Mutex](#mutex)
+  - [RWMutex](#rwmutex)
+  - [sync.Cond](#synccond)
 
 # channel
 
@@ -545,3 +550,437 @@ func main() {
 	<-q
 }
 ```
+
+# Lock
+
+## Deadlock
+
+Deadlock 指兩個或兩個以上 process 在執行過程中, 由於競爭系統資源或者由於彼此通信而造成 blocking 的現象. 若無外力干預, process 無法繼續執行, 此時稱系統產生 deadlock
+
+單 goroutine deadlock: channel 應至少在兩個以上 goroutine 間操作避免 deadlock
+
+channel 寫端 blocking 造成 deadlock
+```go
+func main() {
+
+	ch := make(chan int)
+	ch <- 789
+
+	num := <-ch
+	fmt.Println("num: ", num)
+}
+```
+
+goroutine channel 訪問順序造成 deadlock: 使用 channel 一端讀(寫)要確保另一端有辦法讀(寫)
+
+channel 讀端 blocking 造成 deadlock
+```go
+func main() {
+
+	ch := make(chan int)
+	num := <-ch
+
+	fmt.Println("num: ", num)
+	
+	go func() {
+		ch <- 789
+	}()
+}
+```
+
+goroutine 間多 channel 交叉訪問造成 deadlock
+
+```go
+func main() {
+
+	ch1 := make(chan int)
+	ch2 := make(chan int)
+	
+	go func() {
+		for  {
+			select {
+			case num := <-ch1:
+				ch2<- num
+			}
+		}
+	}()
+
+	for  {
+		select {
+		case num := <-ch2:
+			ch1<- num
+		}
+	}
+}
+```
+
+>❗️盡可能不要將 Mutex, RWMutex 與 channel 混用 - deadlock
+```go
+var rwMutex sync.RWMutex
+
+func readGo(in <-chan int, i int) {
+	for {
+		// read mode lock
+		rwMutex.RLock()
+
+		num := <-in
+		fmt.Printf("%dth read goroutine, read %d\n", i, num)
+
+		// read mode unlock
+		rwMutex.RUnlock()
+	}
+}
+
+func writeGo(out chan<- int, i int) {
+	for {
+		// generate rand
+		num := rand.Intn(1000)
+
+		// write mode lock
+		rwMutex.Lock()
+
+		out <- num
+		fmt.Printf("%dth write goroutine, write %d\n", i, num)
+
+		time.Sleep(time.Millisecond * 300)
+
+		// write mode lock
+		rwMutex.Unlock()
+	}
+}
+
+func main() {
+	// rand seed
+	rand.Seed(time.Now().UnixNano())
+
+	dataCh := make(chan int)
+	quitCh := make(chan bool)
+
+	for i := 0; i < 5; i++ {
+		go readGo(dataCh, i+1)
+	}
+
+	for i := 0; i < 5; i++ {
+		go writeGo(dataCh, i+1)
+	}
+
+	<-quitCh
+}
+```
+
+
+## Mutex
+
+兩個 goroutine 共能訪問共享資料, 由於 cpu 隨機調度, 需要對共享資料訪問順序加以限定 (sync)
+
+創建 mutex, 訪問共享資料前加鎖, 訪問結束解鎖. 在 A goroutine 加鎖期間 B goroutine 加鎖會失敗而 blocking, 直至 A goroutine 解鎖後 B 才能從 blocking 恢復執行
+
+## RWMutex
+
+Mutex 本質是當 goroutine 訪問時其他 goroutine 無法訪問, 這樣在資源同步上可以避免 race concondition, 但同時也降低了 concurrency performance, 由 Concurrency 變成了 Serializability
+
+但一個不操作資料的 read 操作不存在 race condiction 問題, 所以在需要注意的是修改資料的同步. 真正的互斥應該是 RW, WW 之間, RR 之間是沒有互斥操作的必要
+
+由此衍生出另一種鎖, 即 RWMutex
+
+RWMutex 可以讓多個 read operation concurrecy, 但對於 write operation 完全互斥. 即當一個 goroutine 進行 write operation 時其他 goroutine 不能 read 也不能 write
+
+**讀時共享, 寫時獨佔. write lock piority higher than read lock
+**
+go 中 RWMutex 由 sync.RWMutex 定義, 此類型包含兩對 methods:
+
+> 一組是對 write operation 的鎖定及解鎖, 簡稱『寫鎖定』及『寫解鎖』
+
+```go
+func (*RWMute)Lock()
+func (*RWMute)Unlock()
+```
+
+> 另一組表示對 read operation 的鎖定及解鎖, 簡稱『讀鎖定』及『讀解鎖』
+```go
+func (*RWMute)RLock()
+func (*RWMute)RUnlock()
+```
+
+> RWMutex Implement shared data
+
+```go
+var rwMutex sync.RWMutex
+
+// global variable to shared data
+var globalVal int
+
+func readGo(i int) {
+	for {
+		// read mode lock
+		rwMutex.RLock()
+
+		num := globalVal
+		fmt.Printf("%dth read goroutine, read %d\n", i, num)
+
+		// read mode unlock
+		rwMutex.RUnlock()
+	}
+}
+
+func writeGo(i int) {
+	for {
+		// generate rand
+		num := rand.Intn(1000)
+
+		// write mode lock
+		rwMutex.Lock()
+
+		globalVal = num
+		fmt.Printf("%dth write goroutine, write %d\n", i, num)
+
+		time.Sleep(time.Millisecond * 300)
+
+		// write mode lock
+		rwMutex.Unlock()
+	}
+}
+
+func main() {
+	// rand seed
+	rand.Seed(time.Now().UnixNano())
+
+	quitCh := make(chan bool)
+
+	for i := 0; i < 5; i++ {
+		go readGo(i + 1)
+	}
+
+	for i := 0; i < 5; i++ {
+		go writeGo(i + 1)
+	}
+
+	<-quitCh
+}
+```
+
+## sync.Cond
+
+先來回顧一下之前的生產者消費者模型：
+
+```go
+package main
+
+import (
+    "fmt"
+    "time"
+)
+
+func producer(out chan <- int) {
+    for i:=0; i<5; i++ {
+        fmt.Println("producer, produce: ", i)
+        out <- i
+    }
+    close(out)
+}
+
+func consumer(in <- chan int) {
+    for num := range in {
+        fmt.Println("---consumer, consume: ", num)
+    }
+}
+
+func main() {
+    ch := make(chan int)
+    go producer(ch)
+    go consumer(ch)
+    time.Sleep(5 * time.Second)
+}
+```
+
+之前都是一個生產者和一個消費者，如果是多個生產者和多個消費者的情況呢？
+
+```go
+
+package main
+
+import (
+    "fmt"
+    "math/rand"
+    "time"
+)
+
+func producer(out chan <- int, idx int) {
+    for i:=0; i<10; i++ {
+        num := rand.Intn(800)
+        fmt.Printf("%dth producer, produce: %d\n", idx, num)
+        out <- num
+    }
+}
+
+func consumer(in <- chan int, idx int) {
+    for num := range in {
+        fmt.Printf("---%dth consumer, consume: %d\n", idx, num)
+    }
+}
+
+func main() {
+    ch := make(chan int)
+    rand.Seed(time.Now().UnixNano())
+    for i := 0; i < 5; i++ {
+        go producer(ch, i + 1)
+    }
+    for i := 0; i < 5; i++ {
+        go consumer(ch, i + 1)
+    }
+    time.Sleep(5 * time.Second)
+}
+
+```
+
+Output
+```go
+2th goroutine, Write: 115
+----3th goroutine, Read: 709
+----4th goroutine, Read: 115
+1th goroutine, Write: 709
+3th goroutine, Write: 204
+4th goroutine, Write: 711
+```
+
+如果是按照上面的程式碼寫的話, 就又會出現之前的錯誤. 即通過結果我們可以知道, 當寫入 115 時, 由於創建的是無緩衝的channel, 應該先把這個數讀出來, 然後才可以繼續寫數據, 但是結果顯示, 讀到的是 709, 709 在下面才顯示寫入啊, 怎麼會先讀出來呢? 出現這個情況的問題在於, 當運行到 num := <- in 時, 已經把 709 寫進去了, 但是這個時候還沒有來得及打印, 就失去了CPU, 失去CPU之後, 緩衝區中的數據就會被覆蓋掉, 這時被 115 所覆蓋.
+
+上面已經說過了, 解決這種錯誤有兩種方法: 用鎖或者用條件變量.
+
+這次就用條件變量來解決一下.
+
+首先, 強調一下. 條件變量本身不是鎖!! 但是經常與鎖結合使用!!
+
+還有另外一個問題, 如果消費者比生產者多, 倉庫中就會出現沒有數據的情況. 我們需要不斷的通過循環來判斷倉庫隊列中是否有數據, 這樣會造成 cpu 的浪費. 反之, 如果生產者比較多, 倉庫很容易滿, 滿了就不能繼續添加數據, 也需要循環判斷倉庫滿這一事件, 同樣也會造成 cpu 的浪費.
+
+我們希望當倉庫滿時, 生產者停止生產, 等待消費者消費; 同理, 如果倉庫空了, 我們希望消費者停下來等待生產者生產. 為了達到這個目的, 這裡就引入了條件變量. 需要注意如果倉庫隊列用是不存在以上情況的因為被填滿後就阻塞了或者中沒有數據也會阻塞.
+
+條件變量: 條件變量的作用並不保證在同一時刻僅有一個協程線程訪問某個共享的數據資源, 而是在對應的共享數據的狀態發生變化時, 通知阻塞在某個條件上的協程線程. 條件變量不是鎖, 在並發中不能達到同步的目的, 因此條件變量總是與鎖一塊使用.
+
+例如, 我們上面說的, 如果倉庫隊列滿了, 我們可以使用條件變量讓生產者對應的 goroutine 暫停阻塞, 但是當消費者消費了某個產品後, 倉庫就不再滿了, 應該喚醒發送通知給阻塞的生產者 goroutine 繼續生產產品.
+
+Go標準庫中的 sync.Cond 類型代表了條件變量. 條件變量要與鎖互斥鎖或者讀寫鎖一起使用. 成員變量L代表與條件變量搭配使用的鎖.
+
+```go
+type Cond struct {
+    noCopy noCopy
+    L Locker
+    notify notifyList
+    checker copyChecker
+}
+```
+
+對應的有3個常用的方法, Wait, Signal, Broadcast
+
+1) func (c *Cond) Wait()
+
+該函數的作用可歸納為如下三點:
+
+- 阻塞等待條件變量滿足
+- 釋放已掌握的互斥鎖相當於cond.L.Unlock。注意: 兩步為一個**原子操作**第一步與第二步操作不可再分.
+- 當被喚醒時, Wait() 函數返回時, 解除阻塞並重新獲取互斥鎖. 相當於cond.L.Lock
+
+2) func (c *Cond) Signal()
+
+單發通知, 給一個正等待阻塞在該條件變量上的goroutine線程發送通知.
+
+3) func (c *Cond) Broadcast()
+
+廣播通知, 給正在等待阻塞在該條件變量上的所有goroutine線程發送通知
+
+下面, 我們就用條件變量來寫一個生產者消費者模型.
+
+```go
+
+package main
+
+import (
+    "fmt"
+    "math/rand"
+    "sync"
+    "time"
+)
+
+var cond sync.Cond  // 定義全局變量
+
+func producer2(out chan<- int, idx int) {
+    for {
+        // 先加鎖
+        cond.L.Lock()
+        // 判斷緩衝區是否滿
+        for len(out) == 3 {
+            cond.Wait()
+        }
+        num := rand.Intn(800)
+        out <- num
+        fmt.Printf("%dth producer, produce: %d\n", idx, num)
+        // 訪問公共區結束, 並且打印結束, 解鎖
+        cond.L.Unlock()
+        // 喚醒阻塞在條件變量上的 消費者
+        cond.Signal()
+    }
+}
+
+func consumer2(in <- chan int, idx int) {
+    for {
+        // 先加鎖
+        cond.L.Lock()
+        // 判斷緩衝區是否為 空
+        for len(in) == 0 {
+            cond.Wait()
+        }
+        num := <- in
+        fmt.Printf("---%dth consumer, consume: %d\n", idx, num)
+        // 訪問公共區結束後, 解鎖
+        cond.L.Unlock()
+        // 喚醒阻塞在條件變量上的生產者
+        cond.Signal()
+    }
+}
+
+func main() {
+    // 設置隨機種子數
+    rand.Seed(time.Now().UnixNano())
+
+    ch := make(chan int, 3)
+
+    cond.L = new(sync.Mutex)
+
+    for i := 0; i < 5; i++ {
+        go producer2(ch, i + 1)
+    }
+    for i := 0; i < 5; i++ {
+        go consumer2(ch, i + 1)
+    }
+    time.Sleep(time.Second * 1)
+}
+
+```
+
+1）定義 ch 作為隊列, 生產者產生數據保存至隊列中, 最多存儲3個數據, 消費者從中取出數據模擬消費
+
+2）條件變量要與鎖一起使用, 這裡定義全局條件變量 cond, 它有一個屬性: L Locker, 是一個互斥鎖.
+
+3）開啟5個消費者go程, 開啟5個生產者go程.
+
+4）producer2 生產者, 在該方法中開啟互斥鎖, 保證數據完整性. 並且判斷隊列是否滿, 如果已滿, 調用 cond.Wait() 讓該goroutine阻塞. 當消費者取出數據後執行 cond.Signal(), 會喚醒該goroutine, 繼續產生數據.
+
+5）consumer2 消費者, 同樣開啟互斥鎖, 保證數據完整性. 判斷隊列是否為空, 如果為空, 調用 cond.Wait() 使得當前goroutine阻塞. 當生產者產生數據並添加到隊列, 執行 cond.Signal() 喚醒該goroutine.
+
+條件變量使用流程:
+
+1. 創建條件變量: var cond sync.Cond
+2. 指定條件變量用的鎖: cond.L = new
+2. 給公共區加鎖互斥鎖: cond.L.Lock
+4. 判斷是否到達阻塞條件(緩衝區滿/空) --> for循環判斷
+
+```go 
+for len(ch) == cap(ch) { cond.Wait() }
+或者 for len(ch) == 0 { cond.Wait() }
+
+1) blocking 2)unlock 3)lock
+```
+
+5. 訪問公共區 --> 讀、寫數據、打印
+6. 解鎖條件變量用的鎖: cond.L.Unlock
+7. 喚醒阻塞在條件變量上的對端: cond.Signal cond.Broadcast
