@@ -3,6 +3,17 @@
   - [Nil pointer & Wild pointer](#nil-pointer--wild-pointer)
   - [Pointer variable and Memory storage](#pointer-variable-and-memory-storage)
   - [Function parameter](#function-parameter)
+- [Struct](#struct)
+  - [Class in Go](#class-in-go)
+  - [Struct Declaration](#struct-declaration)
+  - [Recursive struct](#recursive-struct)
+  - [Struct Instantiation](#struct-instantiation)
+  - [Basic struct instance](#basic-struct-instance)
+  - [Create pointer type struct](#create-pointer-type-struct)
+  - [Unaddressable But Can Take Addresses](#unaddressable-but-can-take-addresses)
+  - [Struct Initailization](#struct-initailization)
+    - [field key-value pair](#field-key-value-pair)
+    - [multiple value list](#multiple-value-list)
 
 # Pointer
 
@@ -244,3 +255,242 @@ main  x:  20 y:  10
 - 當運行 `*a, *b = *b, *a` 時, 左邊的 `*a` 表示 `x` 的記憶體地址, 左邊的 `*b` 表示的是 `y` 的記憶體位置; 右邊的 `*b` 表示 `y` 的值, 右邊的 `*a` 表示的是 `x` 的值
 - `main()` 中的 `xy` 被交換
 - `swap()` 釋放 stack frame 也不影響被交換結果
+
+# Struct
+
+Struct 是一種聚合的**資料類型**, 由 0 或多個任意類型的值聚合而成的實體. 每個值為 struct 的屬性
+
+Struct 也是值類型, 可以通過 `new()` 來創建
+
+組成 `struct` 類型的資料稱為 `field`
+- `field` 擁有自己的類型和值
+- `field` 必須 unique
+- `field` 的類型也可以是 struct, 或該 struct 類型
+
+## Class in Go
+
+Go 中沒有 `class` 的概念, 也不支持 `class` 的繼承等物件導向的概念. Go 中 `struct` 與 `class` 都是複合結構體, 但 go 中 `struct` 的 `interface field(Nested interface)` 比物件導向具有更高的擴展性及靈活性
+
+## Struct Declaration
+
+使用關鍵字 `type` 可以將各種基本類型定義為自定義類型. **struct 是一種複合的基本類型**, 通過 `type` 定義為自定義類型後讓 struct 更易於使用
+
+```go
+type structTypeName struct {
+    field1 field1Type
+    field2 field2Type
+    …
+}
+```
+
+- struct type name: 標示自定義 struct 名稱, 同一個 package 下不能重複 namespace
+- field1: 表示 struct field name, struct 中 field name msut unique
+- field1Type: 表示 struct field 的具體類型
+
+```go
+type Student struct{
+    id      int
+    name    string
+    age     int
+    gender  int // 0 表示女生，1 表示男生
+    addr    string
+}
+```
+
+> 這裡 Student 地位等價於 int, byte, bool, string 等類型
+
+## Recursive struct
+
+Struct type 可以通過引用自身來定義. 這在定義 `linked list` 或 `binary tree node` 時特別有用, 此時 node 包含指向相鄰節點的鏈接 (address)
+
+linked list
+```go
+type Node struct {
+    Data float64
+    Next *Node
+}
+```
+
+doubly linked list
+```go
+type Node struct {
+    Pre *Node
+    Data float64
+    Next *Node
+}
+```
+
+binary tree
+```go
+type Tree struct {
+    Left *Tree
+    Data float64
+    Right *Tree
+}
+```
+
+## Struct Instantiation
+
+Struct 定義只是一種記憶體佈局的描述, 只有當 struct 實體化後才會被分配記憶體空間, 因此必須定義 struct 並實體化後才能使用 struct 中的 field
+
+實體化就是根據 struct 定義的 field 創建一份一樣格式的記憶體空間, instance & instance 間的記憶體是完全獨立的
+
+Go 可以通過多種方式實體化 struct, 根據實際選擇不同方式
+
+## Basic struct instance
+
+Struct 本身也是一種類型, 可以像宣告 build-in type 一樣使用 `var` 宣告 struct type
+
+```go
+var structInstance structType
+```
+
+對 Student 進行初始化
+
+```go
+type Student struct{
+    id      int
+    name    string
+    age     int
+    gender  int // 0 表示女生，1 表示男生
+    addr    string
+}
+
+func main() {
+    var stu1 Student
+    stu1.id = 120100
+    stu1.name = "Conan"
+    stu1.age = 18
+    stu1.gender = 1
+    fmt.Println("stu1 = ", stu1)  // stu1 =  {120100 Conan 18 1 }
+}
+```
+
+>❗️未賦值的 `field` 默認為該 field type 零值, `addr = ""`
+
+可以通過 `.` 訪問 struct member variable, 如 `stu1.name`
+
+## Create pointer type struct
+
+Go 中可以使用 `new` 對類型(struct, int, float, string) 進行實體化, struct 在實體化後會形成 **pointer type struct**
+
+使用 `new` 實體化
+```go
+varName := new(type)
+```
+
+Go 可以像訪問一般 struct 一樣使用 `.` 訪問 pointer struct member
+```go
+type Student struct{
+    id      int
+    name    string
+    age     int
+    gender  int // 0 表示女生，1 表示男生
+    addr    string
+}
+
+func main() {
+    stu2 := new(Student)
+    stu2.id = 120101
+    stu2.name = "Kidd"
+    stu2.age = 23
+    stu2.gender = 1
+    fmt.Println("stu2 = ", stu2)  // stu2 =  &{120101 Kidd 23 1 }
+}
+```
+
+>❗️Go 中訪問 struct pointer member variable 可以繼續使用 `.`, 因為 go 在此設計了語法糖, 將 `stu2.name` 形式轉換為 `*stu2.name`. 不然這邊 `stu2` 表示的是儲存 Student 實體指針的的記憶體地址
+
+## Unaddressable But Can Take Addresses
+
+go 中對 struct 進行 `&` 操作時視為對該類型進行一次 `new` 實體化操作. 所有組合字面量都是**不可尋址**的, 但其可以被**取址**
+
+```go
+package main
+
+import "fmt"
+
+func main() {
+	type Book struct {
+		Pages int
+	}
+	var book = Book{} // 變數值 book 是可尋址的
+	p := &book.Pages
+	*p = 123
+	fmt.Println(book) // {123}
+
+	// 下面兩行 compile error，因為 Book{} 是不可尋址的，
+	// 繼而 Book{}.Pages 也是不可尋址的。
+	/*
+	Book{}.Pages = 123
+	p = &Book{}.Pages // <=> p = &(Book{}.Pages)
+	*/
+}
+```
+
+## Struct Initailization
+
+Struct 在實體化時可以直接對成員變數進行初始化, 分兩種形式:
+- field key-value pair
+- multiple value list
+
+### field key-value pair
+
+field key-value pair 的初始化方式較適合選擇性填充 field 教多的 struct
+
+key-value pair 填充是可選的, 不需初始化的 field 可以不填
+
+struct 實體化後 field default value 是 field type 零值, 如 int 0, string "", bool false, pointer nil 等
+
+```
+varName := structTypeName {
+    field1: value1,
+    field2: value2,
+    ...
+}
+```
+
+> ❗️Note
+- field name unique
+- key value 之間以 `:` 分隔, key value pair 之間以 `,` 分隔
+
+```go
+stu4 := Student{
+    id:     120103,
+    name:   "Gin",
+    age:    25,
+    gender: 1,
+    addr:   "unknown",
+}
+fmt.Println("stu4 = ", stu4) // stu4 =  {120103 Gin 25 1 unknown}
+```
+
+### multiple value list
+multiple value list 的初始化方式較適合填充 field 較少的 struct
+
+go 可以在 key-value pair 初始化的基礎上忽略 **"key"** , 使用多個 value 的列表初始化 struct field
+
+```go
+varName := structTypeName {
+    field1Val,
+    field2Val,
+    ...
+}
+```
+
+> ❗️Note
+- 必須初始化 struct 所有 fields
+- 每個初始值的填充順序必須與 field 在 struct 中定義的順序一樣
+- key-value pair 與 value list 初始化型態不能混用
+
+```go
+stu5 := Student{
+    120104,
+    "Kogorou",
+    38,
+    1,
+    "區塊鏈革命",
+}
+fmt.Println("stu5 = ", stu5) // stu5 =  {120104 Kogorou 38 1 區塊鏈革命}
+```
+
