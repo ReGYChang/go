@@ -11,7 +11,7 @@
 - [var, const, type, function, package](go/var_const_type_function_package.md)
 - [code blocks, scopes](go/code_blocks_scopes.md)
 - array, slice
-- [pointer, struct, method](go/pointer_struct_method)
+- [pointer, struct, method](go/pointer_struct_method.md)
 - interface
 - [goroutine, channel, buffer, select, mutex](go/go_channel_buffer_select_mutex.md)
 - defer, error, panic, recover
