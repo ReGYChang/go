@@ -1275,7 +1275,6 @@ net:
 [https://youtu.be/lTt-pwJ4jvE](https://youtu.be/lTt-pwJ4jvE)
 
 (mongodb replicaset版本手動升級影片)
-
 [https://www.youtube.com/watch?v=6cCJU1CQ2iw](https://www.youtube.com/watch?v=6cCJU1CQ2iw)
 
 (mongodb ops manager安裝教學管控現有replicaset集群)

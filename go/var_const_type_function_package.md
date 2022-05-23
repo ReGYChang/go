@@ -280,8 +280,6 @@ func main(){
 }
 ```
 
-
-
 # Type
 
 - int
