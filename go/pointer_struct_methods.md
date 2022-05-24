@@ -19,6 +19,8 @@
   - [Struct comparision](#struct-comparision)
   - [Struct array and slice](#struct-array-and-slice)
   - [Struct as map value](#struct-as-map-value)
+  - [Struct slice as map value](#struct-slice-as-map-value)
+  - [Struct as function parameter](#struct-as-function-parameter)
 
 # Pointer
 
@@ -663,3 +665,72 @@ func main() {
     }
 }
 ```
+
+## Struct slice as map value
+
+struct slice (本質是 slice)
+
+```go
+package main
+
+import "fmt"
+
+type student struct {
+    id    int
+    name  string
+    score int
+}
+
+func main() {
+    m := make(map[int][]student)
+    
+    m[101] = append(m[101], student{1, "conan", 88}, student{2, "kidd", 78})
+    m[102] = append(m[101], student{1, "lan", 98}, student{2, "blame", 66})
+
+    // 101 [{1 conan 88} {2 kidd 78}]
+    // 102 [{1 conan 88} {2 kidd 78} {1 lan 98} {2 blame 66}]
+    for k, v := range m {
+        fmt.Println(k, v)
+    }
+
+    for k, v := range m {
+        for i, data := range v {
+            fmt.Println(k, i, data)
+        }
+    }
+}
+```
+
+## Struct as function parameter
+
+Struct 作為參數傳遞使用 pass by value (parameter & argument 在不同儲存區域)
+
+```go
+package main
+
+import "fmt"
+
+type student struct {
+    id    int
+    name  string
+    score int
+}
+
+func foo(stu student) {
+    stu.name = "lan"
+}
+
+func main() {
+    stu := student{101, "conan", 88}
+    fmt.Println(stu)  // {101 conan 88}
+    foo(stu)
+    fmt.Println(stu)  // {101 conan 88}
+}
+```
+
+go 函數參數傳值時是以 pass by value 的方式進行, 所以函數內部無法修改傳遞給函數的原始資料結構, 修改的指示 copy 後的副本; 若傳遞的原始資料結構很大, 完整複製的開銷不小. **故若條件允許, 應當給需要 struct instance 作為參數的函數傳遞 struct pointer**
+
+>❗️NOTE
+
+- struct slice 作為函數參數是 pass by address
+- struct array 作為函數參數是 pass by value
