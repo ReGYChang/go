@@ -62,40 +62,40 @@
 
 ```go
 func main(){
-		// define server protocal and port number
-		listener, err := net.Listen("tcp","172.0.0.1:8000")
-		if err != nil {
-				fmt.Println("net.Listen err: ", err)
-				return
-		}
+	// define server protocal and port number
+	listener, err := net.Listen("tcp","172.0.0.1:8000")
+	if err != nil {
+			fmt.Println("net.Listen err: ", err)
+			return
+	}
 
-		defer listener.Close()
+	defer listener.Close()
 
-		fmt.Println("waiting client to build connection...")
+	fmt.Println("waiting client to build connection...")
 
-		// blocking connetion requests from client
-		// create connetion successfully and return socket to communication
-		conn, err := listener.Accept()
-		if err != nil {
-				fmt.Println("listener.Accept() err: ", err)
-				return
-		}
+	// blocking connetion requests from client
+	// create connetion successfully and return socket to communication
+	conn, err := listener.Accept()
+	if err != nil {
+			fmt.Println("listener.Accept() err: ", err)
+			return
+	}
 
-		defer conn.Close()
+	defer conn.Close()
 
-		fmt.Println("server and client successfully build connection")
+	fmt.Println("server and client successfully build connection")
 
-		// read client data
-		buf := make([]byte, 4096)
-		n, err := conn.Read(buf)
-		if err != nil {
-				fmt.Println("conn.Read() err: ", err)
-				return
-		}
+	// read client data
+	buf := make([]byte, 4096)
+	n, err := conn.Read(buf)
+	if err != nil {
+			fmt.Println("conn.Read() err: ", err)
+			return
+	}
 
-		conn.Write(buf[:n])
+	conn.Write(buf[:n])
 
-		fmt.Println("server read client data: ",string(buf[:n]))
+	fmt.Println("server read client data: ",string(buf[:n]))
 
 }
 ```
@@ -110,25 +110,25 @@ func main(){
 
 ```go
 func main(){
-		// define server protocal and port number
-		conn, err := net.Dial("tcp","172.0.0.1:8000")
-		if err != nil {
-				fmt.Println("net.Dial err: ", err)
-				return
-		}
+	// define server protocal and port number
+	conn, err := net.Dial("tcp","172.0.0.1:8000")
+	if err != nil {
+			fmt.Println("net.Dial err: ", err)
+			return
+	}
 
-		defer conn.Close()
+	defer conn.Close()
 
-		conn.Write([]byte("Are you Ready?"))
+	conn.Write([]byte("Are you Ready?"))
 
-		buf := make([]byte,4096)
-		n, err := conn.Read(buf)
-		if err != nil {
-				fmt.Println("conn.Read() err: ", err)
-				return
-		}
+	buf := make([]byte,4096)
+	n, err := conn.Read(buf)
+	if err != nil {
+			fmt.Println("conn.Read() err: ", err)
+			return
+	}
 
-		fmt.Println("server response data: ", string(buf[:n]))
+	fmt.Println("server response data: ", string(buf[:n]))
 
 }
 ```
@@ -149,70 +149,70 @@ func main(){
 
 ```go
 func HandlerConnect(conn net.Conn){
-		defer conn.Close()
+	defer conn.Close()
 
-		// get remote client address
-		addr := conn.RemoteAddr()
-		fmt.Println(addr,"build connection successfully")
+	// get remote client address
+	addr := conn.RemoteAddr()
+	fmt.Println(addr,"build connection successfully")
 
-		// loop read client data
-		buf := make([]byte,4096)
-		for {
-				n,err := conn.Read(buf)
-				if n == 0 || "exit\n" == string(buf[:n]){
-						fmt.Println("client connection closed!")
-						return
-				}
-				if err != nil {
-						fmt.Println("conn.Read() err: ", err)
-						return
-				}
+	// loop read client data
+	buf := make([]byte,4096)
+	for {
+			n,err := conn.Read(buf)
+			if n == 0 || "exit\n" == string(buf[:n]){
+					fmt.Println("client connection closed!")
+					return
+			}
+			if err != nil {
+					fmt.Println("conn.Read() err: ", err)
+					return
+			}
 
-				// use data
-				fmt.Println("Server read data successfully: ",string(buf[:n]))
+			// use data
+			fmt.Println("Server read data successfully: ",string(buf[:n]))
 
-				// toupper and response
-				conn.Write([]byte(strings.ToUpper(string(buf[:n]))))
-		}
+			// toupper and response
+			conn.Write([]byte(strings.ToUpper(string(buf[:n]))))
+	}
 }
 
 func main(){
-		// define server protocal and port number
-		listener, err := net.Listen("tcp","172.0.0.1:8000")
-		if err != nil {
-				fmt.Println("net.Listen err: ", err)
-				return
-		}
+	// define server protocal and port number
+	listener, err := net.Listen("tcp","172.0.0.1:8000")
+	if err != nil {
+			fmt.Println("net.Listen err: ", err)
+			return
+	}
 
-		defer listener.Close()
+	defer listener.Close()
 
-		// blocking connetion requests from client
-		// create connetion successfully and return socket to communication
-		for {
-				fmt.Println("waiting client to build connection...")
+	// blocking connetion requests from client
+	// create connetion successfully and return socket to communication
+	for {
+			fmt.Println("waiting client to build connection...")
 
-				conn, err := listener.Accept()
-				if err != nil {
-						fmt.Println("listener.Accept() err: ", err)
-						return
-				}
-				// 具體完成 server 及 client 資料通訊請求
-				go HandlerConnect(conn)
-		}
+			conn, err := listener.Accept()
+			if err != nil {
+					fmt.Println("listener.Accept() err: ", err)
+					return
+			}
+			// 具體完成 server 及 client 資料通訊請求
+			go HandlerConnect(conn)
+	}
 
-		fmt.Println("server and client successfully build connection")
+	fmt.Println("server and client successfully build connection")
 
-		// read client data
-		buf := make([]byte, 4096)
-		n, err := conn.Read(buf)
-		if err != nil {
-				fmt.Println("conn.Read() err: ", err)
-				return
-		}
+	// read client data
+	buf := make([]byte, 4096)
+	n, err := conn.Read(buf)
+	if err != nil {
+			fmt.Println("conn.Read() err: ", err)
+			return
+	}
 
-		conn.Write(buf[:n])
+	conn.Write(buf[:n])
 
-		fmt.Println("server read client data: ",string(buf[:n]))
+	fmt.Println("server read client data: ",string(buf[:n]))
 
 }
 ```
@@ -223,52 +223,52 @@ func main(){
 
 ```go
 func main(){
-		// define server protocal and port number
-		conn, err := net.Dial("tcp","172.0.0.1:8000")
-		if err != nil {
-				fmt.Println("net.Dial err: ", err)
-				return
-		}
+	// define server protocal and port number
+	conn, err := net.Dial("tcp","172.0.0.1:8000")
+	if err != nil {
+			fmt.Println("net.Dial err: ", err)
+			return
+	}
 
-		defer conn.Close()
+	defer conn.Close()
 
-		// 獲取 user 鍵盤輸入(stdin)，將輸入資料送給 server
-		go func() {
-				str := make([]byte, 4096)
-				for {
-						n, err := os.Stdin.Read(str)
-						if err != nil {
-								fmt.Println("os.Stdin.Read err: ", err)
-								continue
-						}
-						// 寫給 server
-						conn.Write(str[:n])
-				}
-		}()
+	// 獲取 user 鍵盤輸入(stdin)，將輸入資料送給 server
+	go func() {
+			str := make([]byte, 4096)
+			for {
+					n, err := os.Stdin.Read(str)
+					if err != nil {
+							fmt.Println("os.Stdin.Read err: ", err)
+							continue
+					}
+					// 寫給 server
+					conn.Write(str[:n])
+			}
+	}()
 
-		// 顯示 server response data
-		buf := make([]byte, 4096)
-		for {
-				n, err := conn.Read(buf)
-				if err != nil {
-						fmt.Println("conn.Read err: ", err)
-						return
-				}
-				fmt.Println("client read server response: ", string(buf[:n]))
-		}
+	// 顯示 server response data
+	buf := make([]byte, 4096)
+	for {
+			n, err := conn.Read(buf)
+			if err != nil {
+					fmt.Println("conn.Read err: ", err)
+					return
+			}
+			fmt.Println("client read server response: ", string(buf[:n]))
+	}
 
-		buf := make([]byte,4096)
-		n, err := conn.Read(buf)
-		if n == 0 {
-				fmt.Println("server connection closed!")
-				return
-		}
-		if err != nil {
-				fmt.Println("conn.Read() err: ", err)
-				return
-		}
+	buf := make([]byte,4096)
+	n, err := conn.Read(buf)
+	if n == 0 {
+			fmt.Println("server connection closed!")
+			return
+	}
+	if err != nil {
+			fmt.Println("conn.Read() err: ", err)
+			return
+	}
 
-		fmt.Println("server response data: ", string(buf[:n]))
+	fmt.Println("server response data: ", string(buf[:n]))
 
 }
 ```

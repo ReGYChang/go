@@ -14,6 +14,11 @@
   - [Struct Initailization](#struct-initailization)
     - [field key-value pair](#field-key-value-pair)
     - [multiple value list](#multiple-value-list)
+    - [Initalize anonymouse struct](#initalize-anonymouse-struct)
+  - [Struct assignment](#struct-assignment)
+  - [Struct comparision](#struct-comparision)
+  - [Struct array and slice](#struct-array-and-slice)
+  - [Struct as map value](#struct-as-map-value)
 
 # Pointer
 
@@ -494,3 +499,167 @@ stu5 := Student{
 fmt.Println("stu5 = ", stu5) // stu5 =  {120104 Kogorou 38 1 區塊鏈革命}
 ```
 
+### Initalize anonymouse struct
+
+Anonymouse struct 沒有類型名稱, 不需透過 `type` 關鍵字定義就可以直接使用
+
+```go
+package main
+
+import (
+    "fmt"
+)
+
+func main() {
+    var user struct{name string; age int}
+    user.name = "Conan"
+    user.age = 18
+    fmt.Println("user = ", user)  // user =  {Conan 18}
+}
+```
+
+## Struct assignment
+
+當使用 `=` 對 struct 賦值時, 更改一個 struct field 值不會影響其他值
+
+```go
+package main
+
+import (
+    "fmt"
+)
+
+type Student struct {
+    id     int
+    name   string
+    age    int
+    gender int // 0 表示女生，1 表示男生
+    addr   string
+}
+
+func main() {
+    var stu1 Student
+    stu1.id = 120100
+    stu1.name = "Conan"
+    stu1.age = 18
+    stu1.gender = 1
+
+    stu6 := stu1
+    fmt.Println("stu1 = ", stu1) // stu1 =  {120100 Conan 18 1 }
+    fmt.Println("stu6 = ", stu6) // stu6 =  {120100 Conan 18 1 }
+
+    stu6.name = "柯南"
+    fmt.Println("stu1 = ", stu1) // stu1 =  {120100 Conan 18 1 }
+    fmt.Println("stu6 = ", stu6) // stu6 =  {120100 柯南 18 1 }
+}
+```
+
+## Struct comparision
+
+若 struct 全部成員都是可比較的, sturct 也可以比較; 若 struct 中存在不可比較的成員變數如 slice, map 等, 那麼 struct 則無法比較. 如果用 `==`, `!=` 進行判斷程式會直接抱錯, 可以用 `DeepEqual` 來進行深度比較
+
+```go
+type Student struct {
+    id   int
+    name string
+}
+
+func main() {
+    var stu1 Student
+    stu1.id = 120100
+    stu1.name = "keke"
+
+    stu6 := stu1
+    stu6.name = "顆顆"
+
+    fmt.Println(stu1.id == stu6.id && stu1.name == stu6.name) // "false"
+    fmt.Println(stu1 == stu6)                                 // "false"
+}
+```
+
+## Struct array and slice
+
+假設要用 struct 儲存多個學生資料, 可以定義 struct array 來儲存並通過 loop 方式循環輸出
+
+```go
+package main
+
+import "fmt"
+
+type student struct {
+    id   int
+    name string
+    score  int
+}
+
+func main() {
+    // struct array
+    students := [3]student{
+        {101, "conan", 88},
+        {102, "kidd", 78},
+        {103, "lan", 98},
+    }
+    // print each element in struct array
+    for index, stu := range students {
+        fmt.Println(index, stu.name)
+    }
+}
+```
+
+>用 struct slice 同理
+
+## Struct as map value
+
+```go
+package main
+
+import "fmt"
+
+type student struct {
+    id    int
+    name  string
+    score int
+}
+
+func main() {
+    // 結構體陣列
+    students := [3]student{
+        {101, "conan", 88},
+        {102, "kidd", 78},
+        {103, "lan", 98},
+    }
+    // 輸出結構體陣列每一項
+    for index, stu := range students {
+        fmt.Println(index, stu.name)
+    }
+    fmt.Println(students)
+    // 計算以上學生成績總分
+    sum := students[0].score
+    for i, stuLen := 1, len(students); i < stuLen; i++ {
+        sum += students[i].score
+    }
+    fmt.Println("總分是：", sum)
+
+    // 輸出以上學生成績最高分
+    maxScore := students[0].score
+    for i, stuLen := 1, len(students); i < stuLen; i++ {
+        if maxScore < students[i].score {
+            maxScore = students[i].score
+        }
+    }
+    fmt.Println("最高分是：", maxScore)
+}
+
+func main() {
+    // define map
+    m := make(map[int]student)
+    m[101] = student{101, "conan", 88}
+    m[102] = student{102, "kidd", 78}
+    m[103] = student{103, "lan", 98}
+    fmt.Println(m) // map[101:{101 conan 88} 102:{102 kidd 78} 103:{103 lan 98}]
+
+    for k, v := range m {
+        fmt.Println(k, v)
+    }
+}
+```
