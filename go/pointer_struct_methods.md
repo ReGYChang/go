@@ -21,6 +21,11 @@
   - [Struct as map value](#struct-as-map-value)
   - [Struct slice as map value](#struct-slice-as-map-value)
   - [Struct as function parameter](#struct-as-function-parameter)
+- [Method](#method)
+  - [Unnamed Types](#unnamed-types)
+- [Interface](#interface)
+  - [Nil Interface](#nil-interface)
+  - [Embedding Interface](#embedding-interface)
 
 # Pointer
 
@@ -734,3 +739,308 @@ go 函數參數傳值時是以 pass by value 的方式進行, 所以函數內部
 
 - struct slice 作為函數參數是 pass by address
 - struct array 作為函數參數是 pass by value
+
+# Method
+
+go 中同時有 function 和 method. Method 就是一個包含 receiver 的函數, receiver 可以是 build-in type 或 struct type 的一個值或 pointer. 所有定義類型的 method 屬於該類型的方法集
+
+定義一個新類型 Interger, 它和 int 一樣, 只是為它 build-in int type 增加了新的 method Less()
+
+```go
+type Integer int 
+
+func (a Integer) Less(b Integer) bool {
+    return a < b 
+}
+
+func main() {
+    var a Integer = 1 
+
+    if a.Less(2) {
+        fmt.Println("less then 2")
+    }   
+}
+```
+
+> 可以看出 go 在自定義類型的物件中沒有 C++/Java 那種隱藏的 this pointer, 而是在定義成員方法時顯式宣告了其所屬的物件
+
+method 語法如下：
+
+```go
+func (r ReceiverType) funcName(parameters) (results)
+```
+
+當調用 method 時, 會將 receiver 作為函數的第一個參數：
+```go
+funcName(r, parameters);
+```
+
+所以 receiver 是值類型還是指針類型要看 method 的作用. 若要修改物件的值, 就需要傳遞物件的 pointer. Pointer 作為 receiver 會對實體物件內容產生操作, 而普通類型作為 receiver 僅僅是以副本進行操作, 不會對 argument object 產生操作
+
+```go
+func (a *Ingeger) Add(b Integer) {
+    *a += b
+}
+
+func main() {
+    var a Integer = 1 
+    a.Add(3)
+    fmt.Println("a =", a)     //  a = 4
+}
+```
+
+若 Add method 不使用 pointer, 則 `a` 返回結果不變, **因為 go 函數參數也是基於 pass by value**
+
+Go 沒有構造函數的概念, 通常使用一個全域函數完成：
+
+```go
+func NewRect(x, y, width, height float64) *Rect {
+    return &Rect{x, y, width, height}
+}   
+
+func main() {
+    rect1 := NewRect(1,2,10,20)
+    fmt.Println(rect1.width)
+}
+```
+
+## Unnamed Types
+
+go 中實現繼承採用組合的語法, 稱其為匿名組合
+
+```go
+type Base struct {
+    name string
+}
+
+func (base *Base) Set(myname string) {
+    base.name = myname
+}
+
+func (base *Base) Get() string {
+    return base.name
+}
+
+type Derived struct {
+    Base
+    age int 
+}
+
+func (derived *Derived) Get() (nm string, ag int) {
+    return derived.name, derived.age
+}
+
+
+func main() {
+    b := &Derived{}
+
+    b.Set("sina")
+    fmt.Println(b.Get())
+}
+```
+
+Base type 定義了 `Get()`, `Set()` 兩個 methods, 而 Derived type 繼承了 Base type 並 `overwrite` `Set()` method. 當 Derived object 調用 `Set()` 會 loading Base type 對應的 method; 而調用 `Get()` method 會加載 `overwrite` 後的 `Set()`
+
+當組合類型和被組合類型包含同名的成員時會如何？
+
+```go
+type Base struct {
+    name string
+    age int
+}
+
+func (base *Base) Set(myname string, myage int) {
+    base.name = myname
+    base.age = myage
+}
+
+type Derived struct {
+    Base
+    name string
+}
+
+func main() {
+    b := &Derived{}
+
+    b.Set("sina", 30)
+    fmt.Println("b.name =",b.name, "\tb.Base.name =", b.Base.name)
+    fmt.Println("b.age =",b.age, "\tb.Base.age =", b.Base.age)
+}
+
+//b.name =        b.Base.name = sina
+//b.age = 30      b.Base.age = 30
+
+```
+
+# Interface
+
+Interface 是一組抽象方法集合(未實現方法/僅包含方法名參數返回值的方法), 如果 implement interface 中所有 methods, 即該類型物件實現了此 interface
+
+interface 定義語法：
+
+```go
+type interfaceName interface {  
+    //methods 
+}  
+```
+
+```go
+package main
+
+import "fmt"
+
+type Human struct {
+    name string
+    age int
+    phone string
+}
+
+type Student struct {
+    Human //anonymous field
+    school string
+    loan float32
+}
+
+type Employee struct {
+    Human //anonymous field
+    company string
+    money float32
+}
+
+//Human implement SayHi method
+func (h Human) SayHi() {
+    fmt.Printf("Hi, I am %s you can call me on %s\n", h.name, h.phone)
+}
+
+//Human implement SayHi method
+func (h Human) Sing(lyrics string) {
+    fmt.Println("La la la la...", lyrics)
+}
+
+//Employee overwrite Human SayHi method
+func (e Employee) SayHi() {
+    fmt.Printf("Hi, I am %s, I work at %s. Call me on %s\n", e.name,
+        e.company, e.phone)
+    }
+
+// Interface Men 被 Human,Student和Employee implement
+// 因為這三個 struct 都 implement 下面兩個 methods
+type Men interface {
+    SayHi()
+    Sing(lyrics string)
+}
+
+func main() {
+    mike := Student{Human{"Mike", 25, "222-222-XXX"}, "MIT", 0.00}
+    paul := Student{Human{"Paul", 26, "111-222-XXX"}, "Harvard", 100}
+    sam := Employee{Human{"Sam", 36, "444-222-XXX"}, "Golang Inc.", 1000}
+    tom := Employee{Human{"Tom", 37, "222-444-XXX"}, "Things Ltd.", 5000}
+
+    //定義 Men type 的變數 i
+    var i Men
+
+    //i 能承載 Student
+    i = mike
+    fmt.Println("This is Mike, a Student:")
+    i.SayHi()
+    i.Sing("November rain")
+
+    //i 也能承載 Employee
+    i = tom
+    fmt.Println("This is tom, an Employee:")
+    i.SayHi()
+    i.Sing("Born to be wild")
+
+    //宣告 slice Men
+    fmt.Println("Let's use a slice of Men and see what happens")
+    x := make([]Men, 3)
+    //三個不同 type element 都 implement Men interface
+    x[0], x[1], x[2] = paul, sam, mike
+
+    for _, value := range x{
+        value.SayHi()
+    }
+}
+```
+
+## Nil Interface
+
+Nil interface (interface{}) 不包含任何 method, 所有的類型都實現了 nil interface. Nil interface 在需要承載任意類型的值時相當有用, 類似 C 中的 `void*`
+
+```go
+// define a nil interface
+var a interface{}
+var i int = 5
+s := "Hello world"
+// a 可以承載任意類型值
+a = i
+a = s
+```
+
+那如何知道這個 interface 變數實際保存了哪種類型的物件？目前常用的兩種方法：
+- switch
+- Comma-ok
+
+Switch check
+```go
+type Element interface{}
+type List [] Element
+
+type Person struct {
+    name string
+    age int 
+}
+
+//print
+func (p Person) String() string {
+    return "(name: " + p.name + " - age: "+strconv.Itoa(p.age)+ " years)"
+}
+
+func main() {
+    list := make(List, 3)
+    list[0] = 1 //an int 
+    list[1] = "Hello" //a string
+    list[2] = Person{"Dennis", 70} 
+
+    for index, element := range list{
+        switch value := element.(type) {
+            case int:
+                fmt.Printf("list[%d] is an int and its value is %d\n", index, value)
+            case string:
+                fmt.Printf("list[%d] is a string and its value is %s\n", index, value)
+            case Person:
+                fmt.Printf("list[%d] is a Person and its value is %s\n", index, value)
+            default:
+                fmt.Println("list[%d] is of a different type", index)
+        }   
+    }   
+}
+```
+
+Comma-ok check
+
+```go
+func main() {
+    list := make(List, 3)
+    list[0] = 1 // an int
+    list[1] = "Hello" // a string
+    list[2] = Person{"Dennis", 70}
+
+    for index, element := range list {
+        if value, ok := element.(int); ok {
+            fmt.Printf("list[%d] is an int and its value is %d\n", index, value)
+        } else if value, ok := element.(string); ok {
+            fmt.Printf("list[%d] is a string and its value is %s\n", index, value)
+        } else if value, ok := element.(Person); ok {
+            fmt.Printf("list[%d] is a Person and its value is %s\n", index, value)
+        } else {
+            fmt.Printf("list[%d] is of a different type\n", index)
+        }
+    }
+}
+```
+
+## Embedding Interface
+
+如同 struct type 可以包含一個 anonymouse field, interface 也可以嵌套在另一個 interface 中. 若一個 interface1 作為 interface2 的一個 embedding field, 那麼 interface2 隱式包含 interface1 裡面的 method
+
