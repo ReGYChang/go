@@ -25,6 +25,7 @@
   - [Unnamed Types](#unnamed-types)
 - [Interface](#interface)
   - [Nil Interface](#nil-interface)
+  - [Interface Implement Open Closed Principle](#interface-implement-open-closed-principle)
   - [Embedding Interface](#embedding-interface)
 
 # Pointer
@@ -281,7 +282,9 @@ Struct 也是值類型, 可以通過 `new()` 來創建
 
 ## Class in Go
 
-Go 中沒有 `class` 的概念, 也不支持 `class` 的繼承等物件導向的概念. Go 中 `struct` 與 `class` 都是複合結構體, 但 go 中 `struct` 的 `interface field(Nested interface)` 比物件導向具有更高的擴展性及靈活性
+Go 中沒有 `class` 的概念, 也不支持 `class` 的繼承等物件導向的概念.
+
+Go 中 `struct` 與 `class` 都是複合結構體, 但 go 中 `struct` 的 `interface field(Nested interface)` 比物件導向具有更高的擴展性及靈活性
 
 ## Struct Declaration
 
@@ -415,7 +418,9 @@ func main() {
 
 ## Unaddressable But Can Take Addresses
 
-go 中對 struct 進行 `&` 操作時視為對該類型進行一次 `new` 實體化操作. 所有組合字面量都是**不可尋址**的, 但其可以被**取址**
+go 中對 struct 進行 `&` 操作時視為對該類型進行一次 `new` 實體化操作.
+
+所有組合字面量都是**不可尋址**的, 但其可以被**取址**
 
 ```go
 package main
@@ -563,7 +568,9 @@ func main() {
 
 ## Struct comparision
 
-若 struct 全部成員都是可比較的, sturct 也可以比較; 若 struct 中存在不可比較的成員變數如 slice, map 等, 那麼 struct 則無法比較. 如果用 `==`, `!=` 進行判斷程式會直接抱錯, 可以用 `DeepEqual` 來進行深度比較
+若 struct 全部成員都是可比較的, sturct 也可以比較; 若 struct 中存在不可比較的成員變數如 slice, map 等, 那麼 struct 則無法比較.
+
+如果用 `==`, `!=` 進行判斷程式會直接抱錯, 可以用 `DeepEqual` 來進行深度比較
 
 ```go
 type Student struct {
@@ -733,7 +740,9 @@ func main() {
 }
 ```
 
-go 函數參數傳值時是以 pass by value 的方式進行, 所以函數內部無法修改傳遞給函數的原始資料結構, 修改的指示 copy 後的副本; 若傳遞的原始資料結構很大, 完整複製的開銷不小. **故若條件允許, 應當給需要 struct instance 作為參數的函數傳遞 struct pointer**
+go 函數參數傳值時是以 pass by value 的方式進行, 所以函數內部無法修改傳遞給函數的原始資料結構, 修改的指示 copy 後的副本; 若傳遞的原始資料結構很大, 完整複製的開銷不小.
+
+**故若條件允許, 應當給需要 struct instance 作為參數的函數傳遞 struct pointer**
 
 >❗️NOTE
 
@@ -742,7 +751,11 @@ go 函數參數傳值時是以 pass by value 的方式進行, 所以函數內部
 
 # Method
 
-go 中同時有 function 和 method. Method 就是一個包含 receiver 的函數, receiver 可以是 build-in type 或 struct type 的一個值或 pointer. 所有定義類型的 method 屬於該類型的方法集
+go 中同時有 function 和 method.
+
+Method 就是一個包含 receiver 的函數, receiver 可以是 build-in type 或 struct type 的一個值或 pointer.
+
+所有定義類型的 method 屬於該類型的方法集
 
 定義一個新類型 Interger, 它和 int 一樣, 只是為它 build-in int type 增加了新的 method Less()
 
@@ -771,11 +784,14 @@ func (r ReceiverType) funcName(parameters) (results)
 ```
 
 當調用 method 時, 會將 receiver 作為函數的第一個參數：
+
 ```go
 funcName(r, parameters);
 ```
 
-所以 receiver 是值類型還是指針類型要看 method 的作用. 若要修改物件的值, 就需要傳遞物件的 pointer. Pointer 作為 receiver 會對實體物件內容產生操作, 而普通類型作為 receiver 僅僅是以副本進行操作, 不會對 argument object 產生操作
+所以 receiver 是值類型還是指針類型要看 method 的作用. 若要修改物件的值, 就需要傳遞物件的 pointer.
+
+Pointer 作為 receiver 會對實體物件內容產生操作, 而普通類型作為 receiver 僅僅是以副本進行操作, 不會對 argument object 產生操作
 
 ```go
 func (a *Ingeger) Add(b Integer) {
@@ -839,7 +855,9 @@ func main() {
 }
 ```
 
-Base type 定義了 `Get()`, `Set()` 兩個 methods, 而 Derived type 繼承了 Base type 並 `overwrite` `Set()` method. 當 Derived object 調用 `Set()` 會 loading Base type 對應的 method; 而調用 `Get()` method 會加載 `overwrite` 後的 `Set()`
+Base type 定義了 `Get()`, `Set()` 兩個 methods, 而 Derived type 繼承了 Base type 並 `overwrite` `Set()` method.
+
+當 Derived object 調用 `Set()` 會 loading Base type 對應的 method; 而調用 `Get()` method 會加載 `overwrite` 後的 `Set()`
 
 當組合類型和被組合類型包含同名的成員時會如何？
 
@@ -965,7 +983,9 @@ func main() {
 
 ## Nil Interface
 
-Nil interface (interface{}) 不包含任何 method, 所有的類型都實現了 nil interface. Nil interface 在需要承載任意類型的值時相當有用, 類似 C 中的 `void*`
+Nil interface (interface{}) 不包含任何 method, 所有的類型都實現了 nil interface. 
+
+Nil interface 在需要承載任意類型的值時相當有用, 類似 C 中的 `void*`
 
 ```go
 // define a nil interface
@@ -1040,7 +1060,126 @@ func main() {
 }
 ```
 
+## Interface Implement Open Closed Principle
+
+OCP 描述軟體實體(類型, 模組, 函數等)應該是可擴展但不能被修改的
+
+```go
+package main
+
+import (  
+    "fmt"
+)
+
+type SalaryCalculator interface {  
+    CalculateSalary() int
+}
+
+type Permanent struct {  
+    empId    int
+    basicpay int
+    pf       int
+}
+
+type Contract struct {  
+    empId  int
+    basicpay int
+}
+
+//salary of permanent employee is sum of basic pay and pf
+func (p Permanent) CalculateSalary() int {  
+    return p.basicpay + p.pf
+}
+
+//salary of contract employee is the basic pay alone
+func (c Contract) CalculateSalary() int {  
+    return c.basicpay
+}
+
+/*
+total expense is calculated by iterating though the SalaryCalculator slice and summing  
+the salaries of the individual employees  
+*/
+func totalExpense(s []SalaryCalculator) {  
+    expense := 0
+    for _, v := range s {
+        expense = expense + v.CalculateSalary()
+    }
+    fmt.Printf("Total Expense Per Month $%d", expense)
+}
+
+func main() {  
+    pemp1 := Permanent{1, 5000, 20}
+    pemp2 := Permanent{2, 6000, 30}
+    cemp1 := Contract{3, 3000}
+    employees := []SalaryCalculator{pemp1, pemp2, cemp1}
+    totalExpense(employees)
+
+}
+```
+
+`SalaryCalculator` interface 的設計使得 `totalExpense` 可以擴展新的員工類型而不需要修改任何程式碼.
+
+若公司新增了一種員工類型 `Freelancer` 且有著不同的薪資結構, `Freelancer` 只需傳遞到 `totalExpense` slice parameter, 不需要修改 `totalExpense` method 本身.
+
+只要 `Freelancer` 也實現 `SalaryCalculator` interface 即可實現
+
 ## Embedding Interface
 
-如同 struct type 可以包含一個 anonymouse field, interface 也可以嵌套在另一個 interface 中. 若一個 interface1 作為 interface2 的一個 embedding field, 那麼 interface2 隱式包含 interface1 裡面的 method
+Go 中沒有提供繼承機制, 但可以通過 embedding interface 來創建一個新 interface 實現
 
+```go
+package main
+
+import (  
+    "fmt"
+)
+
+type SalaryCalculator interface {  
+    DisplaySalary()
+}
+
+type LeaveCalculator interface {  
+    CalculateLeavesLeft() int
+}
+
+type EmployeeOperations interface {  
+    SalaryCalculator
+    LeaveCalculator
+}
+
+type Employee struct {  
+    firstName string
+    lastName string
+    basicPay int
+    pf int
+    totalLeaves int
+    leavesTaken int
+}
+
+func (e Employee) DisplaySalary() {  
+    fmt.Printf("%s %s has salary $%d", e.firstName, e.lastName, (e.basicPay + e.pf))
+}
+
+func (e Employee) CalculateLeavesLeft() int {  
+    return e.totalLeaves - e.leavesTaken
+}
+
+func main() {  
+    e := Employee {
+        firstName: "Naveen",
+        lastName: "Ramanathan",
+        basicPay: 5000,
+        pf: 200,
+        totalLeaves: 30,
+        leavesTaken: 5,
+    }
+    var empOp EmployeeOperations = e
+    empOp.DisplaySalary()
+    fmt.Println("\nLeaves left =", empOp.CalculateLeavesLeft())
+}
+```
+
+創建新 interface `EmployeeOperations` 並嵌套兩個 interface: `SalaryCalculator` & `LeaveCalculator`.
+
+如果一個類型定義了 `SalaryCalculator` 及 `LeaveCalculator` interface 中的 method, 就稱該類型實現了 `EmployeeOperations` interface
