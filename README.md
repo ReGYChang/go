@@ -10,7 +10,7 @@
 - go cmd
 - [var, const, type, function, package](go/var_const_type_function_package.md)
 - [code blocks, scopes](go/code_blocks_scopes.md)
-- array, slice, map
+- [array, slice, map](go/array_slice_map.md)
 - [pointer, struct, method](go/pointer_struct_methods.md)
 - [interface](go/interface.md)
 - [goroutine, channel, buffer, select, mutex](go/go_channel_buffer_select_mutex.md)
