@@ -13,6 +13,9 @@
   - [Passing Slice as Function Parameter](#passing-slice-as-function-parameter)
   - [Multi Dimensional Slice](#multi-dimensional-slice)
   - [Memory Optimization](#memory-optimization)
+  - [Comparison Slice in Go](#comparison-slice-in-go)
+    - [Reflect](#reflect)
+    - [For range Comparison](#for-range-comparison)
 - [Map](#map)
   - [Create Map](#create-map)
   - [Append Element to Map](#append-element-to-map)
@@ -692,6 +695,56 @@ func main() {
 `neededCountries := countries[:len(countries)-2` 創建一個去掉尾部兩個元素的 slice `countries` 並將 `neededCountries` 複製到 `countriesCpy` 再返回
 
 而 `countries` array 可以被 GC, 因為 `neededCountries` 不再被引用
+
+## Comparison Slice in Go
+
+當需要比較兩個 slice 包含的元素是否完全相等時, 一般有兩種方法:
+- `reflect`
+- `for range` 遍歷比較
+
+### Reflect
+
+```go
+func StringSliceReflectEqual(a, b []string) bool {
+    return reflect.DeepEqual(a, b)
+}
+```
+
+直接使用 `reflect` 的 `reflect.DeepEqual` 來比較 `a` 和 `b` 是否相等
+
+### For range Comparison
+
+```go
+func StringSliceEqual(a, b []string) bool {
+    if len(a) != len(b) {
+        return false
+    }
+
+    if (a == nil) != (b == nil) {
+        return false
+    }
+
+    for i, v := range a {
+        if v != b[i] {
+            return false
+        }
+    }
+
+    return true
+}
+```
+
+先比較長度是否相等, 在比較兩個 slice 是否都為 `nil` 或都不為 `nil`, 最後比較對應 index 元素是否相等
+
+>❗️NOTE
+
+```go
+if (a == nil) != (b == nil) {
+    return false
+}
+```
+
+這段程式碼作用是與 `reflect.DeepEqual` 結果保持一致: `[]int{} != []int(nil)`
 
 # Map
 
