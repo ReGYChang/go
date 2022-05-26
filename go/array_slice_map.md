@@ -13,6 +13,14 @@
   - [Passing Slice as Function Parameter](#passing-slice-as-function-parameter)
   - [Multi Dimensional Slice](#multi-dimensional-slice)
   - [Memory Optimization](#memory-optimization)
+- [Map](#map)
+  - [Create Map](#create-map)
+  - [Append Element to Map](#append-element-to-map)
+  - [Get Element from Map](#get-element-from-map)
+  - [Delete Element from Map](#delete-element-from-map)
+  - [Get Length of Map](#get-length-of-map)
+  - [Map is a Reference Type](#map-is-a-reference-type)
+  - [Comparing Map in Go](#comparing-map-in-go)
 
 # Array
 
@@ -684,3 +692,318 @@ func main() {
 `neededCountries := countries[:len(countries)-2` 創建一個去掉尾部兩個元素的 slice `countries` 並將 `neededCountries` 複製到 `countriesCpy` 再返回
 
 而 `countries` array 可以被 GC, 因為 `neededCountries` 不再被引用
+
+# Map
+
+map 是在 Go 中將 value & key 關聯的 build-in type, 通過相印的 key 獲取 value
+
+## Create Map
+
+通過 `make` 函數傳入 key & value 的類型可以創建 map
+
+`make(map[type of key]type of value)` 
+
+```go
+personSalary := make(map[string]int)
+```
+
+使用 `make` 創建名為 `personSalary` 的 map, 其中 key 是 string type, value 是 int type
+
+map 零值是 `nil`, 若想添加元素到 nil map 中會觸發 runtime `panic`, 因此 map 必須使用 `make` 函數初始化
+
+```go
+package main
+
+import (
+    "fmt"
+)
+
+func main() {  
+    var personSalary map[string]int
+    if personSalary == nil {
+        fmt.Println("map is nil. Going to make one.")
+        personSalary = make(map[string]int)
+    }
+}
+```
+
+`personSalry` 是 `nil`, 因此需使用 `make` 初始化
+
+## Append Element to Map
+
+新增元素到 map 的語法與 array 相同：
+
+```go
+package main
+
+import (
+    "fmt"
+)
+
+func main() {
+    personSalary := make(map[string]int)
+    personSalary["steve"] = 12000
+    personSalary["jamie"] = 15000
+    personSalary["mike"] = 9000
+    fmt.Println("personSalary map contents:", personSalary)
+    // personSalary map contents: map[steve:12000 jamie:15000 mike:9000]
+}
+```
+
+也可以在宣告的時候初始化 map
+
+```go
+package main
+
+import (  
+    "fmt"
+)
+
+func main() {  
+    personSalary := map[string]int {
+        "steve": 12000,
+        "jamie": 15000,
+    }
+    personSalary["mike"] = 9000
+    fmt.Println("personSalary map contents:", personSalary)
+    // personSalary map contents: map[steve:12000 jamie:15000 mike:9000]
+}
+```
+
+## Get Element from Map
+
+從 map 獲取元素的語法為 `map[key]`
+
+```go
+package main
+
+import (
+    "fmt"
+)
+
+func main() {
+    personSalary := map[string]int{
+        "steve": 12000,
+        "jamie": 15000,
+    }
+    personSalary["mike"] = 9000
+    employee := "jamie"
+    fmt.Println("Salary of", employee, "is", personSalary[employee])
+    // Salary of jamie is 15000
+}
+```
+
+如果獲取一個不存在的元素 map 會返回該元素的零值
+
+```go
+package main
+
+import (  
+    "fmt"
+)
+
+func main() {
+    personSalary := map[string]int{
+        "steve": 12000,
+        "jamie": 15000,
+    }
+    personSalary["mike"] = 9000
+    employee := "jamie"
+    fmt.Println("Salary of", employee, "is", personSalary[employee])
+    //Salary of jamie is 15000
+    fmt.Println("Salary of joe is", personSalary["joe"])
+    //Salary of joe is 0
+
+}
+```
+
+若要確認 map 中存不存在這個 key, 可以使用 comma-ok 斷言:
+
+```go
+value, ok := map[key]
+```
+
+若 `ok` 為 true 則表示 key 存在; 反之則表示不存在
+
+```go
+package main
+
+import (
+    "fmt"
+)
+
+func main() {
+    personSalary := map[string]int{
+        "steve": 12000,
+        "jamie": 15000,
+    }
+    personSalary["mike"] = 9000
+    newEmp := "joe"
+    value, ok := personSalary[newEmp]
+    if ok == true {
+        fmt.Println("Salary of", newEmp, "is", value)
+    } else {
+        fmt.Println(newEmp,"not found")
+    }
+    // joe not found
+}
+```
+
+遍歷 map 中所有元素需要用 `for range`:
+
+```go
+package main
+
+import (
+    "fmt"
+)
+
+func main() {
+    personSalary := map[string]int{
+        "steve": 12000,
+        "jamie": 15000,
+    }
+    personSalary["mike"] = 9000
+    fmt.Println("All items of a map")
+    for key, value := range personSalary {
+        fmt.Printf("personSalary[%s] = %d\n", key, value)
+    }
+
+}
+```
+
+output:
+
+```go
+All items of a map
+personSalary[mike] = 9000
+personSalary[steve] = 12000
+personSalary[jamie] = 15000
+```
+
+>❗️當使用 `for range` 遍歷 map 時不保證每次執行程式獲取的元素順序都相同
+
+## Delete Element from Map
+
+刪除 `map` 中的 key 語法為 `delete(map, key)`, 這個函數沒有返回值
+
+```go
+package main
+
+import (  
+    "fmt"
+)
+
+func main() {  
+    personSalary := map[string]int{
+        "steve": 12000,
+        "jamie": 15000,
+    }
+    personSalary["mike"] = 9000
+    fmt.Println("map before deletion", personSalary)
+    delete(personSalary, "steve")
+    fmt.Println("map after deletion", personSalary)
+
+}
+```
+
+output:
+
+```go
+map before deletion map[steve:12000 jamie:15000 mike:9000]
+map after deletion map[mike:9000 jamie:15000]
+```
+
+## Get Length of Map
+
+與 array 相同, 使用 `len` 函數獲取 map 長度
+
+```go
+package main
+
+import (
+    "fmt"
+)
+
+func main() {
+    personSalary := map[string]int{
+        "steve": 12000,
+        "jamie": 15000,
+    }
+    personSalary["mike"] = 9000
+    fmt.Println("length is", len(personSalary))
+    // length is 3
+}
+```
+
+## Map is a Reference Type
+
+與 slice 類似, map 也是引用類型
+
+當 map 被賦值為一個新變數時, 它們指向同一個內部資料結構
+
+因此改變其中一個變數就會影響到另一個變數
+
+```go
+package main
+
+import (
+    "fmt"
+)
+
+func main() {
+    personSalary := map[string]int{
+        "steve": 12000,
+        "jamie": 15000,
+    }
+    personSalary["mike"] = 9000
+    fmt.Println("Original person salary", personSalary)
+    newPersonSalary := personSalary
+    newPersonSalary["mike"] = 18000
+    fmt.Println("Person salary changed", personSalary)
+
+}
+```
+
+`personSalary` 被賦值給 `newPersonSalary`, `newPersonSalary` 中 `mike` 新資料成了 `18000`, 而 `personSalar` 中 `mike` 薪資也變成 `18000`
+
+output:
+
+```go
+Original person salary map[steve:12000 jamie:15000 mike:9000]
+Person salary changed map[steve:12000 jamie:15000 mike:18000]
+```
+
+當 map 作為函數參數傳遞時也是一樣, 函數中對 map 任何修改對於外部調用都是可見的
+
+## Comparing Map in Go
+
+map 之間不能使用 `==` 操作符判斷, `==` 只能用來檢查 map 是否為 `nil`
+
+```go
+package main
+
+func main() {
+    map1 := map[string]int{
+        "one": 1,
+        "two": 2,
+    }
+
+    map2 := map1
+
+    if map1 == map2 {
+    }
+}
+```
+
+上述程式拋出 compile error **invalid operation: map1 == map2 (map can only be compared to nil)**
+
+> 判斷兩個 map 是否相同的方法是遍歷兩個 map 的每個元素
+
+
+
+
+
+
+
+
