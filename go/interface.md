@@ -54,7 +54,7 @@ func (e Employee) SayHi() {
         e.company, e.phone)
     }
 
-// Interface Men 被 Human,Student和Employee implement
+// Interface Men 被 Human,Student 和 Employee implement
 // 因為這三個 struct 都 implement 下面兩個 methods
 type Men interface {
     SayHi()
