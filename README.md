@@ -14,7 +14,7 @@
 - [pointer, struct, method](go/pointer_struct_methods.md)
 - [interface](go/interface.md)
 - [goroutine, channel, buffer, select, mutex](go/go_channel_buffer_select_mutex.md)
-- defer, error, panic, recover
+- [defer, error, panic, recover](go/defer_error_panic_recover.md)
 - [anonymous function, closure](go/anonymouse_closure.md)
 - [higher-order function](go/higher_order_func.md)
 - [learn Go dependency management tool](go/pkg_tools.md)
