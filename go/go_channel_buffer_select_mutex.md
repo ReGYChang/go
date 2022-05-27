@@ -1,31 +1,32 @@
 - [Goroutine](#goroutine)
-  - [create goroutine](#create-goroutine)
-  - [goroutine features](#goroutine-features)
-  - [runtime package](#runtime-package)
-    - [Gosched](#gosched)
-    - [Goexit](#goexit)
-    - [GOMAXPROCS](#gomaxprocs)
-    - [Other](#other)
+	- [create goroutine](#create-goroutine)
+	- [goroutine features](#goroutine-features)
+	- [runtime package](#runtime-package)
+		- [Gosched](#gosched)
+		- [Goexit](#goexit)
+		- [GOMAXPROCS](#gomaxprocs)
+		- [Other](#other)
 - [Channel](#channel)
-  - [Unbuffered channel](#unbuffered-channel)
-  - [Buffered channel](#buffered-channel)
-  - [Close channel](#close-channel)
-    - [Check if channel be closed](#check-if-channel-be-closed)
-  - [One-way channel](#one-way-channel)
-    - [One-way channel features](#one-way-channel-features)
-    - [One-way channel as parm in the function](#one-way-channel-as-parm-in-the-function)
-  - [Timer](#timer)
-    - [三種定時器方法](#三種定時器方法)
-    - [Ticker](#ticker)
+	- [Unbuffered channel](#unbuffered-channel)
+	- [Buffered channel](#buffered-channel)
+		- [WaitGroup](#waitgroup)
+		- [Worker Pool](#worker-pool)
+	- [Close channel](#close-channel)
+		- [Check if channel be closed](#check-if-channel-be-closed)
+	- [One-way channel](#one-way-channel)
+		- [One-way channel features](#one-way-channel-features)
+		- [One-way channel as parm in the function](#one-way-channel-as-parm-in-the-function)
+	- [Timer](#timer)
+		- [Ticker](#ticker)
 - [Producer and consumer](#producer-and-consumer)
 - [Select](#select)
-  - [select implement fibonacci sequence](#select-implement-fibonacci-sequence)
-  - [Timeout](#timeout)
+	- [select implement fibonacci sequence](#select-implement-fibonacci-sequence)
+	- [Timeout](#timeout)
 - [Lock](#lock)
-  - [Deadlock](#deadlock)
-  - [Mutex](#mutex)
-  - [RWMutex](#rwmutex)
-  - [sync.Cond](#synccond)
+	- [Deadlock](#deadlock)
+	- [Mutex](#mutex)
+	- [RWMutex](#rwmutex)
+	- [sync.Cond](#synccond)
 
 # Goroutine
 
@@ -461,6 +462,298 @@ func main() {
 }
 ```
 
+### WaitGroup
+
+`WaitGroup` 用於實現 Worker Pools, 等待一批 goroutine 執行結束, 結束前程式控制會一直 blocking, 直到這些 goroutine 全部執行完畢
+
+```go
+package main
+
+import (  
+    "fmt"
+    "sync"
+    "time"
+)
+
+func process(i int, wg *sync.WaitGroup) {  
+    fmt.Println("started Goroutine ", i)
+    time.Sleep(2 * time.Second)
+    fmt.Printf("Goroutine %d ended\n", i)
+    wg.Done()
+}
+
+func main() {  
+    no := 3
+    var wg sync.WaitGroup
+    for i := 0; i < no; i++ {
+        wg.Add(1)
+        go process(i, &wg)
+    }
+    wg.Wait()
+    fmt.Println("All go routines finished executing")
+}
+```
+
+[WaitGroup](https://golang.org/pkg/sync/#WaitGroup) 是一個 struct 類型, 使用計數器來工作
+
+當調用 `WaitGroup` 的 `Add` 傳遞一個 `int` 時, `WaitGroup` 的計數器會加上 `Add` 的 parm 
+
+要減少計數器可以調用 `WaitGroup` 的 `Done()` 方法, `Wait()` 方法會 blocking 調用它的 goroutine, 直到計數器變為 0 後才會停止 blocking
+
+> 傳遞 `&wg` 非常重要, 若沒有傳遞 `&wg` 那麼每個 goroutine 都會得到一個 `WaitGroup` 的值拷貝, 因而當他們執行結束時 `main` 函數會持續 blocking
+
+### Worker Pool
+
+Buffered channel 重要應用之一就是實現 [Worker Pool](https://en.wikipedia.org/wiki/Thread_pool)
+
+一般來說 `Worker Pool` 就是一組等待任務分配的 threads, 一旦完成了所分配的任務, 這些 threads 可以繼續等待任務的分配
+
+>Worker pool 的任務是計算所輸入每個數字的每一位和
+
+Worker Pool 核心功能如下:
+- 創建一個 goroutine pool, 監聽一個等待工作分配的輸入型 buffered channel
+- 將工作添加到該 buffered channel
+- 工作完成後再將結果寫入一個輸出型 buffered channel
+- 從輸出型 buffered channel 讀取並打印結果
+
+首先是創建一個 struct, 表示工作及結果
+
+```go
+type Job struct {  
+    id       int
+    randomno int
+}
+type Result struct {  
+    job         Job
+    sumofdigits int
+}
+```
+
+所有 `Job` Struct 變數都會有 `id` 及 `randomno` 兩個 field, `randomno` 用於計算每位數之和
+
+而 `Result` struct 有一個 `job` field, 表示所對應的工作, 還有一個 `sumofdigits` field, 表示計算的結果(每位數字和)
+
+再來分別創建用於接收工作和寫入結果的 buffered channel
+
+```go
+var jobs = make(chan Job, 10)  
+var results = make(chan Result, 10)
+```
+
+Worker goroutine 會監聽 buffered channel `jobs` 中更新的工作,  一旦 worker goroutine 完成工作其結果會寫入 buffered channel `results`
+
+如下, `digits` 函數的任務實際上就是計算整數的每一位之和, 最後返回該結果
+
+為了模擬出 `digits` 在計算過程中花費了一段時間, 在函數中添加了兩秒的睡眠時間
+
+```go
+func digits(number int) int {  
+    sum := 0
+    no := number
+    for no != 0 {
+        digit := no % 10
+        sum += digit
+        no /= 10
+    }
+    time.Sleep(2 * time.Second)
+    return sum
+}
+```
+
+再寫一個創建工作 goroutine 的函數:
+
+```go
+func worker(wg *sync.WaitGroup) {  
+    for job := range jobs {
+        output := Result{job, digits(job.randomno)}
+        results <- output
+    }
+    wg.Done()
+}
+```
+
+上述函數創建了一個 worker 來讀取 `jobs` 的資料, 根據當前的 `job` 和 `degits` 函數的返回值創建一個 `Result` struct 變數並將結果寫進 `results` buffered channel
+
+`worker` 函數接收了一個 `WaitGroup` 類型的 `wg` 作爲參數, 當所有 `jobs` 完成時調用 `Done()` 方法
+
+`createWorkerPool`  函數創建了一個 goroutine 的 worker pool
+
+```go
+func createWorkerPool(noOfWorkers int) {  
+    var wg sync.WaitGroup
+    for i := 0; i < noOfWorkers; i++ {
+        wg.Add(1)
+        go worker(&wg)
+    }
+    wg.Wait()
+    close(results)
+}
+```
+
+上述函數的參數是需要創建的 worker goroutine 的數量, 在創建 goroutine 之前調用了 `wg.Add(1)` 方法, 於是 `WaitGroup` 計數器遞增
+
+接著創建 worker goroutine 並向 `worker` 函數傳遞 `&wg`
+
+創建完需要的 worker goroutine 後函數調用 `wg.Wait()` 等待所有的 goroutine 執行完畢, 當所有 goroutine 執行完畢後函數會關閉 `results` channel
+
+再寫一個函數把工作分配給 worker:
+
+```go
+func allocate(noOfJobs int) {  
+    for i := 0; i < noOfJobs; i++ {
+        randomno := rand.Intn(999)
+        job := Job{i, randomno}
+        jobs <- job
+    }
+    close(jobs)
+}
+```
+
+上述 `allocate` 函數接收創建的工作數量作為輸入參數, 生成了最大值為 998 的偽隨機數, 並使用該隨機數創建了 `Job` struct 變數
+
+這個函數把 for loop 的計數器 `i` 作為 id, 最後把創建的 struct 變數寫入 `jobs` buffered channel
+
+當寫入所有的 `job` 時關閉 `jobs` buffered channel
+
+再來是創建一個函數來讀取 `results` channel和打印輸出
+
+```go
+func result(done chan bool) {  
+    for result := range results {
+        fmt.Printf("Job id %d, input random no %d , sum of digits %d\n", result.job.id, result.job.randomno, result.sumofdigits)
+    }
+    done <- true
+}
+```
+
+`result` 函數讀取 `results` channel 並打印出 `job` 的 `id`, 輸入的隨機數, 該隨機數的每位數之和
+
+`result` 函數也接受 `done` channel 作為參數, 當打印完所有結果時 `done` 會被寫入 true
+
+最後在 `main()` 函數中調用所有函數
+
+```go
+func main() {  
+    startTime := time.Now()
+    noOfJobs := 100
+
+    go allocate(noOfJobs)
+
+    done := make(chan bool)
+
+    go result(done)
+
+    noOfWorkers := 10
+
+    createWorkerPool(noOfWorkers)
+
+    <-done
+
+    endTime := time.Now()
+    diff := endTime.Sub(startTime)
+
+    fmt.Println("total time taken ", diff.Seconds(), "seconds")
+}
+```
+
+- 通過 `endTime` 和 `startTime` 差值顯示程式運行時間
+- 將 `noOfJobs` 設為 100, 並調用 `allocate` 向 `jobs` channel 新增工作
+- 創建 `done` channel 並傳遞給 `result` goroutine, 其會開始打印結果並在結束時發出通知
+- 通過調用 `createWorkerPool` 函數會創建一個有 10 個 goroutine 的 worker pool, `main` 函數會監聽 `done` channel 通知等待所有結果打印結束
+
+overall:
+
+```go
+package main
+
+import (  
+    "fmt"
+    "math/rand"
+    "sync"
+    "time"
+)
+
+type Job struct {  
+    id       int
+    randomno int
+}
+type Result struct {  
+    job         Job
+    sumofdigits int
+}
+
+var jobs = make(chan Job, 10)  
+var results = make(chan Result, 10)
+
+func digits(number int) int {  
+    sum := 0
+    no := number
+    for no != 0 {
+        digit := no % 10
+        sum += digit
+        no /= 10
+    }
+    time.Sleep(2 * time.Second)
+    return sum
+}
+func worker(wg *sync.WaitGroup) {  
+    for job := range jobs {
+        output := Result{job, digits(job.randomno)}
+        results <- output
+    }
+    wg.Done()
+}
+func createWorkerPool(noOfWorkers int) {  
+    var wg sync.WaitGroup
+    for i := 0; i < noOfWorkers; i++ {
+        wg.Add(1)
+        go worker(&wg)
+    }
+    wg.Wait()
+    close(results)
+}
+func allocate(noOfJobs int) {  
+    for i := 0; i < noOfJobs; i++ {
+        randomno := rand.Intn(999)
+        job := Job{i, randomno}
+        jobs <- job
+    }
+    close(jobs)
+}
+func result(done chan bool) {  
+    for result := range results {
+        fmt.Printf("Job id %d, input random no %d , sum of digits %d\n", result.job.id, result.job.randomno, result.sumofdigits)
+    }
+    done <- true
+}
+func main() {  
+    startTime := time.Now()
+    noOfJobs := 100
+    go allocate(noOfJobs)
+    done := make(chan bool)
+    go result(done)
+    noOfWorkers := 10
+    createWorkerPool(noOfWorkers)
+    <-done
+    endTime := time.Now()
+    diff := endTime.Sub(startTime)
+    fmt.Println("total time taken ", diff.Seconds(), "seconds")
+}
+```
+
+output:
+
+```go
+Job id 1, input random no 636, sum of digits 15  
+Job id 0, input random no 878, sum of digits 23  
+Job id 9, input random no 150, sum of digits 6  
+...
+total time taken  20.01081009 seconds
+```
+
+隨著 worker goroutine 數量增加, 完成工作的總時間會減少, 可以透過 `main()` 函數修改 `noOfJobs` 和 `noOfWorkers` 值測試
+
+
 ## Close channel
 - 使用 close(ch) 關閉 channel
 - 讀端可以判斷 channel 是否關閉
@@ -615,7 +908,6 @@ type Timer struct {
 
 其提供一個 channel, 在設定時間到達前沒有資料寫入 timer.C 會一直 blocking 直到設定時間到, 系統會自動向 timer.C 這個 channel 中寫入當前時間, blocking 即被解除
 
-### 三種定時器方法
 ```go
 func main() {
 
