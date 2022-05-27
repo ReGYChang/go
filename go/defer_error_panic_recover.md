@@ -9,6 +9,11 @@
     - [Type Assertion for Struct - Struct Field](#type-assertion-for-struct---struct-field)
     - [Type Assertion for Struct - Call Methods](#type-assertion-for-struct---call-methods)
     - [Compare Error](#compare-error)
+  - [Custom Error](#custom-error)
+    - [Use New Function](#use-new-function)
+    - [Use Errorf Function](#use-errorf-function)
+    - [Use Struct Type and Field](#use-struct-type-and-field)
+    - [Use Struct Methods](#use-struct-methods)
 
 # Defer
 
@@ -489,4 +494,339 @@ func main() {
 
 ```go
 syntax error in pattern
+```
+
+## Custom Error
+
+### Use New Function
+
+創建自定義錯誤最簡單的方法就是使用 `errors` package 中的 `New` 函數
+
+`New` 函數實現:
+
+```go
+// Package errors implements functions to manipulate errors.
+package errors
+
+// New returns an error that formats as the given text.
+func New(text string) error {
+    return &errorString{text}
+}
+
+// errorString is a trivial implementation of error.
+type errorString struct {
+    s string
+}
+
+func (e *errorString) Error() string {
+    return e.s
+}
+```
+
+`errorString` 是一個 struct type, 成員只有一個 string field `s`
+
+使用 `errorString` pointer receiver 實現 `error` interface 的 `Error() string` method
+
+創建一個計算圓半徑的程式, 若半徑為負則返回錯誤
+
+```go
+package main
+
+import (  
+    "errors"
+    "fmt"
+    "math"
+)
+
+func circleArea(radius float64) (float64, error) {  
+    if radius < 0 {
+        return 0, errors.New("Area calculation failed, radius is less than zero")
+    }
+    return math.Pi * radius * radius, nil
+}
+
+func main() {  
+    radius := -20.0
+    area, err := circleArea(radius)
+    if err != nil {
+        fmt.Println(err)
+        return
+    }
+    fmt.Printf("Area of circle %0.2f", area)
+}
+```
+
+上述程式中檢查半徑是否小於 0, 若小於 0 則返回 0 和對應錯誤訊息; 若大於 0 則會計算出面積並返回值為 `nil` 的 error
+
+output:
+
+```go
+Area calculation failed, radius is less than zero
+```
+
+### Use Errorf Function
+
+`fmt` package 中的 `Errorf` 函數會根據程式說明符, 規定錯誤的格式並返回一個符合該錯誤的 string
+
+```go
+package main
+
+import (  
+    "fmt"
+    "math"
+)
+
+func circleArea(radius float64) (float64, error) {  
+    if radius < 0 {
+        return 0, fmt.Errorf("Area calculation failed, radius %0.2f is less than zero", radius)
+    }
+    return math.Pi * radius * radius, nil
+}
+
+func main() {  
+    radius := -20.0
+    area, err := circleArea(radius)
+    if err != nil {
+        fmt.Println(err)
+        return
+    }
+    fmt.Printf("Area of circle %0.2f", area)
+}
+```
+
+output:
+
+```go
+Area calculation failed, radius -20.00 is less than zero
+```
+
+### Use Struct Type and Field
+
+錯誤可以實現 `error` interface 的 struct 表示, 這種方式可以更靈活地處理錯誤
+
+可以使用 struct field 來訪問引發錯誤的半徑
+
+先創建一個表示錯誤的 struct type, 錯誤類型命名規範名稱以 `Error` 結尾, 於是命名為 `areaError`
+
+```go
+type areaError struct {  
+    err    string
+    radius float64
+}
+```
+
+上述結構體類型有一個 `radius` field, 其儲存了與錯誤有關的半徑, `err` field 存儲了實際的錯誤訊息
+
+再來是實現 `error` interface
+
+```go
+func (e *areaError) Error() string {  
+    return fmt.Sprintf("radius %0.2f: %s", e.radius, e.err)
+}
+```
+
+使用 pointer receiver `*areaError`, 實現了 `error` interface 及 `Error() string` method, 該方法用於打印半徑及相關錯誤描述
+
+```go
+package main
+
+import (  
+    "fmt"
+    "math"
+)
+
+type areaError struct {  
+    err    string
+    radius float64
+}
+
+func (e *areaError) Error() string {  
+    return fmt.Sprintf("radius %0.2f: %s", e.radius, e.err)
+}
+
+func circleArea(radius float64) (float64, error) {  
+    if radius < 0 {
+        return 0, &areaError{"radius is negative", radius}
+    }
+    return math.Pi * radius * radius, nil
+}
+
+func main() {  
+    radius := -20.0
+    area, err := circleArea(radius)
+    if err != nil {
+        if err, ok := err.(*areaError); ok {
+            fmt.Printf("Radius %0.2f is less than zero", err.radius)
+            return
+        }
+        fmt.Println(err)
+        return
+    }
+    fmt.Printf("Area of rectangle1 %0.2f", area)
+}
+```
+
+`circleArea` 用於計算圓的面積, 檢查半徑若小於零則通過錯誤半徑和對應錯誤訊息創建一個 `areaError` 類型的值, 然後返回 `areaError` 值的地址
+
+在 `main` 函數檢查錯誤是否為 `nil` 並斷言 `*areaError` 類型, 若錯誤是 `*areaError` 類型就可以用 `err.radius` 來獲取錯誤半徑, 並打印出自定義錯誤訊息
+
+>這種作法提供了更多的錯誤訊息(即導致錯誤的半徑), 通過自定義錯誤的 struct field 來定義
+
+output:
+
+```go
+Radius -20.00 is less than zero
+```
+
+### Use Struct Methods
+
+首先創建一個表示錯誤的 struct
+
+```go
+type areaError struct {  
+    err    string //error description
+    length float64 //length which caused the error
+    width  float64 //width which caused the error
+}
+```
+
+上述結構體類型除了有一個錯誤描述字段, 還有可能引法錯誤的寬和高
+
+接著實現 `error` interface, 並給錯誤類型添加兩個方法, 使其提供更多的錯誤訊息
+
+```go
+func (e *areaError) Error() string {  
+    return e.err
+}
+
+func (e *areaError) lengthNegative() bool {  
+    return e.length < 0
+}
+
+func (e *areaError) widthNegative() bool {  
+    return e.width < 0
+}
+```
+
+上述程式碼中從 `Error() string` 方法中返回了關於錯誤的描述, 當 `length` 小於零時 `lengthNegative() bool` 方法返回 `true`; 而當 `width` 小於零時 `widthNegative() bool` 方法返回 `true`
+
+這兩個方法都提供了關於錯誤的更多訊息, 其提示了計算面積失敗的原因(長度為負數或寬度為負數)
+
+```go
+func rectArea(length, width float64) (float64, error) {  
+    err := ""
+    if length < 0 {
+        err += "length is less than zero"
+    }
+    if width < 0 {
+        if err == "" {
+            err = "width is less than zero"
+        } else {
+            err += ", width is less than zero"
+        }
+    }
+    if err != "" {
+        return 0, &areaError{err, length, width}
+    }
+    return length * width, nil
+}
+```
+
+`rectArea` 函數分別檢查長或寬是否小於零, 若小於零則返回一個錯誤訊息; 否則 `rectArea` 會返回矩形的面積和一個 `nil` 的錯誤
+
+```go
+func main() {  
+    length, width := -5.0, -9.0
+    area, err := rectArea(length, width)
+    if err != nil {
+        if err, ok := err.(*areaError); ok {
+            if err.lengthNegative() {
+                fmt.Printf("error: length %0.2f is less than zero\n", err.length)
+
+            }
+            if err.widthNegative() {
+                fmt.Printf("error: width %0.2f is less than zero\n", err.width)
+
+            }
+            return
+        }
+        fmt.Println(err)
+        return
+    }
+    fmt.Println("area of rect", area)
+}
+```
+
+`main` 函數中檢查錯誤是否為 `nil`, 若錯誤值不為 `nil` 接著斷言 `*areaError` 類型, 並使用 `lengthNegative()` 和 `widthNegative()` 方法來檢查錯誤原因是長度小於零還是寬度小於零
+
+完整程式碼:
+
+```go
+package main
+
+import "fmt"
+
+type areaError struct {  
+    err    string  //error description
+    length float64 //length which caused the error
+    width  float64 //width which caused the error
+}
+
+func (e *areaError) Error() string {  
+    return e.err
+}
+
+func (e *areaError) lengthNegative() bool {  
+    return e.length < 0
+}
+
+func (e *areaError) widthNegative() bool {  
+    return e.width < 0
+}
+
+func rectArea(length, width float64) (float64, error) {  
+    err := ""
+    if length < 0 {
+        err += "length is less than zero"
+    }
+    if width < 0 {
+        if err == "" {
+            err = "width is less than zero"
+        } else {
+            err += ", width is less than zero"
+        }
+    }
+    if err != "" {
+        return 0, &areaError{err, length, width}
+    }
+    return length * width, nil
+}
+
+func main() {  
+    length, width := -5.0, -9.0
+    area, err := rectArea(length, width)
+    if err != nil {
+        if err, ok := err.(*areaError); ok {
+            if err.lengthNegative() {
+                fmt.Printf("error: length %0.2f is less than zero\n", err.length)
+
+            }
+            if err.widthNegative() {
+                fmt.Printf("error: width %0.2f is less than zero\n", err.width)
+
+            }
+            return
+        }
+        fmt.Println(err)
+        return
+    }
+    fmt.Println("area of rect", area)
+}
+```
+
+output:
+
+```go
+error: length -5.00 is less than zero  
+error: width -9.00 is less than zero
 ```
