@@ -6,7 +6,7 @@
 - [Struct](#struct)
   - [Class in Go](#class-in-go)
   - [Struct Declaration](#struct-declaration)
-  - [Recursive struct](#recursive-struct)
+  - [Recursive Struct](#recursive-struct)
   - [Struct Instantiation](#struct-instantiation)
   - [Basic struct instance](#basic-struct-instance)
   - [Create pointer type struct](#create-pointer-type-struct)
@@ -310,7 +310,7 @@ type Student struct{
 
 > 這裡 Student 地位等價於 int, byte, bool, string 等類型
 
-## Recursive struct
+## Recursive Struct
 
 Struct type 可以通過引用自身來定義. 這在定義 `linked list` 或 `binary tree node` 時特別有用, 此時 node 包含指向相鄰節點的鏈接 (address)
 

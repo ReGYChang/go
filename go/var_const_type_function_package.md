@@ -4,6 +4,8 @@
   - [Literal Constants(unnamed constants)](#literal-constantsunnamed-constants)
   - [iota](#iota)
 - [Type](#type)
+  - [Type Assertion](#type-assertion)
+  - [Type Switch](#type-switch)
 - [Function](#function)
 
 # Variable
@@ -317,6 +319,168 @@ func main(){
 - alias
   - `byte` 是 `uint8` alias, 表示 ASCII 中一個字符 (1 byte)
   - `rune` 是 `int32` alias, 表示一個 UTF-8 字符, 處理中文日文或其他特殊字符 (4 bytes)
+
+## Type Assertion
+
+通過 type assertion 可以做到以下兩件事:
+- 檢查 `i` 是否為 `nil`
+- 檢查 `i` 儲存的值是否為某個類型
+
+具體使用方式有兩種:
+
+> 第一種: `t := i.(T)`
+
+這個表達式可以斷言一個 interface object `i` 裡不是 `nil`, 且 interface object `i` 儲存的值類型是 T, 若斷言成功會返回值給 t; 失敗則會觸發 panic
+
+```go
+package main
+
+import "fmt"
+
+func main() {
+    var i interface{} = 10
+    t1 := i.(int)
+    fmt.Println(t1)
+
+    fmt.Println("==========")
+
+    t2 := i.(string)
+    fmt.Println(t2)
+}
+```
+
+output:
+
+```go
+10
+==========
+panic: interface conversion: interface {} is int, not string
+
+goroutine 1 [running]:
+main.main()
+        E:/GoPlayer/src/main.go:12 +0x10e
+exit status 2
+```
+
+執行第二次斷言的時候失敗且觸發了 panic
+
+若要斷言的 interface value 是 `nil`, 一樣會觸發 panic:
+
+```go
+package main
+
+func main() {
+    var i interface{} // nil
+    var _ = i.(interface{})
+}
+```
+
+output:
+
+```go
+panic: interface conversion: interface is nil, not interface {}
+
+goroutine 1 [running]:
+main.main()
+        E:/GoPlayer/src/main.go:5 +0x34
+exit status 2
+```
+
+> 第二種: `t, ok:= i.(T)`
+
+如同第一種, 這個表達式也是可以斷言一個 interface object `i` 值是否為 `nil`, 且 interface object `i` 儲存的值類型是 T, 若斷言成功則會返回其類型給 `t`, 且此時 `ok` 值為 true 表示斷言成功
+
+若 interface value type 並非所斷言的 T 則失敗, 不會觸發 panic, 而是將 `ok` 值設為 false, 此時 `t` 為 T 的零值
+
+```go
+package main
+
+import "fmt"
+
+func main() {
+    var i interface{} = 10
+    t1, ok := i.(int)
+    fmt.Printf("%d-%t\n", t1, ok)
+
+    fmt.Println("==========")
+
+    t2, ok := i.(string)
+    fmt.Printf("%s-%t\n", t2, ok)
+
+    fmt.Println("==========")
+
+    var k interface{} // nil
+    t3, ok := k.(interface{})
+    fmt.Println(t3, "-", ok)
+
+    fmt.Println("==========")
+    k = 10
+    t4, ok := k.(interface{})
+    fmt.Printf("%d-%t\n", t4, ok)
+
+    t5, ok := k.(int)
+    fmt.Printf("%d-%t\n", t5, ok)
+}
+```
+
+output:
+
+```go
+10-true
+==========
+-false
+==========
+<nil> - false
+==========
+10-true
+10-true
+```
+
+## Type Switch
+
+若需要區分多種類型, 可以使用 type switch 斷言
+
+```go
+package main
+
+import "fmt"
+
+func findType(i interface{}) {
+    switch x := i.(type) {
+    case int:
+        fmt.Println(x, "is int")
+    case string:
+        fmt.Println(x, "is string")
+    case nil:
+        fmt.Println(x, "is nil")
+    default:
+        fmt.Println(x, "not type matched")
+    }
+}
+
+func main() {
+    findType(10)      // int
+    findType("hello") // string
+
+    var k interface{} // nil
+    findType(k)
+
+    findType(10.23) //float64
+}
+```
+
+output:
+
+```go
+10 is int
+hello is string
+<nil> is nil
+10.23 not type matched
+```
+
+> Summary
+- 若值為 `nil`, 匹配的是 `case nil`
+- 若值在 switch-case 中並沒有匹配對應類型, 那麼匹配的是 default
 
 # Function
 

@@ -777,7 +777,7 @@ func main() {
 
 	go func() {
 		for i := 0; i < 8; i++ {
-			ch<- i
+			ch <- i
 		}
 		// write side close channel
 		close(ch)
