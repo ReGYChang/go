@@ -529,7 +529,7 @@ type Result struct {
 }
 ```
 
-所有 `Job` Struct 變數都會有 `id` 及 `randomno` 兩個 field, `randomno` 用於計算每位數之和
+所有 `Job` struct 變數都會有 `id` 及 `randomno` 兩個 field, `randomno` 用於計算每位數之和
 
 而 `Result` struct 有一個 `job` field, 表示所對應的工作, 還有一個 `sumofdigits` field, 表示計算的結果(每位數字和)
 
@@ -609,7 +609,7 @@ func allocate(noOfJobs int) {
 }
 ```
 
-上述 `allocate` 函數接收創建的工作數量作為輸入參數, 生成了最大值為 998 的偽隨機數, 並使用該隨機數創建了 `Job` struct 變數
+上述 `allocate` 函數接收創建的工作數量作為輸入參數, 生成了最大值為 999 的偽隨機數, 並使用該隨機數創建了 `Job` struct 變數
 
 這個函數把 for loop 的計數器 `i` 作為 id, 最後把創建的 struct 變數寫入 `jobs` buffered channel
 
@@ -759,7 +759,7 @@ total time taken  20.01081009 seconds
 - 讀端可以判斷 channel 是否關閉
 
 ```go
-if num, of := <-ch; ok == true {
+if num, ok := <-ch; ok == true {
     //  channel 關閉 return false, num == nil
     //  channel 未關閉 return true, num == <-ch
 }
