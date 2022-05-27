@@ -1,7 +1,7 @@
 - [Interface](#interface)
   - [Nil Interface](#nil-interface)
-  - [Interface Implement Open Closed Principle](#interface-implement-open-closed-principle)
-  - [Embedding Interface](#embedding-interface)
+  - [Polymorphism with Open Closed Principle](#polymorphism-with-open-closed-principle)
+  - [Composition Instead of Inheritance](#composition-instead-of-inheritance)
 
 # Interface
 
@@ -173,7 +173,7 @@ func main() {
 }
 ```
 
-## Interface Implement Open Closed Principle
+## Polymorphism with Open Closed Principle
 
 OCP 描述軟體實體(類型, 模組, 函數等)應該是可擴展但不能被修改的
 
@@ -237,7 +237,7 @@ func main() {
 
 只要 `Freelancer` 也實現 `SalaryCalculator` interface 即可實現
 
-## Embedding Interface
+## Composition Instead of Inheritance
 
 Go 中沒有提供繼承機制, 但可以通過 embedding interface 來創建一個新 interface 實現
 

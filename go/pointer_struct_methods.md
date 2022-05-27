@@ -21,8 +21,8 @@
   - [Struct as map value](#struct-as-map-value)
   - [Struct slice as map value](#struct-slice-as-map-value)
   - [Struct as function parameter](#struct-as-function-parameter)
+  - [Composition Instead of Inheritance](#composition-instead-of-inheritance)
 - [Method](#method)
-  - [Unnamed Types](#unnamed-types)
 
 # Pointer
 
@@ -745,6 +745,76 @@ go 函數參數傳值時是以 pass by value 的方式進行, 所以函數內部
 - struct slice 作為函數參數是 pass by address
 - struct array 作為函數參數是 pass by value
 
+## Composition Instead of Inheritance
+
+go 中實現繼承採用組合的語法, 稱其為匿名組合
+
+```go
+type Base struct {
+    name string
+}
+
+func (base *Base) Set(myname string) {
+    base.name = myname
+}
+
+func (base *Base) Get() string {
+    return base.name
+}
+
+type Derived struct {
+    Base
+    age int 
+}
+
+func (derived *Derived) Get() (nm string, ag int) {
+    return derived.name, derived.age
+}
+
+
+func main() {
+    b := &Derived{}
+
+    b.Set("sina")
+    fmt.Println(b.Get())
+}
+```
+
+Base type 定義了 `Get()`, `Set()` 兩個 methods, 而 Derived type 繼承了 Base type 並 `overwrite` `Set()` method.
+
+當 Derived object 調用 `Set()` 會 loading Base type 對應的 method; 而調用 `Get()` method 會加載 `overwrite` 後的 `Set()`
+
+當組合類型和被組合類型包含同名的成員時會如何？
+
+```go
+type Base struct {
+    name string
+    age int
+}
+
+func (base *Base) Set(myname string, myage int) {
+    base.name = myname
+    base.age = myage
+}
+
+type Derived struct {
+    Base
+    name string
+}
+
+func main() {
+    b := &Derived{}
+
+    b.Set("sina", 30)
+    fmt.Println("b.name =",b.name, "\tb.Base.name =", b.Base.name)
+    fmt.Println("b.age =",b.age, "\tb.Base.age =", b.Base.age)
+}
+
+//b.name =        b.Base.name = sina
+//b.age = 30      b.Base.age = 30
+
+```
+
 # Method
 
 go 中同時有 function 和 method.
@@ -814,74 +884,4 @@ func main() {
     rect1 := NewRect(1,2,10,20)
     fmt.Println(rect1.width)
 }
-```
-
-## Unnamed Types
-
-go 中實現繼承採用組合的語法, 稱其為匿名組合
-
-```go
-type Base struct {
-    name string
-}
-
-func (base *Base) Set(myname string) {
-    base.name = myname
-}
-
-func (base *Base) Get() string {
-    return base.name
-}
-
-type Derived struct {
-    Base
-    age int 
-}
-
-func (derived *Derived) Get() (nm string, ag int) {
-    return derived.name, derived.age
-}
-
-
-func main() {
-    b := &Derived{}
-
-    b.Set("sina")
-    fmt.Println(b.Get())
-}
-```
-
-Base type 定義了 `Get()`, `Set()` 兩個 methods, 而 Derived type 繼承了 Base type 並 `overwrite` `Set()` method.
-
-當 Derived object 調用 `Set()` 會 loading Base type 對應的 method; 而調用 `Get()` method 會加載 `overwrite` 後的 `Set()`
-
-當組合類型和被組合類型包含同名的成員時會如何？
-
-```go
-type Base struct {
-    name string
-    age int
-}
-
-func (base *Base) Set(myname string, myage int) {
-    base.name = myname
-    base.age = myage
-}
-
-type Derived struct {
-    Base
-    name string
-}
-
-func main() {
-    b := &Derived{}
-
-    b.Set("sina", 30)
-    fmt.Println("b.name =",b.name, "\tb.Base.name =", b.Base.name)
-    fmt.Println("b.age =",b.age, "\tb.Base.age =", b.Base.age)
-}
-
-//b.name =        b.Base.name = sina
-//b.age = 30      b.Base.age = 30
-
 ```
