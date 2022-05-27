@@ -14,6 +14,13 @@
     - [Use Errorf Function](#use-errorf-function)
     - [Use Struct Type and Field](#use-struct-type-and-field)
     - [Use Struct Methods](#use-struct-methods)
+- [Panic](#panic)
+  - [Panic Use Cases](#panic-use-cases)
+  - [Defer and Panic](#defer-and-panic)
+- [Recover](#recover)
+  - [Pannic, Recover and Goroutine](#pannic-recover-and-goroutine)
+  - [Runtime Panic](#runtime-panic)
+  - [Get Stack Trace Info After Recover](#get-stack-trace-info-after-recover)
 
 # Defer
 
@@ -830,3 +837,399 @@ output:
 error: length -5.00 is less than zero  
 error: width -9.00 is less than zero
 ```
+
+# Panic
+
+Go 中一般是使用錯誤來處理異常情況, 但在有些情況當程式發生異常無法繼續運行時, 會透過 `panic` 來終止程式
+
+當函數發生 panic 時會終止運行, 並在執行完所有的 `defer` 函數後返回到函數調用方, 持續過程至當前 goroutine 所有函數都返回退出, 最後程式會打印 panic 資訊及 stack trace, 程式終止
+
+## Panic Use Cases
+
+> 需要注意的是, 應盡可能地使用 `error`, 而不是 `panic` 和 `recover`, 只用當程式無法繼續運行時才使用 `panic` 和 `recover`
+
+panic 有兩個合理的 use cases:
+- 發生了一個不能恢復的錯誤, 此時程式無法繼續運行(web server 無法綁定要求的 port)
+- 程式上的錯誤(用 `nil` 參數調用一個只能接收合法 pointer 的方法)
+
+Build-in panic 簽名如下:
+
+```go
+func panic(interface{})
+```
+
+當程式終止時會打印傳入 `panic` 的參數
+
+```go
+package main
+
+import (  
+    "fmt"
+)
+
+func fullName(firstName *string, lastName *string) {  
+    if firstName == nil {
+        panic("runtime error: first name cannot be nil")
+    }
+    if lastName == nil {
+        panic("runtime error: last name cannot be nil")
+    }
+    fmt.Printf("%s %s\n", *firstName, *lastName)
+    fmt.Println("returned normally from fullName")
+}
+
+func main() {  
+    firstName := "Elon"
+    fullName(&firstName, nil)
+    fmt.Println("returned normally from main")
+}
+```
+
+`fullName` 函數會檢查 `firstName` 和 `lastName` 指針是否為 `nil`; 若為 `nil` `fullName` 函數會調用含有不同錯誤訊息的 `panic`
+
+當程式終止時, 會打印該錯誤訊息:
+
+```go
+panic: runtime error: last name cannot be nil
+
+goroutine 1 [running]:  
+main.fullName(0x1040c128, 0x0)  
+    /tmp/sandbox135038844/main.go:12 +0x120
+main.main()  
+    /tmp/sandbox135038844/main.go:20 +0x80
+```
+
+由於程式在 `fullName` 函數第 12 行發生 panic, 因此首先打印出以下輸出:
+
+```go
+main.fullName(0x1040c128, 0x0)  
+    /tmp/sandbox135038844/main.go:12 +0x120
+```
+
+接著會打印出 stack frame 的下一項, 即 `fullName(&firstName, nil)`, 因此接下來會打印出:
+
+```go
+main.main()  
+    /tmp/sandbox135038844/main.go:20 +0x80
+```
+
+至此已經到達導致 panic 最上層的函數, 因此結束打印並終止程式
+
+## Defer and Panic
+
+若存在 defer 函數, 則會先調用它再返回函數調用方
+
+```go
+package main
+
+import (  
+    "fmt"
+)
+
+func fullName(firstName *string, lastName *string) {  
+    defer fmt.Println("deferred call in fullName")
+    if firstName == nil {
+        panic("runtime error: first name cannot be nil")
+    }
+    if lastName == nil {
+        panic("runtime error: last name cannot be nil")
+    }
+    fmt.Printf("%s %s\n", *firstName, *lastName)
+    fmt.Println("returned normally from fullName")
+}
+
+func main() {  
+    defer fmt.Println("deferred call in main")
+    firstName := "Elon"
+    fullName(&firstName, nil)
+    fmt.Println("returned normally from main")
+}
+```
+
+上述程式添加了 `defer` 函數的調用
+
+```go
+This program prints,
+
+deferred call in fullName  
+deferred call in main  
+panic: runtime error: last name cannot be nil
+
+goroutine 1 [running]:  
+main.fullName(0x1042bf90, 0x0)  
+    /tmp/sandbox060731990/main.go:13 +0x280
+main.main()  
+    /tmp/sandbox060731990/main.go:22 +0xc0
+```
+
+程式發生 panic 時首先執行了 defer 函數, 接著返回函數調用方, 調用方的 defer 函數繼續運行直到最上層調用函數並終止程式
+
+# Recover
+
+`recover` 是一個 build-in 函數, 用於重新獲得 panic goroutine 的控制
+
+`recover` 函數簽名如下所示:
+
+```go
+func recover() interface{}
+```
+
+只有在 defer 函數內部調用 `recover` 才有用
+
+在 defer 函數內部調用 `recover` 可以取到 `panic` 的錯誤訊息, 並停止 panic 續發事件(Panicking Sequence) 使程式運行恢復正常, 若在 defer 函數外部調用 `recover` 則不能停止 panic 續發事件
+
+```go
+package main
+
+import (  
+    "fmt"
+)
+
+func recoverName() {  
+    if r := recover(); r!= nil {
+        fmt.Println("recovered from ", r)
+    }
+}
+
+func fullName(firstName *string, lastName *string) {  
+    defer recoverName()
+    if firstName == nil {
+        panic("runtime error: first name cannot be nil")
+    }
+    if lastName == nil {
+        panic("runtime error: last name cannot be nil")
+    }
+    fmt.Printf("%s %s\n", *firstName, *lastName)
+    fmt.Println("returned normally from fullName")
+}
+
+func main() {  
+    defer fmt.Println("deferred call in main")
+    firstName := "Elon"
+    fullName(&firstName, nil)
+    fmt.Println("returned normally from main")
+}
+```
+
+`recoverName()` 函數調用了 `recover()`, 返回了調用 `panic` 的 parameter
+
+這裡打印出 `recover` 的返回值, 並在 `fullName` 函數內 defer 調用了 `recoverNames()`
+
+當 `fullName` 發生 panic 時會調用 defer 函數 `recoverName`, 它會反過來的調用 `recover()` 來重新獲得 panic goroutine 的控制
+
+調用 `recover` 並返回 panic 的 parameter, 因此會打印:
+
+```go
+recovered from  runtime error: last name cannot be nil
+```
+
+執行完 `recover()` 之後 panic 會停止, 程式控制返回到調用方 (這裡的 `main` 函數)
+
+程式在發生 panic 之後會繼續正常運行, 接續打印 `returned normally from main` 及 `deferred call in main`
+
+## Pannic, Recover and Goroutine
+
+只有在相同的 `goroutine` 中調用 `recover` 才有用, `recover` 不能恢復一個不同 goroutine 的 panic
+
+```go
+package main
+
+import (  
+    "fmt"
+    "time"
+)
+
+func recovery() {  
+    if r := recover(); r != nil {
+        fmt.Println("recovered:", r)
+    }
+}
+
+func a() {  
+    defer recovery()
+    fmt.Println("Inside A")
+    go b()
+    time.Sleep(1 * time.Second)
+}
+
+func b() {  
+    fmt.Println("Inside B")
+    panic("oh! B panicked")
+}
+
+func main() {  
+    a()
+    fmt.Println("normally returned from main")
+}
+```
+
+函數 `b()` 發生 pannic, 函數 `a()` 調用了一個 defer 函數 `recovery()` 用於恢復 panic
+
+函數 `b()` 作為一個獨立的 goroutine 來調用
+
+結果 panic 並不會恢復, 因為調用 `recovery` 的 goroutine 和 `b()` 中發生 panic 的 goroutine 並不相同, 無法恢復panic
+
+output:
+
+```go
+Inside A  
+Inside B  
+panic: oh! B panicked
+
+goroutine 5 [running]:  
+main.b()  
+    /tmp/sandbox388039916/main.go:23 +0x80
+created by main.a  
+    /tmp/sandbox388039916/main.go:17 +0xc0
+```
+
+若函數 `b()` 在同一個 goroutine 調用 panic 就可以恢復: 將 `go b()` 改為 `b()`
+
+output:
+
+```go
+Inside A  
+Inside B  
+recovered: oh! B panicked  
+normally returned from main
+```
+
+## Runtime Panic
+
+Runtime error (array out of index) 也會導致 panic, 等價調用 build-in function `panic`, 其參數由 interface type `runtime.Error` 給出
+
+`runtime.Error` interface 定義如下:
+
+```go
+type Error interface {  
+    error
+    // RuntimeError is a no-op function but
+    // serves to distinguish types that are run time
+    // errors from ordinary errors: a type is a
+    // run time error if it has a RuntimeError method.
+    RuntimeError()
+}
+```
+
+而 `runtime.Error` interface 滿足 build-in interface type `error`
+
+```go
+package main
+
+import (  
+    "fmt"
+)
+
+func a() {  
+    n := []int{5, 7, 4}
+    fmt.Println(n[3])
+    fmt.Println("normally returned from a")
+}
+func main() {  
+    a()
+    fmt.Println("normally returned from main")
+}
+```
+
+上述程式試圖訪問 `n[3]`, 這是一個對 slice 的錯誤引用, 程式錯誤並拋出 panic:
+
+```go
+panic: runtime error: index out of range
+
+goroutine 1 [running]:  
+main.a()  
+    /tmp/sandbox780439659/main.go:9 +0x40
+main.main()  
+    /tmp/sandbox780439659/main.go:13 +0x20
+```
+
+試圖恢復這個 panic:
+
+```go
+package main
+
+import (  
+    "fmt"
+)
+
+func r() {  
+    if r := recover(); r != nil {
+        fmt.Println("Recovered", r)
+    }
+}
+
+func a() {  
+    defer r()
+    n := []int{5, 7, 4}
+    fmt.Println(n[3])
+    fmt.Println("normally returned from a")
+}
+
+func main() {  
+    a()
+    fmt.Println("normally returned from main")
+}
+```
+
+output:
+
+```go
+Recovered runtime error: index out of range  
+normally returned from main
+```
+
+## Get Stack Trace Info After Recover
+
+當恢復 panic 時, 就釋放了它的 stack trace
+
+使用 `Debug` package 中的 `PrintStack` 函數可以打印出 stack trace
+
+```go
+package main
+
+import (  
+    "fmt"
+    "runtime/debug"
+)
+
+func r() {  
+    if r := recover(); r != nil {
+        fmt.Println("Recovered", r)
+        debug.PrintStack()
+    }
+}
+
+func a() {  
+    defer r()
+    n := []int{5, 7, 4}
+    fmt.Println(n[3])
+    fmt.Println("normally returned from a")
+}
+
+func main() {  
+    a()
+    fmt.Println("normally returned from main")
+}
+```
+
+上述程式使用 `debug.PrintStack()` 打印 stack trace:
+
+```go
+Recovered runtime error: index out of range  
+goroutine 1 [running]:  
+runtime/debug.Stack(0x1042beb8, 0x2, 0x2, 0x1c)  
+    /usr/local/go/src/runtime/debug/stack.go:24 +0xc0
+runtime/debug.PrintStack()  
+    /usr/local/go/src/runtime/debug/stack.go:16 +0x20
+main.r()  
+    /tmp/sandbox949178097/main.go:11 +0xe0
+panic(0xf0a80, 0x17cd50)  
+    /usr/local/go/src/runtime/panic.go:491 +0x2c0
+main.a()  
+    /tmp/sandbox949178097/main.go:18 +0x80
+main.main()  
+    /tmp/sandbox949178097/main.go:23 +0x20
+normally returned from main
+```
+
+從輸出可以看出恢復了 panic, 打印出 `Recovered runtime error: index out of range` 及 stack trace
