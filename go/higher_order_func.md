@@ -1,6 +1,12 @@
-# 高階函數
+- [Higher-order Function](#higher-order-function)
+	- [Decorator Pattern](#decorator-pattern)
+	- [Recursion](#recursion)
+		- [Fibonacci](#fibonacci)
+		- [Summary](#summary)
 
-## 裝飾器模式
+# Higher-order Function
+
+## Decorator Pattern
 
  > 高階函數係指接收其他函數做為參數傳入，或把其他函數做為結果返回的函數。可以透過實現高階函數來實現 Go 裝飾器模式
 
