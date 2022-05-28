@@ -1,4 +1,11 @@
-# 匿名函數
+- [Anonymous Function](#anonymous-function)
+	- [Closure](#closure)
+	- [Why Closure](#why-closure)
+	- [Closure Best Practice](#closure-best-practice)
+		- [Summary](#summary)
+	- [Closure Use Cases](#closure-use-cases)
+
+# Anonymous Function
 
 > 擁有函數名的函數隻能在包級語法塊中被聲明，通過函數字面量（function literal），我們可繞過這一限制，在任何表達式中表示一個函數值。函數字面量的語法和函數聲明相似，區别在於func關鍵字後沒有函數名。函數值字面量是一種表達式，它的值被成爲匿名函數（anonymous function）。函數字面量允許我們在使用時函數時，再定義它。通過這種技巧，我們可以改寫之前對strings.Map的調用：
 
@@ -8,7 +15,7 @@ strings.Map(func(r rune) rune { return r + 1 }, "HAL-9000")
 
 更爲重要的是，通過這種方式定義的函數可以訪問完整的詞法環境（lexical environment），這意味着在函數中定義的內部函數可以引用該函數的變量
 
-## 匿名函數與閉包
+## Closure
 
 ```go
 package main
@@ -61,7 +68,7 @@ func main() {
 - 閉包是類別，函數是操作，n是字段。函數使用到n即構成閉包
 - 閉包關鍵在於分析出返回的函數所引用的變量
 
-## 閉包優點
+## Why Closure
 
 - 強化模組化
     - 便於以簡單方式開發較小模組，提高開發速度和程式的復用性
@@ -74,7 +81,7 @@ func main() {
     - 允許定義匿名函數
     - 可以捕獲引用環境，並把引用環境和函數程式碼組成一個可調用的實體
 
-## 閉包 Best Practice
+## Closure Best Practice
 
 > 所謂閉包是指有權訪問另一個函數作用域中的變量的函數，就是在一個函數內部創建另一個函數。Golang 中所有的匿名函數都是閉包
 
@@ -112,7 +119,7 @@ fmt.Println("after file name processor: ",f2("bird.jpg"))
 - **閉包不關心這些捕獲的變數或常數是否已經超出了作用域，只要閉包還在使用它，這些變數就還會存在**
 - 實現工廠模式生成器
 
-## 閉包應用場景
+## Closure Use Cases
 
 - 工廠模式 - 生成器
 - 單例模式
