@@ -8,6 +8,9 @@
 	- [Client](#client)
 	- [Server - Concurrent](#server---concurrent)
 	- [Client - Concurrent](#client---concurrent)
+- [UDP-CS](#udp-cs)
+	- [UDP Server](#udp-server)
+	- [UDP Client](#udp-client)
 - [Sticky Packaet Issue](#sticky-packaet-issue)
 - [Multi-Users Chat Romm Demo](#multi-users-chat-romm-demo)
 	- [Modules](#modules)
@@ -315,6 +318,71 @@ func main(){
 
 	fmt.Println("server response data: ", string(buf[:n]))
 
+}
+```
+
+# UDP-CS
+
+## UDP Server
+
+```go
+func main() {
+    listen, err := net.ListenUDP("udp", &net.UDPAddr{
+        IP:   net.IPv4(0, 0, 0, 0),
+        Port: 8888,
+    })
+    if err != nil {
+        fmt.Println("net.ListenUDP error : ", err)
+        return
+    }
+    defer listen.Close()
+    for {
+        var data [1024]byte
+        // receive datagram
+        n, addr, err := listen.ReadFromUDP(data[:]) 
+        if err != nil {
+            fmt.Println("listen.ReadFromUDP error : ", err)
+            continue
+        }
+        fmt.Printf("data == %v  , addr == %v , count == %v\n", string(data[:n]), addr, n)
+        // response data to client
+        _, err = listen.WriteToUDP(data[:n], addr) 
+        if err != nil {
+            fmt.Println("listen.WriteToUDP error:", err)
+            continue
+        }
+    }
+}
+```
+
+## UDP Client
+
+```go
+func main() {
+   socket, err := net.DialUDP("udp", nil, &net.UDPAddr{
+      IP:   net.IPv4(0, 0, 0, 0),
+      Port: 8888,
+   })
+   if err != nil {
+      fmt.Println("net.DialUDP error : ", err)
+      return
+   }
+   defer socket.Close()
+   sendData := []byte("hello xiaomotong!!")
+   // send dat
+   _, err = socket.Write(sendData)
+   if err != nil {
+      fmt.Println("socket.Write error : ", err)
+      return
+   }
+   data := make([]byte, 2048)
+   // receive response data
+   n, remoteAddr, err := socket.ReadFromUDP(data)
+   if err != nil {
+      fmt.Println("socket.ReadFromUDP error : ", err)
+      return
+   }
+   fmt.Printf("data == %v  , addr == %v , count == %v\n", string(data[:n]), remoteAddr, n)
 }
 ```
 
