@@ -22,7 +22,7 @@
 
 - Listen Function
     
-    ```fsharp
+    ```go
     func Listen(network, address string) (Listener, error)
     
     network: protocol like TCP, UDP
@@ -31,7 +31,7 @@
     
 - Listener Interface
     
-    ```fsharp
+    ```go
     type Listener interface {
     		Accept() (Conn, error)
     		Close() error
@@ -41,7 +41,7 @@
     
 - Conn Interface
     
-    ```fsharp
+    ```go
     type Conn interface {
     		Read(b []byte) (n int, err error)
     		Write(b []byte) (n, int, err error)
