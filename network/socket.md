@@ -1,5 +1,8 @@
 - [Socket](#socket)
-- [Server Side](#server-side)
+	- [Stream Socket](#stream-socket)
+	- [Datagram Socket](#datagram-socket)
+- [TCP Server](#tcp-server)
+	- [Net package](#net-package)
 - [TCP-CS](#tcp-cs)
 	- [Server](#server)
 	- [Client](#client)
@@ -18,7 +21,49 @@
 # Socket
 ![socket_conn](img/socket_conn.png)
 
-# Server Side
+`socket` 是 BSD UNIX 的 process 通信機制, 他是一個 `file handle`, 用於描述 `IP Address` 和 `port`
+
+`socket` 在 design pattern 中屬於 `Facade Pattern`, 將複雜的 `TCP/IP` 封裝在 socket 中, 使用者只需要調用 socket 定義的相關函數就可以進行 socket communication
+
+應用程式通常通過 `socket` 向網路發出 request / response 的網路請求, 常用的 socket 類型有兩種:
+- Stream Socket(SOCK_STREAM)
+- Datagram Socket(SOCK_DGRAM)
+
+## Stream Socket
+
+Stream socket 是可靠的, 雙向連接的通信串流, 若以 "1,2" 的順序將兩個項目輸出到 socket, 它們在另一端則會以 "1,2" 的順序抵達且不會出錯
+
+瀏覽器所使用的 HTTP protocol 也是利用 stream socket 取得網頁所需的 HTML 等文件
+
+Stream socket 使用所謂的 `The Transmission Control Protocol`(TCP)來確保資料可以依序抵達且不出錯, 保障資料的完整性
+
+TCP 會在傳輸層對上層送來的過大訊息分割成多個 segments, 並由傳輸層負責處理封包遺失, 確保依序送達等工作; 若應用程式對資料有靠與依序需求時, 使用 stream socket 就無須自行處理
+
+## Datagram Socket
+
+Datagram socket 也使用 IP 進行 routing, 但其傳輸層協議使用 `User Datagram Protocol`(UDP) 而非 TCP
+
+使用 datagram socket 不用像 stream socket 一樣維護一個開啟的連線, 只需打造封包, 給它一個 IP header 與目的資訊即可送出
+
+通常當一些封包遺失不會造成重大影響時會只用 datagram socket, 如 tftp, 多人遊戲, 串流音樂, 影像會議等
+
+Datagram socket 是基於訊息導向的方式傳送資料, 資料封包可能會由於繞送封包路徑改變而造成抵達順序不同, 發送方也無法知道是否遞送成功
+
+# TCP Server
+
+TCP/IP(Transmission Control Protocol/Internet Protocol) 是一種**連接導向**, 可靠, 基於 bytes flow 的傳輸層通訊協議
+
+因為是**連接導向**的協議, 資料像流水一樣傳輸, 因此會產生 `sticky packet` 問題
+
+TCP Server 可以同時連接多個 clien, Go 每建立一個連線就會創建一個 `groutine` 來處理請求
+
+Server 處理流程大致分為:
+- 監聽 port
+- 接收 client request & create connection
+- 創建 `goroutine` 處理連線
+- close connection
+
+## Net package
 
 - Listen Function
     
@@ -54,7 +99,6 @@
     }
     ```
     
-
 # TCP-CS
 ![tcp_cs](img/tcp_cs.png)
 
