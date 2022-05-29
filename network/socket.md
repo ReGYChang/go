@@ -8,6 +8,7 @@
 	- [Client](#client)
 	- [Server - Concurrent](#server---concurrent)
 	- [Client - Concurrent](#client---concurrent)
+- [Sticky Packaet Issue](#sticky-packaet-issue)
 - [Multi-Users Chat Romm Demo](#multi-users-chat-romm-demo)
 	- [Modules](#modules)
 	- [Functions](#functions)
@@ -314,6 +315,236 @@ func main(){
 
 	fmt.Println("server response data: ", string(buf[:n]))
 
+}
+```
+
+# Sticky Packaet Issue
+
+server.go
+
+```go
+package main
+
+import (
+   "bufio"
+   "fmt"
+   "io"
+   "net"
+)
+
+// handle client connection
+func process(conn net.Conn) {
+   defer conn.Close()
+   reader := bufio.NewReader(conn)
+   var buf [2048]byte
+   for {
+      n, err := reader.Read(buf[:])
+      // exit goroutine if client be closed
+      if err == io.EOF {
+         break
+      }
+      if err != nil {
+         fmt.Println("reader.Read error :", err)
+         break
+      }
+      recvStr := string(buf[:n])
+      // print received data
+      fmt.Printf("received data：%s\n\n", recvStr)
+   }
+}
+
+func main() {
+
+   listen, err := net.Listen("tcp", "127.0.0.1:8888")
+   if err != nil {
+      fmt.Println("net.Listen error : ", err)
+      return
+   }
+   defer listen.Close()
+   fmt.Println("server start ...  ")
+
+   for {
+      conn, err := listen.Accept()
+      if err != nil {
+         fmt.Println("listen.Accept error :", err)
+         continue
+      }
+      go process(conn)
+   }
+}
+```
+
+client.go
+
+```go
+package main
+
+import (
+   "fmt"
+   "net"
+)
+
+func main() {
+   conn, err := net.Dial("tcp", "127.0.0.1:8888")
+   if err != nil {
+      fmt.Println("net.Dial error : ", err)
+      return
+   }
+   defer conn.Close()
+   fmt.Println("client start ... ")
+
+   for i := 0; i < 30; i++ {
+
+      msg := `Hello world, hello regy!`
+
+      conn.Write([]byte(msg))
+   }
+
+   fmt.Println("send data over... ")
+
+}
+```
+
+由結果可看出 Client 發送了 30 次資料到 server, 可是 server 只輸出了 4 次, 多條資料黏在一起輸出
+
+導致 sticky packet 原因有兩種:
+- Nagle 演算法導致發送端提交一段資料給 TCP 傳送時, TCP 並不會立刻發送, **而是等待一小段時間看是否還有要發送的資料, 若有則會將這兩段資料一起發送**
+- 接收端接收不及時: TCP 會將接收到的資料存在自己的緩衝區中, 並通知應用層讀取, 當應用層由於某些原因無法及時將 TCP 資料讀取出來就會造成 TCP 緩衝區中存放幾段資料
+
+解決方法可以針對資料進行封包及拆包的操作
+
+封包: 給一段資料加上 header, 資料就分為 packet header 和 packet body 兩部份, 有時為了過濾非法封包還會加上 packet tail
+
+Packet header 的長度是固定的, 會明確指出 packet body 大小, 這樣就可以正確的拆解一個完整的 packet:
+- 根據 packet header length(fixed)
+- 根據 packet header length variable
+
+可以自定義一個協議, 譬如資料包前兩個 byte 是 packet header, 裡面儲存發送資料的長度
+
+server2.go
+
+```go
+package main
+
+import (
+   "bufio"
+   "bytes"
+   "encoding/binary"
+   "fmt"
+   "io"
+   "net"
+)
+
+// Decode data
+func Decode(reader *bufio.Reader) (string, error) {
+   // read data length
+   lengthByte, _ := reader.Peek(2) // read 2 byte from packet
+   lengthBuff := bytes.NewBuffer(lengthByte)
+   var length int16
+   // read packet length
+   err := binary.Read(lengthBuff, binary.LittleEndian, &length)
+   if err != nil {
+      return "", err
+   }
+   // Buffered return readable bytes
+   if int16(reader.Buffered()) < length+2 {
+      return "", err
+   }
+
+   // read real data
+   realData := make([]byte, int(2+length))
+   _, err = reader.Read(realData)
+   if err != nil {
+      return "", err
+   }
+   return string(realData[2:]), nil
+}
+
+func process(conn net.Conn) {
+   defer conn.Close()
+   reader := bufio.NewReader(conn)
+
+   for {
+      msg, err := Decode(reader)
+      if err == io.EOF {
+         return
+      }
+      if err != nil {
+         fmt.Println("Decode error : ", err)
+         return
+      }
+      fmt.Println("received data ：", msg)
+   }
+}
+
+func main() {
+
+   listen, err := net.Listen("tcp", "127.0.0.1:8888")
+   if err != nil {
+      fmt.Println("net.Listen error :", err)
+      return
+   }
+   defer listen.Close()
+   for {
+      conn, err := listen.Accept()
+      if err != nil {
+         fmt.Println("listen.Accept error :", err)
+         continue
+      }
+      go process(conn)
+   }
+}
+```
+
+client2.go
+
+```go
+package main
+
+import (
+   "bytes"
+   "encoding/binary"
+   "fmt"
+   "net"
+)
+
+// Encode data
+func Encode(message string) ([]byte, error) {
+   // packet header length with 2 bytes(int16)
+   var length = int16(len(message))
+   var nb = new(bytes.Buffer)
+
+   // write packet header
+   err := binary.Write(nb, binary.LittleEndian, length)
+   if err != nil {
+      return nil, err
+   }
+
+   // write into packet
+   err = binary.Write(nb, binary.LittleEndian, []byte(message))
+   if err != nil {
+      return nil, err
+   }
+   return nb.Bytes(), nil
+}
+
+func main() {
+   conn, err := net.Dial("tcp", "127.0.0.1:8888")
+   if err != nil {
+      fmt.Println("net.Dial error : ", err)
+      return
+   }
+   defer conn.Close()
+   for i := 0; i < 30; i++ {
+      msg := `Hello world,hello xiaomotong!`
+
+      data, err := Encode(msg)
+      if err != nil {
+         fmt.Println("Encode msg error : ", err)
+         return
+      }
+      conn.Write(data)
+   }
 }
 ```
 
