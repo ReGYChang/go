@@ -3,6 +3,10 @@
 	- [Datagram Socket](#datagram-socket)
 - [TCP Server](#tcp-server)
 	- [Net package](#net-package)
+	- [Dial Function](#dial-function)
+	- [Timeout Handle](#timeout-handle)
+		- [Connection Timeout](#connection-timeout)
+		- [Request / Response Timeout](#request--response-timeout)
 - [TCP-CS](#tcp-cs)
 	- [Server](#server)
 	- [Client](#client)
@@ -55,7 +59,7 @@ Datagram socket 是基於訊息導向的方式傳送資料, 資料封包可能�
 
 # TCP Server
 
-TCP/IP(Transmission Control Protocol/Internet Protocol) 是一種**連接導向**, 可靠, 基於 bytes flow 的傳輸層通訊協議
+TCP/IP(Transmission Control Protocol/Internet Protocol) 是一種**連接導向**, 可靠, 基於 byte stream 的傳輸層通訊協議
 
 因為是**連接導向**的協議, 資料像流水一樣傳輸, 因此會產生 `sticky packet` 問題
 
@@ -102,7 +106,106 @@ Server 處理流程大致分為:
     		SetWriteDeadline(t time.Time) error
     }
     ```
-    
+
+## Dial Function
+
+Go 對 socket 創建過程進行了抽象與封裝, 無論使用什麼協議建立什麼形式的連接, 都只需要調用 `net.Dial()` 函數即可完成
+
+`Dial()` 函數原型:
+
+```go
+func Dial(network, address string) (Conn, error) {
+    var d Dialer
+    return d.Dial(network, address)
+}
+```
+
+其中 `network` 參數表示傳入的網路協議(tcp, udp 等), `address` 參數表示傳入的 IP Address or domain name, port 是可選的, 若需指定以 `:` 形式寫在 IP/Domain 後面即可
+
+如果連接成功函數返回連接物件, 否則返回 `error`
+
+幾種常見協議的調用方式:
+
+TCP Connection:
+
+```go
+conn, err := net.Dial("tcp", "192.168.10.10:80")
+```
+
+UDP Connection:
+
+```go
+conn, err := net.Dial("udp", "192.168.10.10:8888")
+```
+
+ICMP Connection:
+
+```go
+conn, err := net.Dial("ip4:icmp", "www.google.com")
+```
+
+目前 `Dial()` 函數支持幾種網路協議: `tcp`, `tcp4`(IPv4), `tcp6`(IPv6), `udp`, `udp4`(IPv4), `udp6`(IPv6), `ip`, `ip4`(IPv4), `ip6`(IPv6), `unix`, `unixgram`, `unixpacket`
+
+成功建立連接後, 可以使用連接物件 `conn` 的 `Write()` 方法, 接收資料時使用 `Read()` 方法
+
+`Dial()` 函數是對 `dialTCP()`, `dialUDP()`, `dialIP()`, `dialUnix()` 的封裝, 可以通過 source code 看到, 底層真正建立連接是通過 `dialSingle()` 函數完成:
+
+![dialSingle()](img/socket_dial_single.png)
+
+`dialSingle()` 函數通過從輸入參數中獲得網絡協議類型調用對應的連接建立函數並返回連接物件
+
+再往下追可以看到這些底層函數最終都的調用了 `syscall` package 的 `Socket()` 函數與對應的 OS Socket API 交互實現網絡連接建立, 針對不同的通訊協議建立不同的連接類型:
+
+![Socket()](img/socket_Socket.png)
+
+其中 `domain` 代表通訊域, 支持 `IPv4`, `IPv6` 和 `Unix`, 對應的常數值分別是 `syscall.AF_INET`, `syscall.AF_INET6` 和 `syscall.AF_UNIX`
+
+`typ` 則代表 Socket 的類型, 如 TCP 對應的 Socket 類型常數是 `syscall.SOCK_STREAM`, UDP 對應的 Socket 類型常數是 `syscall.SOCK_DGRAM`, 此外還支持 `syscall.SOCK_RAW` 和 `syscall.SOCK_SEQPACKET` 兩種類型
+
+`SOCK_RAW` 就是原始的 IP protocol packet, `SOCK_SEQPACKET` 與 `SOCK_STREAM` 類似, 都是連接導向, 只不過前者有消息邊界, 傳輸的是資料包而不是 byte stream
+
+通常使用 `SOCK_STREAM` 和 `SOCK_DGRAM` 居多
+
+最後一個參數 `proto` 表示通訊協議, 一般默認為 `0`, 因為該值可以通過前兩個參數判斷得出, 如前兩個參數分別為 `syscall.AF_INET` 和 `syscall.SOCK_DGRAM` 時會選擇 UDP 作為通訊協議
+
+## Timeout Handle
+網絡超時包含在多個環節中, 包括 connection timeout, request timeout 或 response timeout
+
+### Connection Timeout
+
+在使用 `Dial()` 函數建立網絡連接時, 可以使用 `net` package 提供的 `DialTimeout` 函數主動傳入額外的 timeout parameter 來建立連接, `DialTimeout` 原型如下:
+
+```go
+func DialTimeout(network, address string, timeout time.Duration) (Conn, error) {
+    d := Dialer{Timeout: timeout}
+    return d.Dial(network, address)
+}
+```
+
+和 `Dial()` 函數調用一樣, 只是多設置了 timeout field
+
+若使用 `Dial()` 函數默認會通過 OS 提供的機制來處理 connection timeout, 對於 TCP 連接通常是 3 分鐘左右
+
+```go
+// create connection
+conn, err := net.DialTimeout("tcp", service, 3 * time.Second)
+```
+
+### Request / Response Timeout
+
+使用 `Dial()` 或 `DialTimeout()` 函數建立網絡連接成功後會返回 `net.Conn` 物件, 可以通過在該物件上進行讀寫操作實現 request 和 response, 這部分 timeout 可以通過 `Conn` 提供的三個方法來設置:
+
+```go
+SetDeadline(t time.Time) error
+SetReadDeadline(t time.Time) error
+SetWriteDeadline(t time.Time) error
+```
+
+可以通過 `SetDeadline()` 設置統一的讀寫 timeout 時間, 也可以通過 `SetReadDeadline` 和 `SetWriteDeadline` 分別設置 read timeout 和 write timeout
+
+>❗️這三種方法傳入的都是絕對時間, 而不是相對時間
+
+
 # TCP-CS
 ![tcp_cs](img/tcp_cs.png)
 
