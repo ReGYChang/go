@@ -8,6 +8,7 @@
   - [http.Client Data Structures](#httpclient-data-structures)
   - [http.Transport Implementation](#httptransport-implementation)
   - [Transport.RoundTrip() Implementation](#transportroundtrip-implementation)
+- [HTTP/HTTPS Request Handle](#httphttps-request-handle)
 
 # net/http
 
@@ -448,3 +449,6 @@ func (t *Transport) RoundTrip(req *Request) (*Response, error) {
 以上就是 `http.Client` 底層實現的幾個核心組件及其默認實現, 重點關注 `http.Transport`, 其定義了一次 HTTP transaction 的完整流程
 
 可以通過自定義 `Transport` 實現對 HTTP Client request 的訂製
+
+# HTTP/HTTPS Request Handle
+
