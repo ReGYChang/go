@@ -1,4 +1,6 @@
 - [Goroutine](#goroutine)
+	- [Go Concurrency Implementation](#go-concurrency-implementation)
+		- [Go Thread Implementation - GMP](#go-thread-implementation---gmp)
 	- [create goroutine](#create-goroutine)
 	- [goroutine features](#goroutine-features)
 	- [runtime package](#runtime-package)
@@ -32,6 +34,82 @@
 
 goroutine 主要被設計用來處理 concurrency, loading 較
 thread 更輕, go 在語言層面實現了 goroutine 之間的 communication
+
+Goroutine 是 Go 中最基本的執行單位, 每個 Go 程式至少有一個 gourine: main goroutine 在程式啟動時會自動創建
+
+> Thread
+
+Thread 又被稱為 ｀, 是程式 execution stream 最小單位
+
+一個標準的 thread 由 thread ID, 當前 programming counter, 暫存器集合, stack frame 所組成
+
+Thread 是 process 的一個實體, 是被系統獨立調度和分派的基本單位; 擁有自己獨立的 stack 及與 process 共享的 heap, thread 切換一般由 OS 調度
+
+> Coroutine
+
+與 thread 類似, 擁有 shared heap 及 stake frame, 切換一般在程式碼中顯式控制, 其避免了 context switch 的資源消耗並兼顧了 multithreading 的優點, 簡化了 concurrency 的複雜度
+
+> Goroutine
+
+Coroutine 是一種 cooperative tasks 的機制, 最簡單意義上 coroutine 不是併發, 而 goroutine 則支持併發, 且可以運行在一個或多個 thread 上
+
+## Go Concurrency Implementation
+
+> Thread
+
+不論語言層面使用哪種併發模型, 在 OS 層一定是以 thread 的型態存在
+
+而 OS 根據資源訪問權限的不同, 體系架構分為 user space 和 kernel space; 
+- kernel space 主要操作訪問 CPU 資源, I/O 資源, 記憶體資源等硬體資源, 為上層應用程式提供最基本的基礎資源
+- user space 主要負責上層應用程式的活動空間, 其無法直接訪問資源, 必須通過 `system call`, `library function` 或 `shell` 來調用 kernel space 提供的資源
+
+程式語言中所謂的 "thread", 往往是 user mode thread, 和 OS 本身的 kernel mode thread(KSE)不同
+
+Thread Model 實現可以分為以下幾種方式:
+
+- User Level Thread Model: 多個 user level thread 對應一個 kernel level thread, thread 的創建, 終止, 切換或同步必須自身完成, 可以做快速的 context switch, 缺點是無法有效利用 multi-cores CPU
+- Kernel Level Thread Model: 這種模型可以直接調用 OS kernel thread, 所有 thread 的創建, 終止, 切換或同步都由 kernel 完成; 一個 user level thread 對應一個 system thread, 可以利用 multi-cores 機制, 但 context switch 需要消耗額外資源(C++)
+- Two-Level Model: 介於 user level 和 kernel level 間的 thread model, 和 kernel level thread mode 類似, 一個 process 中可以對應多個 kernel level thread, 但 process 中的 thread 不與 kernel thread 一一對應; 這種 thread model 會先創建多個 kernel level thread, 然後用自己的 user level thread 去對應創建的多個 kernel level thread, 自己的 user level thread 需要本身程式做調度, kernel level thread 交給 OS 調度
+
+Go 的 thread model 就是一種特殊的 two-level thread model(GMP Model), M 個 user level thread 對應 N 個 kernel level thread, 缺點是增加了調度器的複雜度
+
+> Concurrency Model
+
+Go 實現了兩種併發形式: 第一種是普遍認知的 multithreading shared memory, 即 Java 或 C++ 中的 multithreading programming; 另一種是 Go 中特有的 `CSP`(communicating sequential processes) 併發模型
+
+CSP 併發模型是在 1970 年左右提出的概念, 屬於較新的概念, 不同於傳統 multithreading 通過 shared memory 來通訊, CSP 講究的是 **"以通訊的方式共享記憶體"**
+
+`DO NOT COMMUNICATE BY SHARING MEMORY; INSTEAD, SHARE MEMORY BY COMMUNICATING.
+`
+
+普通的 thread concurrency model 像是 Java, C++ 或 Python, thread 間通訊都是通過 shared memory 進行, 非常典型的方式是在訪問 shared data(array, map or object) 時通過 lock 來訪問, 因此衍生出一種方便操作的資料結構 `Thread safety` , 如 Java 中 `java.util.concurrent` 中的資料結構
+
+Go 中也實現了傳統的 multithreading concurrency model
+
+Go 的 GSP concurrency model 是通過 `goroutine` 和 `channel` 來實現的
+- `goroutine` 是 Go 中併發的執行單位
+- `channel` 是 Go 中各個併發 struct(goroutine)之前的通訊機制, 有點類似 linux pipeline
+
+### Go Thread Implementation - GMP
+
+- `G` 指 `Goroutine`, 本質上也是一種 ｀Lightweight Process(LWP), 包含 stack, channel 等
+- `M` 指 `Machine`, 一個 `M` 直接關聯一個 kernel thread, 由 OS 管理
+- `P` 指 `Processor`, 代表 `M` 所提供的 context 環境, 也是處理 user level 程式碼邏輯的處理器, 主要負責銜接 `M` 和 `G` 的調度 context, 將等待執行的 `G` 和 `M` 對接
+
+`P` 的數量是由環境變數中的 `GOMAXPROCS` 所決定, 通常來說與 cores 數對應, 例如在 4 cores sever 上會啟動 4 個 thread, `G` 會有很多個, 每個 `P` 會將 `Goroutine` 從一個就緒的 queue 中做 pop 操作, 為了減小 lock 競爭, 通常每個 `P` 會負責一個 queue
+
+Go 中每有一個 go 語句被執行, runqueue 就在其尾段加入一個 goroutine, 一旦 context 運行 goroutine 直到調度點, 它會從 runqueue 中彈出 goroutine, 設置 stack frame 和 pointer 開始運行 goroutine
+
+> 去除 `P`(Processor)
+
+實際上無法去除 context, 讓 `Goroutine` 的 `runqueues` 直接掛到 `M` 上
+
+Context 的目的是當遇到 kernel thread blocing 時, 可以直接放開其他 thread
+
+比如讓系統調用 `sysall`, 一個 thread 肯定無法同時執行程式碼和 system call 而被 block, 此時 thread `M` 需要放棄當前的 context 環境 `P`, 以便讓其他的 `Goroutine` 被調度執行
+
+
+
 
 ## create goroutine
 

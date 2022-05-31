@@ -35,7 +35,7 @@ func (c *Client) PostForm(url string, data url.Values) (resp *Response, err erro
 調用 `http.Get()`方法並傳入請求 URL 即可發起一個 GET request:
 
 ```go
-resp, err := http.Get("https://xueyuanjun.com") 
+resp, err := http.Get("https://regy.dev") 
 if err != nil {    // error handle ...    return }
 defer resp.Body.Close() 
 io.Copy(os.Stdout, resp.Body)
