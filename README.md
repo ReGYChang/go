@@ -20,6 +20,7 @@
 - [learn Go dependency management tool](go/pkg_tools.md)
 - semantic versioning
 - version, scripts, repository and other properties
+- [interview](go/interview.md)
 
 # SQL fundamentals
 # General Development Skills
