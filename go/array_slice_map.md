@@ -593,7 +593,7 @@ type slice struct {
 
 slice 包含 len, cap 和指向 array 第 0 個元素的 pointer
 
-當 slice 傳遞給函數時, 即時透過 pass by value, pointer variable 也將引用相同的底層 array
+當 slice 傳遞給函數時, 即使透過 pass by value, pointer variable 也將引用相同的底層 array
 
 因此當 slice 作為參數傳遞給函數時, 函數內所做的更改也會在函數外可見
 

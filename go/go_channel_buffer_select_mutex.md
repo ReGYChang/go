@@ -894,7 +894,7 @@ func main() {
 	}
 }
 ```
-
+∏
 > Summary
 - 資料沒發完不應該關閉
 - 已經關閉的 channel 不能再向其寫資料 -> panic
