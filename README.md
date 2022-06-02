@@ -46,7 +46,7 @@
       - PostgreSQL
   - NoSQL
       - [MongoDB](database/mongodb.md)
-      - Redis
+      - [Redis](database/redis.md)
   - Search Engines
       - ElasticSearch
 # Caching
