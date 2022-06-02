@@ -12,6 +12,10 @@
     - [Bitmap](#bitmap)
     - [Geo](#geo)
   - [Stream Types(v5.0)](#stream-typesv50)
+    - [Stream Structure](#stream-structure)
+    - [CRUD](#crud)
+    - [Single Consumer](#single-consumer)
+    - [Consumer Group](#consumer-group)
   - [Redis Object](#redis-object)
     - [redisObject](#redisobject)
     - [Shared Object](#shared-object)
@@ -537,6 +541,180 @@ zset
 ```
 
 ## Stream Types(v5.0)
+
+> Redis 5.0 中新增加了一個資料類型 Stream, 其借鑒了 Kafka 的設計, 是一個新的支持 multicast 的可持久化 message queue
+
+基於 Redis message queue 實現有很多種:
+- pub/sub: 無法持久化, 若出現網路斷線, redis 崩潰訊息就會被丟棄
+- 基於 List LPUSH + BRPOP 或 Sorted-Set 實現: 支持持久化但不支持 multicast 及 consumer group
+
+設計一個良好的 MQ 需要考慮什麼?
+- 訊息生產
+- 訊息消費
+  - singlecast
+  - multicast
+- 訊息有序性
+- 訊息持久性
+
+參考自美團技術團隊文章[消息隊列設計精要](https://tech.meituan.com/2016/07/01/mq-design.html)
+![mq_design](img/mq_design.png)
+
+Redis Stream 設計特點:
+- 訊息 ID 序列化生成
+- 訊息遍歷
+- 訊息 blocking read 和 non-blocking read
+- 訊息支持 consumer group
+- 未完成訊息處理
+- MQ 監控
+- ...
+
+> Redis Stream 是一種超輕量 MQ, 並無完全實現 MQ 所有所有設計要點, 決定其適用場景
+
+### Stream Structure
+
+每個 Stream 都有一個唯一的名稱, 其就是 redis key, 在首次使用 `XADD` 指令追加訊息時自動創建
+
+![stream_structure](img/stream_structure.png)
+
+- `Consumer Group`: 由 `XGROUP CREATE` 指令創建, 一個 `Consumer Group` 中有多個 `Consumer`, 其之間為競爭關係
+- `last_delivered_id`: 每個 `Consumer Group` 會有個 `last_delivered_id`, 任意一個 `Consumer` 讀取了訊息都會使 `last_delivered_id` 往前移動
+- `pending_ids`: `Consumer` 狀態變數, 作用是維護 `Consumer` 未確認的id, 其紀錄了當前被 client 讀取的訊息, 但還沒有 `ACK`, 又被稱為 `PFL(Pending Entries List)`用來確保 client 至少消費了訊息一次, 而不會在網路傳輸中被丟棄未處理
+
+此外還需理解兩點:
+- message ID: 形式為 timestampInMillis-sequence, 例如1527846880572-5, 表示當前訊息在毫秒時間戳 1527846880572 時產生, 且是該毫秒內產生的第 5 條訊息; message ID 可由 server 自動生成或由 client 指定, 但形式必須是 int-int, 且後面加入的訊息 ID 必須大於前面的訊息 ID
+- message content: 訊息內容就是 key-value pair, 如同 hash 結構的 key-value pair
+
+### CRUD
+
+- `XADD`: 新增訊息到末端
+- `XTRIM`: 修剪並限制 Stream 長度
+- `XDEL`: 刪除訊息
+- `XLEN`: 讀取 Stream 包含的元素數量, 即訊息長度
+- `XRANGE`: 讀取訊息列表, 會自動過濾已刪除的訊息
+- `XREVRANGE`: 反向讀取訊息列表, ID 從大到小
+- `XREAD`: 以 blocking 或 non-blocking 方式讀取訊息列表
+
+```go
+# *表示 server 自動生成 ID，後面順序跟著一堆 key/value
+127.0.0.1:6379> xadd codehole * name laoqian age 30  #  名字叫laoqian，年齡30岁
+1527849609889-0  # 生成的訊息ID
+127.0.0.1:6379> xadd codehole * name xiaoyu age 29
+1527849629172-0
+127.0.0.1:6379> xadd codehole * name xiaoqian age 1
+1527849637634-0
+127.0.0.1:6379> xlen codehole
+(integer) 3
+127.0.0.1:6379> xrange codehole - +  # -表示最小值, +表示最大值
+127.0.0.1:6379> xrange codehole - +
+1) 1) 1527849609889-0
+   1) 1) "name"
+      1) "laoqian"
+      2) "age"
+      3) "30"
+2) 1) 1527849629172-0
+   1) 1) "name"
+      1) "xiaoyu"
+      2) "age"
+      3) "29"
+3) 1) 1527849637634-0
+   1) 1) "name"
+      1) "xiaoqian"
+      2) "age"
+      3) "1"
+127.0.0.1:6379> xrange codehole 1527849629172-0 +  # 指定最小訊息ID的列表
+1) 1) 1527849629172-0
+   2) 1) "name"
+      2) "xiaoyu"
+      3) "age"
+      4) "29"
+2) 1) 1527849637634-0
+   2) 1) "name"
+      2) "xiaoqian"
+      3) "age"
+      4) "1"
+127.0.0.1:6379> xrange codehole - 1527849629172-0  # 指定最大訊息ID的列表
+1) 1) 1527849609889-0
+   2) 1) "name"
+      2) "laoqian"
+      3) "age"
+      4) "30"
+2) 1) 1527849629172-0
+   2) 1) "name"
+      2) "xiaoyu"
+      3) "age"
+      4) "29"
+127.0.0.1:6379> xdel codehole 1527849609889-0
+(integer) 1
+127.0.0.1:6379> xlen codehole  # 長度不受影響
+(integer) 3
+127.0.0.1:6379> xrange codehole - +  # 被刪除的訊息消失
+1) 1) 1527849629172-0
+   2) 1) "name"
+      2) "xiaoyu"
+      3) "age"
+      4) "29"
+2) 1) 1527849637634-0
+   2) 1) "name"
+      2) "xiaoqian"
+      3) "age"
+      4) "1"
+127.0.0.1:6379> del codehole  # 刪除整个Stream
+(integer) 1
+```
+
+### Single Consumer
+
+可以在不定義 consumer group 時進行 Stream 訊息的獨立消費, 當 Stream 沒有新訊息時甚至可以 blocking wait
+
+Redis 設計了一個單獨的消費指令 `XREAD`, 可以將 Stream 當成普通的訊息對列(list)使用, 使用時可以完全忽略 consumer group 的存在
+
+```go
+# 從 Stream 頭部讀取兩個訊息
+127.0.0.1:6379> xread count 2 streams codehole 0-0
+1) 1) "codehole"
+   2) 1) 1) 1527851486781-0
+         2) 1) "name"
+            2) "laoqian"
+            3) "age"
+            4) "30"
+      2) 1) 1527851493405-0
+         2) 1) "name"
+            2) "yurui"
+            3) "age"
+            4) "29"
+# 從 Stream 尾部讀取一條訊息, 這裡不會返回任何訊息
+127.0.0.1:6379> xread count 1 streams codehole $
+(nil)
+# 從尾部 blocking 等待新訊息, 下面的指令阻塞直到新訊息到來
+127.0.0.1:6379> xread block 0 count 1 streams codehole $
+# 重新打開一個窗口, 從這個窗口往 Stream 塞訊息
+127.0.0.1:6379> xadd codehole * name youming age 60
+1527852774092-0
+# 切換到前面窗口發現阻塞解除, 返回新的訊息內容
+# 並顯示一個等待時間, 這裡等待了 93s
+127.0.0.1:6379> xread block 0 count 1 streams codehole $
+1) 1) "codehole"
+   2) 1) 1) 1527852774092-0
+         2) 1) "name"
+            2) "youming"
+            3) "age"
+            4) "60"
+(93.11s)
+```
+
+Client 若想使用 `XREAD` 進行順序消費, 一定要返回訊息 ID, 下次繼續調用 `XREAD` 時將上次返回的最後一個訊息 ID 作為參數傳遞進去就可以繼續消費後續訊息
+
+block 0 表示永遠 blocking 直到訊息到來, block 1000 表示 blocking 1s, 1s 內沒有訊息來則返回 nil
+
+```go
+127.0.0.1:6379> xread block 1000 count 1 streams codehole $
+(nil)
+(1.07s)
+```
+
+### Consumer Group
+
+![consumer_group](img/consumer_group.png)
 
 ## Redis Object
 
