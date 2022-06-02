@@ -355,9 +355,186 @@ ZSet 通過兩種資料結構實現:
 
 ### HyperLogLog
 
+> Redis 2.8.9 新增 Hyperloglog 資料結構
+
+HyperLogLogs 主要功能為基數統計, 即不重複的元素, 可以在統計各種計數如註冊 IP 數量, 每日訪問 IP 數量, 在線使用者數量等過程中省去大量記憶體
+
+例如一個大型網站每天訪問 IP 有 1M, 粗算一個 IP 消耗 15 Bytes, 1M 個 IP 即 15MB, 而 HyperLogLog 在 Redis 中每個 key 佔用的大小為 12KB, 理論存儲數量接近 2^64
+
+不管儲存的內容為何, 其為一個基於基數估算的演算法, 只能較精準的估算出基數, 可以使用少量固定的記憶體去存儲並識別集合中唯一的元素, 但估算的基數不一定準確, 是一個帶有 0.81% 標準錯誤的近似值(對於能接受一定程度容錯的場景可忽略)
+
+> Execution
+
+```go
+127.0.0.1:6379> pfadd key1 a b c d e f g h i	# 創建第一組元素
+(integer) 1
+127.0.0.1:6379> pfcount key1					# 统计元素的基数数量
+(integer) 9
+127.0.0.1:6379> pfadd key2 c j k l m e g a		# 创建第二组元素
+(integer) 1
+127.0.0.1:6379> pfcount key2
+(integer) 8
+127.0.0.1:6379> pfmerge key3 key1 key2			# 合并两组：key1 key2 -> key3 并集
+OK
+127.0.0.1:6379> pfcount key3
+(integer) 13
+```
+
 ### Bitmap
 
+> 即點陣圖, 用一個 bit 來表示元素狀態, 只有 0 和 1 兩種狀態
+
+主要用於記錄兩個狀態的元素, 如 user 活躍不活躍, 登陸未登陸等
+
+若儲存一年的打卡狀態, 365 天 = 365 bit, 相當於使用 46 bytes 記憶體左右
+
+> Execution
+
+使用 bitmap 紀錄一週七天打卡狀態
+
+```go
+127.0.0.1:6379> setbit sign 0 1
+(integer) 0
+127.0.0.1:6379> setbit sign 1 1
+(integer) 0
+127.0.0.1:6379> setbit sign 2 0
+(integer) 0
+127.0.0.1:6379> setbit sign 3 1
+(integer) 0
+127.0.0.1:6379> setbit sign 4 0
+(integer) 0
+127.0.0.1:6379> setbit sign 5 0
+(integer) 0
+127.0.0.1:6379> setbit sign 6 1
+(integer) 0
+```
+
+查看某一天是否有打卡
+
+```go
+127.0.0.1:6379> getbit sign 3
+(integer) 1
+127.0.0.1:6379> getbit sign 5
+(integer) 0
+```
+
+統計打卡的天數
+
+```go
+127.0.0.1:6379> bitcount sign # 统计这周的打卡记录，就可以看到是否有全勤！
+(integer) 3
+```
+
 ### Geo
+
+> Redis Geo 於 3.2 版本推出, 可以推算地理位置的資訊: 兩地之間距離, 方圓幾公里有誰等
+
+> geoadd: 新增地理位置
+
+```go
+127.0.0.1:6379> geoadd china:city 118.76 32.04 manjing 112.55 37.86 taiyuan 123.43 41.80 shenyang
+(integer) 3
+127.0.0.1:6379> geoadd china:city 144.05 22.52 shengzhen 120.16 30.24 hangzhou 108.96 34.26 xian
+(integer) 3
+```
+
+- 有效的精度從 -180度 -- 180度
+- 有效緯度從 -85.05112878度 -- 85.05112878度
+
+```go
+// # 當座標位置超出上述範圍返回錯誤
+127.0.0.1:6379> geoadd china:city 39.90 116.40 beijin
+(error) ERR invalid longitude,latitude pair 39.900000,116.400000
+```
+
+> geopos: 讀取只成員的經緯度
+
+```go
+127.0.0.1:6379> geopos china:city taiyuan manjing
+1) 1) "112.54999905824661255"
+   1) "37.86000073876942196"
+2) 1) "118.75999957323074341"
+   1) "32.03999960287850968"
+```
+
+> geodist: 若不存在返回空
+
+```go
+127.0.0.1:6379> geodist china:city taiyuan shenyang m
+"1026439.1070"
+127.0.0.1:6379> geodist china:city taiyuan shenyang km
+"1026.4391"
+```
+
+> georadius: 查詢附近的位置, 通過半徑查詢
+
+```go
+127.0.0.1:6379> georadius china:city 110 30 1000 km			以 100,30 座標為中心尋找半徑為 1000km 的城市
+1) "xian"
+2) "hangzhou"
+3) "manjing"
+4) "taiyuan"
+127.0.0.1:6379> georadius china:city 110 30 500 km
+1) "xian"
+127.0.0.1:6379> georadius china:city 110 30 500 km withdist
+1) 1) "xian"
+   2) "483.8340"
+127.0.0.1:6379> georadius china:city 110 30 1000 km withcoord withdist count 2
+1) 1) "xian"
+   2) "483.8340"
+   3) 1) "108.96000176668167114"
+      2) "34.25999964418929977"
+2) 1) "manjing"
+   2) "864.9816"
+   3) 1) "118.75999957323074341"
+      2) "32.03999960287850968"
+```
+
+> georadiusbymember: 顯示與指定成員一定的半徑範圍內的其他成員
+
+```go
+127.0.0.1:6379> georadiusbymember china:city taiyuan 1000 km
+1) "manjing"
+2) "taiyuan"
+3) "xian"
+127.0.0.1:6379> georadiusbymember china:city taiyuan 1000 km withcoord withdist count 2
+1) 1) "taiyuan"
+   2) "0.0000"
+   3) 1) "112.54999905824661255"
+      2) "37.86000073876942196"
+2) 1) "xian"
+   2) "514.2264"
+   3) 1) "108.96000176668167114"
+      2) "34.25999964418929977"
+```
+
+> Geo 底層實現原理就是 Zset, 因此可以通過 ZSet 指令來操作 Geo
+
+```go
+127.0.0.1:6379> type china:city
+zset
+127.0.0.1:6379> zrange china:city 0 -1 withscores
+ 1) "xian"
+ 2) "4040115445396757"
+ 3) "hangzhou"
+ 4) "4054133997236782"
+ 5) "manjing"
+ 6) "4066006694128997"
+ 7) "taiyuan"
+ 8) "4068216047500484"
+ 9) "shenyang"
+1)  "4072519231994779"
+2)  "shengzhen"
+3)  "4154606886655324"
+127.0.0.1:6379> zrem china:city manjing
+(integer) 1
+127.0.0.1:6379> zrange china:city 0 -1
+1) "xian"
+2) "hangzhou"
+3) "taiyuan"
+4) "shenyang"
+5) "shengzhen"
+```
 
 ## Stream Types(v5.0)
 
