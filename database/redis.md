@@ -137,8 +137,8 @@ Relational Database 在 ranking 方面查詢速度普遍偏慢, 可以借住 red
 | String | String, int, float                   | 對 String 或 String 部分操作; 對 int 或 float 進行遞增或遞減                                                                |
 | List   | Linked List, 每個節點都有一個 String | 對 Linked List 頭尾 push 或 pop, 讀取單個或多個元素; 根據值查找或刪除元素                                                   |
 | Set    | 包含 String 的無序集合               | String 集合, 確認是否存在新增, 讀取, 刪除; 計算交集, 聯級, 差集等                                                           |
-| Hash   | 包含 key-value pair 的無序散列表     | 新增, 讀取, 刪除單個元素                                                                                                    |
-| Zset   | 包含 key-value pair 的有序散列表     | String 成員與 float 之間的有序映射; 元素排列順序由 float 大小決定; 新增, 讀取, 刪除單個元素以及根據分值範圍或成員來讀取元素 |
+| Hash   | 包含 key-value pair 的無序 hash table     | 新增, 讀取, 刪除單個元素                                                                                                    |
+| Zset   | 包含 key-value pair 的有序 hash table     | String 成員與 float 之間的有序映射; 元素排列順序由 score 大小決定; 新增, 讀取, 刪除單個元素以及根據 score 範圍或成員來讀取元素 |
 
 ### String
 
@@ -322,7 +322,7 @@ Redis Set 透過 hash table 實現, 新增, 刪除, 查詢的時間複雜度都�
 
 ### ZSet
 
-> Redis 有序集合, 與集合一樣也是 String 類型元素的集合, 且不允許重複成員; 不同的是每個元素都會關聯一個 double 類型的分數, redis 是透過分數來為集合成員進行排序
+> Redis 有序集合, 與集合一樣也是 String 類型元素的集合, 且不允許重複成員; 不同的是每個元素都會關聯一個 double 類型的 score, redis 是透過score 來為集合成員進行排序
 
 ZSet 成員是唯一的, 但分數(score)卻可以重複
 
