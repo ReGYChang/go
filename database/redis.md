@@ -40,8 +40,6 @@
 
 全名為 **Remote Dictionary Server**, 使用 C 撰寫
 
-![redis_object_impl](img/redis_object_impl.png)
-
 ## Why Redis
 
 Redis 有以下幾種特點:
@@ -717,6 +715,9 @@ block 0 表示永遠 blocking 直到訊息到來, block 1000 表示 blocking 1s,
 ![consumer_group](img/consumer_group.png)
 
 ## Redis Object
+
+![redis_object_impl](img/redis_object_impl.png)
+
 
 ### redisObject
 
