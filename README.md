@@ -39,6 +39,7 @@
 # Network
   - [net/http](network/net_http.md)
   - [socket](network/socket.md)
+  - [websocket](network/websocket.md)
 # ORMs
   - Gorm
 # Database
