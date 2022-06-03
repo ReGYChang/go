@@ -40,6 +40,7 @@
   - [net/http](network/net_http.md)
   - [socket](network/socket.md)
   - [WebSocket](network/websocket.md)
+  - [Remote Procedure Call](network/rpc.md)
 # ORMs
   - Gorm
 # Database
