@@ -9,6 +9,8 @@
   - [http.Transport Implementation](#httptransport-implementation)
   - [Transport.RoundTrip() Implementation](#transportroundtrip-implementation)
 - [HTTP/HTTPS Request Handle](#httphttps-request-handle)
+  - [HTTP Request Handle](#http-request-handle)
+  - [HTTPS Request Handle](#https-request-handle)
 
 # net/http
 
@@ -451,4 +453,65 @@ func (t *Transport) RoundTrip(req *Request) (*Response, error) {
 可以通過自定義 `Transport` 實現對 HTTP Client request 的訂製
 
 # HTTP/HTTPS Request Handle
+
+## HTTP Request Handle
+
+使用 `net/http` package 提供的 `http.ListenAndServe()` 函數可以開啟一個 HTTP server, 並且在指定的 IP 和 port 上監聽 client request, 此函數簽名如下:
+
+```go
+func ListenAndServe(addr string, handler Handler) error
+```
+
+該函數有兩個參數:
+- `addr`: 表示監聽的 IP 和 port
+- `handler`: 表示 server 對應的處理程式, 通常為空, 意味著將調用 `http.DefaultServerMux` 處理
+
+> server 業務邏輯處理程式 `http.Handle()` 或 `http.HandleFunc()` 默認會被注入到 `http.DefaultServerMux`
+
+實現一個最基本的 HTTP server:
+
+```go
+package main
+
+import (
+    "fmt"
+    "log"
+    "net/http"
+)
+
+func main() {
+    http.HandleFunc("/hello", func(writer http.ResponseWriter, request *http.Request) {
+        params := request.URL.Query();
+        fmt.Fprintf(writer, "Hello, %s", params.Get("name"))
+    })
+    err := http.ListenAndServe(":8080", nil)
+    if err != nil {
+        log.Fatalf("Failed to start HTTP server: %v", err)
+    }
+}
+```
+
+通過 `http.HandleFunc` 函數定義了一個 `/hello` 路由及其對應處理程式, 處理程式會返回一個 Hello string, 其中還引用了 client 傳送的 request parameter
+
+再通過 `http.ListenAndServe` 函數啟動 HTTP server, 監聽 localhost 8080 port
+
+當 client 請求 `http://127.0.0.1:8080/hello` URL 時, HTTP server 會將其轉發給默認的 `http.DefaultServeMux` 處理, 最後會調用 `http.HandleFunc` 函數定義的處理器 handle request 並 response
+
+實現一個基本的 client request:
+
+```go
+req, err := http.NewRequest("GET", "http://127.0.0.1:8080/hello?name=regy", nil)
+```
+
+## HTTPS Request Handle
+
+net/http package 還提供了 `http.ListenAndServeTLS()` 函數, 用於處理 HTTPS request:
+
+```go
+func ListenAndServeTLS(addr string, certFile string, keyFile string, handler Handler) error
+```
+
+`ListenAndServeTLS()` 和 `ListenAndServe()` 行為一致, 區別在於前者只處理 HTTPS request
+
+Server 必須配置 SSL/TLS 憑證等相關文件, 比如 `certFile` 對應 SSL/TLS 憑證文件目錄, `keyFile` 對應憑證私鑰文件目錄
 
