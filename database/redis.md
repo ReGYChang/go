@@ -555,6 +555,7 @@ zset
 - 訊息持久性
 
 參考自美團技術團隊文章[消息隊列設計精要](https://tech.meituan.com/2016/07/01/mq-design.html)
+
 ![mq_design](img/mq_design.png)
 
 Redis Stream 設計特點:
