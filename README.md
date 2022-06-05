@@ -55,7 +55,7 @@
 # Caching
   - GCache
   - Distributed Cache
-      - Go-Redis
+      - [Go-Redis](go_redis.md)
 # Logging
   - Log Frameworks
       - Zap
