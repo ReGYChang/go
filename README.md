@@ -31,6 +31,7 @@
   - Scrum, Kanban or other project strategies
   - Basic Authentication, OAuth, JWT, etc
   - SOLIC, YAGNI, KISS
+  - [System Design](general/system_design.md)
 # CLI
   - cobra
 # Web Frameworks & Routers
