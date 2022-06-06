@@ -1,34 +1,41 @@
 - [Goroutine](#goroutine)
-	- [Go Concurrency Implementation](#go-concurrency-implementation)
-		- [Go Thread Implementation - GMP](#go-thread-implementation---gmp)
-	- [create goroutine](#create-goroutine)
-	- [goroutine features](#goroutine-features)
-	- [runtime package](#runtime-package)
-		- [Gosched](#gosched)
-		- [Goexit](#goexit)
-		- [GOMAXPROCS](#gomaxprocs)
-		- [Other](#other)
+  - [Go Concurrency Implementation](#go-concurrency-implementation)
+    - [Go Thread Implementation - GMP](#go-thread-implementation---gmp)
+  - [create goroutine](#create-goroutine)
+  - [goroutine features](#goroutine-features)
+  - [runtime package](#runtime-package)
+    - [Gosched](#gosched)
+    - [Goexit](#goexit)
+    - [GOMAXPROCS](#gomaxprocs)
+    - [Other](#other)
 - [Channel](#channel)
-	- [Unbuffered channel](#unbuffered-channel)
-	- [Buffered channel](#buffered-channel)
-		- [WaitGroup](#waitgroup)
-		- [Worker Pool](#worker-pool)
-	- [Close channel](#close-channel)
-		- [Check if channel be closed](#check-if-channel-be-closed)
-	- [One-way channel](#one-way-channel)
-		- [One-way channel features](#one-way-channel-features)
-		- [One-way channel as parm in the function](#one-way-channel-as-parm-in-the-function)
-	- [Timer](#timer)
-		- [Ticker](#ticker)
+  - [Unbuffered channel](#unbuffered-channel)
+  - [Buffered channel](#buffered-channel)
+    - [WaitGroup](#waitgroup)
+    - [Worker Pool](#worker-pool)
+  - [Close channel](#close-channel)
+    - [Check if channel be closed](#check-if-channel-be-closed)
+  - [One-way channel](#one-way-channel)
+    - [One-way channel features](#one-way-channel-features)
+    - [One-way channel as parm in the function](#one-way-channel-as-parm-in-the-function)
+  - [Timer](#timer)
+    - [Ticker](#ticker)
 - [Producer and consumer](#producer-and-consumer)
 - [Select](#select)
-	- [select implement fibonacci sequence](#select-implement-fibonacci-sequence)
-	- [Timeout](#timeout)
+  - [select implement fibonacci sequence](#select-implement-fibonacci-sequence)
+  - [Timeout](#timeout)
 - [Lock](#lock)
-	- [Deadlock](#deadlock)
-	- [Mutex](#mutex)
-	- [RWMutex](#rwmutex)
-	- [sync.Cond](#synccond)
+  - [Deadlock](#deadlock)
+  - [Mutex](#mutex)
+  - [RWMutex](#rwmutex)
+  - [sync.Cond](#synccond)
+  - [sync.atomic](#syncatomic)
+    - [Add](#add)
+    - [Compare And Swap(CAS)](#compare-and-swapcas)
+    - [Load](#load)
+    - [Store](#store)
+    - [Swap](#swap)
+    - [atomic type](#atomic-type)
 
 # Goroutine
 
@@ -1648,3 +1655,208 @@ func main() {
 5. 訪問公共區 --> 讀、寫數據、打印
 6. 解鎖條件變量用的鎖: cond.L.Unlock
 7. 喚醒阻塞在條件變量上的對端: cond.Signal cond.Broadcast
+
+## sync.atomic
+
+通過 mutex 的使用我們可以預期一個 goroutine 在執行 critical section 程式碼時不被其他 goroutine 所影響, 實現 serializable execution, 但不意味著不會被 interrupt
+
+Interrupt 時機很多, 比如任意兩條語句間隙, 甚至某條語句執行過程中, 即使是在 critical section
+
+Mutex 只能保證程式碼 serializable execution, 卻無法保證執行時的 atomic
+
+Atomic 通常是 CPU 和 OS 提供支持, 由於執行過程中不會被 interrupt, 所以 atomic operation 要求很高, 既要簡單又要快速
+
+Go atomic operation 也是基於 CPU 和 OS, 只針對少數資料結構的值提供了 atomic operation functions, 這些 functions 都位於 `sync/atomic`, 包括 `Add`, `Compare And Swap(CAS)`, `Load`, `Store`, `Swap` 等
+
+### Add
+
+可以通過 atomic package 提供下列函數實現加減法的 atomic op, 第一個參數是操作數值對應的指針, 第二個參數是加/減值
+
+- func AddInt32(addr *int32, delta int32) (new int32)
+- func AddInt64(addr *int64, delta int64) (new int64)
+- func AddUint32(addr *uint32, delta uint32) (new uint32)
+- func AddUint64(addr *uint64, delta uint64) (new int64)
+- func AddUintptr(addr *uintptr, delta uintptr) (new uintptr)
+
+雖然函數都以 `Add` 開頭, 但對於減法可以通過傳遞負數實現, 不過對於無號數類型無法通過傳遞負數實現減法
+
+`AddInt32()`
+
+```go
+var i int32 = 1
+atomic.AddInt32(&i, 1)
+fmt.Println("i = i + 1 =", i)
+atomic.AddInt32(&i, -1)
+fmt.Println("i = i - 1 =", i)
+```
+
+output:
+
+```go
+i = i + 1 = 2
+i = i - 1 = 1
+```
+
+### Compare And Swap(CAS)
+
+`CAS` 第一個參數是操作數值對應的 pointer, 第二, 三個參數是待比較和交換的舊值和新值
+
+```go
+// CompareAndSwapInt32 executes the compare-and-swap operation for an int32 value.
+func CompareAndSwapInt32(addr *int32, old, new int32) (swapped bool)
+
+// CompareAndSwapInt64 executes the compare-and-swap operation for an int64 value.
+func CompareAndSwapInt64(addr *int64, old, new int64) (swapped bool)
+
+// CompareAndSwapUint32 executes the compare-and-swap operation for a uint32 value.
+func CompareAndSwapUint32(addr *uint32, old, new uint32) (swapped bool)
+
+// CompareAndSwapUint64 executes the compare-and-swap operation for a uint64 value.
+func CompareAndSwapUint64(addr *uint64, old, new uint64) (swapped bool)
+
+// CompareAndSwapUintptr executes the compare-and-swap operation for a uintptr value.
+func CompareAndSwapUintptr(addr *uintptr, old, new uintptr) (swapped bool)
+```
+
+這些函數會在交換前判斷 `old` 和 `new` 對應的值是否相等, 若不相等才會交換:
+
+```go
+var a int32 = 1
+var b int32 = 2
+var c int32 = 2
+atomic.CompareAndSwapInt32(&a, a, b)
+atomic.CompareAndSwapInt32(&b, b, c)
+fmt.Println("a, b, c:", a, b, c)
+```
+
+output:
+
+```go
+a, b, c: 2 2 2
+```
+
+### Load
+
+`Load` 相關 atomic op 函數如下, 這些函數僅傳遞一個參數, 即待操作數值對應的 pointer, 且有一個返回值, 返回傳入 pointer 指向的值:
+
+```go
+// LoadInt32 atomically loads *addr.
+func LoadInt32(addr *int32) (val int32)
+
+// LoadInt64 atomically loads *addr.
+func LoadInt64(addr *int64) (val int64)
+
+// LoadUint32 atomically loads *addr.
+func LoadUint32(addr *uint32) (val uint32)
+
+// LoadUint64 atomically loads *addr.
+func LoadUint64(addr *uint64) (val uint64)
+
+// LoadUintptr atomically loads *addr.
+func LoadUintptr(addr *uintptr) (val uintptr)
+
+// LoadPointer atomically loads *addr.
+func LoadPointer(addr *unsafe.Pointer) (val unsafe.Pointer)
+```
+
+這裡的 `atomic` 指得是當讀取該 pointer value 時, CPU 不會執行任何其他針對此值的讀寫操作, 如可以調用 `LoadInt32`:
+
+```go
+var x int32 = 100
+y := atomic.LoadInt32(&x)
+fmt.Println("x, y:", x, y)
+```
+
+### Store
+
+`Store` 相關的 atomic op 函數如下, 第一個參數表示待操作變數對應的 pointer, 第二個參數表示要儲存到待操作變數的值:
+
+```go
+// StoreInt32 atomically stores val into *addr.
+func StoreInt32(addr *int32, val int32)
+
+// StoreInt64 atomically stores val into *addr.
+func StoreInt64(addr *int64, val int64)
+
+// StoreUint32 atomically stores val into *addr.
+func StoreUint32(addr *uint32, val uint32)
+
+// StoreUint64 atomically stores val into *addr.
+func StoreUint64(addr *uint64, val uint64)
+
+// StoreUintptr atomically stores val into *addr.
+func StoreUintptr(addr *uintptr, val uintptr)
+
+// StorePointer atomically stores val into *addr.
+func StorePointer(addr *unsafe.Pointer, val unsafe.Pointer)
+```
+
+此操作為 `Load` 的反向操作, 一個用於讀一個用於寫, 通過上述 atomic functions 儲存值時不會出現儲存過程到一半被 CPU interrupt, 比如通過 `StoreInt32` 函數改寫 `y` 變數:
+
+```go
+var x int32 = 100
+var y int32
+atomic.StoreInt32(&y, atomic.LoadInt32(&x))
+fmt.Println("x, y:", x, y)
+```
+
+output 同上
+
+### Swap
+
+`Swap` 和 `CAS` 看起來類似, 但 `Swap` 不關心待操作數的舊值, 直接通過新值替換舊值, 不過 `Swap` 函數會返回一個舊值:
+
+```go
+// SwapInt32 atomically stores new into *addr and returns the previous *addr value.
+func SwapInt32(addr *int32, new int32) (old int32)
+
+// SwapInt64 atomically stores new into *addr and returns the previous *addr value.
+func SwapInt64(addr *int64, new int64) (old int64)
+
+// SwapUint32 atomically stores new into *addr and returns the previous *addr value.
+func SwapUint32(addr *uint32, new uint32) (old uint32)
+
+// SwapUint64 atomically stores new into *addr and returns the previous *addr value.
+func SwapUint64(addr *uint64, new uint64) (old uint64)
+
+// SwapUintptr atomically stores new into *addr and returns the previous *addr value.
+func SwapUintptr(addr *uintptr, new uintptr) (old uintptr)
+
+// SwapPointer atomically stores new into *addr and returns the previous *addr value.
+func SwapPointer(addr *unsafe.Pointer, new unsafe.Pointer) (old unsafe.Pointer)
+```
+
+示範程式碼:
+
+```go
+var j int32 = 1
+var k int32 = 2
+j_old := atomic.SwapInt32(&j, k)
+fmt.Println("old,new:", j_old, j)
+```
+
+output:
+
+```go
+old,new: 1 2
+```
+
+### atomic type
+
+Go 在 1.4 版本發佈時在 `sync/atomic` package 中加了一個新的類型 `Value`, 此類型的值相當於一個容器, 可以被用於 atomic store 和 load 任意值:
+
+```go
+type Value struct {v interface{}}
+```
+
+可以直接宣告一個 `atomic.Value` 類型的變數就可以直接使用, 其只有 `Store` 和 `Load` 兩個 pointer methods, 這兩種方法都是 atomic op:
+
+```go
+var v atomic.Value
+v.Store(100)
+fmt.Println("v:", v.Load())
+```
+
+>❗️Note
+- 儲存值不能為 `nil`
+- 宣告 `atomic.Value` 後無法修改, 違反這兩條會直接 compile error
