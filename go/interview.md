@@ -1,14 +1,10 @@
-- [Channel](#channel)
-- [Map](#map)
-- [json](#json)
-- [const](#const)
-- [string](#string)
-- [method](#method)
-- [select](#select)
-- [slice](#slice)
-- [goroutine](#goroutine)
+- [Syntax](#syntax)
+  - [Channel](#channel)
+  - [Map](#map)
 
-# Channel
+# Syntax
+
+## Channel
 
 1. 下面關於通道(channel)的描述正確的是（單選）?
     - 讀nil通道會觸發panic
@@ -34,7 +30,7 @@
     - 函數什麼也不輸出, 陷入阻塞(blocking)
 
 
-# Map
+## Map
 
 1. 下面的代碼存在什麼問題？
    ```golang
@@ -45,7 +41,7 @@
     }
     ```
 
-# json
+## json
 
 1. 使用標準json package操作下面的結構時, 何者的描述是正確的(單選)?
     ```golang
@@ -62,7 +58,7 @@
     - 執行json.Unmarsha([]byte(s), &amp;f)時 ,會忽略Color字段
     - 執行json.Unmarsha([]byte(s), &amp;f)時會出錯 ,因為Fruit類型沒有Weight字段
 
-# const
+## const
 
 1. 下面代碼中每個constant的值是多少?
     ```golang
@@ -75,7 +71,7 @@
     )
     ```
 
-# string
+## string
 
 1. 針對下面函數中的字串長度的描述正確的是(單選)?
     ```golang 
@@ -90,7 +86,7 @@
     - 不可以針對中文字串計算長度
     - 不確定, 與運行環境有關
 
-# method
+## method
 
 1. 針對下列代碼的描述正確的是(單選)?
     ```golang
@@ -112,7 +108,7 @@
     - SetAget()無法修改年齡
     - SetName()和SetAge()工作正常
 
-# select
+## select
 
 1. 針對下面的函數描述正確的是(單選)?
     ```golang
@@ -125,7 +121,7 @@
     - 函數陷入阻塞(blocking)
     - 函數什麼也不做直接返回
 
-# slice
+## slice
 
 1. 下面的函數輸出為何?
     ```golang 
@@ -150,7 +146,7 @@
     } 
     ```
 
-# goroutine
+## goroutine
 
 1. 下面的函數輸出為何?
     ```golang
@@ -167,4 +163,42 @@
     }
     ```
 
+# Coding
 
+1. sync.WaitGroup 中 Wait 函數支持 WaitTimeout 功能
+
+```go
+package main
+
+import (
+    "fmt"
+    "sync"
+    "time"
+)
+
+func main() {
+    wg := sync.WaitGroup{}
+    c := make(chan struct{})
+    for i := 0; i < 10; i++ {
+        wg.Add(1)
+        go func(num int, close <-chan struct{}) {
+            defer wg.Done()
+            <-close
+            fmt.Println(num)
+        }(i, c)
+    }
+
+    if WaitTimeout(&wg, time.Second*5) {
+        close(c)
+        fmt.Println("timeout exit")
+    }
+    time.Sleep(time.Second * 10)
+}
+
+func WaitTimeout(wg *sync.WaitGroup, timeout time.Duration) bool {
+    // implement
+    // 要求 sync.WaitGroup 支持 timeout
+    // 如果 timeout 到了超時時間返回 true
+    // 如果 WaitGroup 自然結束返回 false
+}
+```
