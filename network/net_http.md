@@ -8,7 +8,8 @@
   - [http.Client Data Structures](#httpclient-data-structures)
   - [http.Transport Implementation](#httptransport-implementation)
   - [Transport.RoundTrip() Implementation](#transportroundtrip-implementation)
-- [HTTP/HTTPS Request Handle](#httphttps-request-handle)
+- [http.Server](#httpserver)
+  - [Handler](#handler)
   - [HTTP Request Handle](#http-request-handle)
   - [HTTPS Request Handle](#https-request-handle)
 
@@ -452,7 +453,95 @@ func (t *Transport) RoundTrip(req *Request) (*Response, error) {
 
 可以通過自定義 `Transport` 實現對 HTTP Client request 的訂製
 
-# HTTP/HTTPS Request Handle
+# http.Server
+
+http.Server 是一個 struct, 簽名如下:
+
+```go
+// A Server defines parameters for running an HTTP server.
+// The zero value for Server is a valid configuration.
+type Server struct {
+	Addr string
+	Handler Handler // handler to invoke, http.DefaultServeMux if nil
+	TLSConfig *tls.Config
+	ReadTimeout time.Duration
+	ReadHeaderTimeout time.Duration
+	WriteTimeout time.Duration
+	IdleTimeout time.Duration
+	MaxHeaderBytes int
+	TLSNextProto map[string]func(*Server, *tls.Conn, Handler)
+	ConnState func(net.Conn, ConnState)
+	ErrorLog *log.Logger
+	BaseContext func(net.Listener) context.Context
+	ConnContext func(ctx context.Context, c net.Conn) context.Context
+	inShutdown atomicBool // true when server is in shutdown
+	disableKeepAlives int32     // accessed atomically.
+	nextProtoOnce     sync.Once // guards setupHTTP2_* init
+	nextProtoErr      error     // result of http2.ConfigureServer if used
+	mu         sync.Mutex
+	listeners  map[*net.Listener]struct{}
+	activeConn map[*conn]struct{}
+	doneChan   chan struct{}
+	onShutdown []func()
+}
+```
+
+- Addr field 表示網絡位址, 若為 "" 表示所有網絡 interface 80 port
+- Handler field 若為 nli, 則為 `DefaultServeMux`
+
+`http.ListenAndServe()` 函數程式碼如下:
+
+```go
+// ListenAndServe always returns a non-nil error.
+func ListenAndServe(addr string, handler Handler) error {
+	server := &Server{Addr: addr, Handler: handler}
+	return server.ListenAndServe()
+}
+```
+
+其中將參數 `addr` 和 `handler` 作為 http.Server struct `Addr` 和 `Handler` field 做初始化, 並調用 `http.Server` 的方法 `ListenAndServe()`
+
+因此以下兩段程式碼功能相同:
+
+```go
+package main
+
+import "net/http"
+
+func main() {
+  // init server
+	server := http.Server{
+		Addr: ":8080",
+		Handler: nil,
+	}
+	server.ListenAndServe()
+
+  // call http.ListenAndServe(addr, handler) directly
+	http.ListenAndServe(":8080", nil)
+}
+```
+
+## Handler
+
+- handler 是一個 interface
+- handler 定義了一個 method ServeHTTP()
+  - http.ResponseWriter
+  - *http.Request
+
+handler interface 簽名如下:
+
+```go
+type Handler interface {
+	ServeHTTP(ResponseWriter, *Request)
+}
+```
+
+若使用 `server.ListenAndServe()` 方法或者調用 `http.ListenAndServe()` 函數且 handler 傳入 nil, 則默認初始化 `DefaultServeMux`
+
+- `DefaultServeMux` 是一個 Multiplexer
+- 其也是一個 Handler, 負責 dispatches requests 到其他 handler
+
+![DefaultServeMux](img/defaultServeMux.png)
 
 ## HTTP Request Handle
 
@@ -464,7 +553,7 @@ func ListenAndServe(addr string, handler Handler) error
 
 該函數有兩個參數:
 - `addr`: 表示監聽的 IP 和 port
-- `handler`: 表示 server 對應的處理程式, 通常為空, 意味著將調用 `http.DefaultServerMux` 處理
+- `handler`: 表示 server 對應的處理程式, 若為空表示將調用 `http.DefaultServerMux` 處理(DefaultServeMux 是一個 multiplexer)
 
 > server 業務邏輯處理程式 `http.Handle()` 或 `http.HandleFunc()` 默認會被注入到 `http.DefaultServerMux`
 
