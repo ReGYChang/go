@@ -11,6 +11,12 @@
 - [http.Server](#httpserver)
   - [Handler](#handler)
     - [http.Handle](#httphandle)
+    - [Build-in Handler](#build-in-handler)
+      - [NotFoundHandler](#notfoundhandler)
+      - [RedirectHandler](#redirecthandler)
+      - [StripPrefix](#stripprefix)
+      - [TimeoutHandler](#timeouthandler)
+      - [FileServer](#fileserver)
   - [HTTP Request Handle](#http-request-handle)
   - [HTTPS Request Handle](#https-request-handle)
 
@@ -597,6 +603,187 @@ func (f HandlerFunc) ServeHTTP(w ResponseWriter, r *Request) {
 ```
 
 透過 `http.HandlerFunc` 類型使函數類型完成了 Handler 類型的轉換
+
+### Build-in Handler
+
+Go 內建了五種 Handler:
+- NotFoundHandler
+- RedirectHandler
+- StripPrefix
+- TimeoutHandler
+- FileServer
+
+#### NotFoundHandler
+
+調用 `http.NotFoundHander()` 函數會返回一個 handler, 其會給每個 request response "404 page not found"
+
+```go
+// NotFoundHandler returns a simple request handler
+// that replies to each request with a ``404 page not found'' reply.
+func NotFoundHandler() Handler { return HandlerFunc(NotFound) }
+```
+
+#### RedirectHandler
+
+`http.RedirectHandler()` 會返回一個 handler, 其會把每個 requests 使用特定的 status code 跳轉到指定的 URL
+
+```go
+// RedirectHandler returns a request handler that redirects
+// each request it receives to the given url using the given
+// status code.
+//
+// The provided code should be in the 3xx range and is usually
+// StatusMovedPermanently, StatusFound or StatusSeeOther.
+func RedirectHandler(url string, code int) Handler {
+	return &redirectHandler{url, code}
+}
+```
+
+- url: 要跳轉的目標 URL
+- code: 跳轉的 status code, 比較常見的有 `StatusMovedPermanently`, `StatusFound` 或 `StatusSeeOther` 等
+
+#### StripPrefix
+
+`http.StripPrefix()` 返回一個 Handler, 其會從 request URL 中去除指定的前綴, 再調用另一個 Handler
+
+若 request URL 與指定的 prefix 不符則返回 `404`
+
+```go
+// StripPrefix returns a handler that serves HTTP requests by removing the
+// given prefix from the request URL's Path (and RawPath if set) and invoking
+// the handler h. StripPrefix handles a request for a path that doesn't begin
+// with prefix by replying with an HTTP 404 not found error. The prefix must
+// match exactly: if the prefix in the request contains escaped characters
+// the reply is also an HTTP 404 not found error.
+func StripPrefix(prefix string, h Handler) Handler {
+	if prefix == "" {
+		return h
+	}
+	return HandlerFunc(func(w ResponseWriter, r *Request) {
+		p := strings.TrimPrefix(r.URL.Path, prefix)
+		rp := strings.TrimPrefix(r.URL.RawPath, prefix)
+		if len(p) < len(r.URL.Path) && (r.URL.RawPath == "" || len(rp) < len(r.URL.RawPath)) {
+			r2 := new(Request)
+			*r2 = *r
+			r2.URL = new(url.URL)
+			*r2.URL = *r.URL
+			r2.URL.Path = p
+			r2.URL.RawPath = rp
+			h.ServeHTTP(w, r2)
+		} else {
+			NotFound(w, r)
+		}
+	})
+}
+```
+
+- prefix: URL 將要被移除的 prefix string
+- h: 移除 prefix string 後此 Handler 將會接受到 request
+
+#### TimeoutHandler
+
+`http.TimeoutHandler()` 返回一個 Handler, 用來在指定時間內運行傳入的 Handler h
+
+```go
+// TimeoutHandler returns a Handler that runs h with the given time limit.
+//
+// The new Handler calls h.ServeHTTP to handle each request, but if a
+// call runs for longer than its time limit, the handler responds with
+// a 503 Service Unavailable error and the given message in its body.
+// (If msg is empty, a suitable default message will be sent.)
+// After such a timeout, writes by h to its ResponseWriter will return
+// ErrHandlerTimeout.
+//
+// TimeoutHandler supports the Pusher interface but does not support
+// the Hijacker or Flusher interfaces.
+func TimeoutHandler(h Handler, dt time.Duration, msg string) Handler {
+	return &timeoutHandler{
+		handler: h,
+		body:    msg,
+		dt:      dt,
+	}
+}
+```
+
+也相當於一個修飾器
+- h: 將要被修飾的 Handler
+- dt: 第一個 Handler 允許處理的時間
+- msg: 若 timeout 則將 msg 返回給 request, 表示 response time 過長
+
+#### FileServer
+
+`http.FileServer()` 返回一個 Handler, 使用基於 root 的 file system 來 response
+
+```go
+// FileServer returns a handler that serves HTTP requests
+// with the contents of the file system rooted at root.
+//
+// As a special case, the returned file server redirects any request
+// ending in "/index.html" to the same path, without the final
+// "index.html".
+//
+// To use the operating system's file system implementation,
+// use http.Dir:
+//
+//     http.Handle("/", http.FileServer(http.Dir("/tmp")))
+//
+// To use an fs.FS implementation, use http.FS to convert it:
+//
+//	http.Handle("/", http.FileServer(http.FS(fsys)))
+//
+func FileServer(root FileSystem) Handler {
+	return &fileHandler{root}
+}
+```
+
+`FileSystem` 是一個 interface, 簽名如下:
+
+```go
+type FileSystem interface {
+	Open(name string) (File, error)
+}
+```
+
+可以使用此 interface 實現自定義 `FileSystem`, 若需使用到 OS 的 file system, 需要使用 `Dir` 類型
+
+```go
+type Dir string
+
+func (d Dir) Open(name string) (File, error)
+```
+
+`Dir` 類型 implement `FileSystem` interface `Open()` 方法, 底層類型為 string
+
+> 實現瀏覽特定目錄文件的 Handler:
+
+```go
+package main
+
+import "net/http"
+
+
+func main() {
+	http.HandleFunc("/", func (w http.ResponseWriter, r *http.Request)  {
+		http.ServeFile(w, r, "wwwroot" + r.URL.Path)
+	})
+	http.ListenAndServe(":8080", nil)
+}
+```
+
+上述程式實現了一個 Handler, 可以直接瀏覽 `wwwroot` 目錄下的文件, 不需要在 URL 輸入 `wwwroot`
+
+若使用 `http.FileServer()` 的 `fileHandler` 處理相同請求如下:
+
+```go
+package main
+
+import "net/http"
+
+
+func main() {
+	http.ListenAndServe(":8080", http.FileServer(http.Dir("wwwroot")))
+}
+```
  
 ## HTTP Request Handle
 
