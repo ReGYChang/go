@@ -19,6 +19,13 @@
       - [FileServer](#fileserver)
   - [HTTP Request Handle](#http-request-handle)
   - [HTTPS Request Handle](#https-request-handle)
+- [HTTP Message](#http-message)
+  - [HTTP Request](#http-request)
+    - [Request URL](#request-url)
+    - [Request Header](#request-header)
+    - [Request Body](#request-body)
+    - [Form](#form)
+    - [PostForm](#postform)
 
 # net/http
 
@@ -846,3 +853,238 @@ func ListenAndServeTLS(addr string, certFile string, keyFile string, handler Han
 
 Server 必須配置 SSL/TLS 憑證等相關文件, 比如 `certFile` 對應 SSL/TLS 憑證文件目錄, `keyFile` 對應憑證私鑰文件目錄
 
+# HTTP Message
+
+HTTP message 分為 HTTP Request 和 HTTP Response
+
+兩者具有相同的結構:
+- request/reponse line
+- 0 或多個 header
+- 可選的 body
+
+```go
+// request line
+GET /Protocols/rfc2616/rfc2616.html HTTP/1.1
+
+// request headers
+Host: www.w3.org
+User-Agent: Mozilla/5.0
+
+// blank body
+blank
+```
+
+`net/http` package 提供了 HTTP message struct
+
+## HTTP Request
+
+`net/http` 中提供 Request struct, 代表 client 發送的 HTTP request message
+
+其中重要的幾個 field:
+- URL
+- Header
+- Body
+- Form, PostForm, MultipartForm
+
+也可以通過 Request 方法訪問請求中的 Cookie, URL, User Agent 等資訊
+
+Request 既可以代表發送到 server 的請求, 也可以代表從 client 發出的請求
+
+### Request URL
+
+Request URL field 代表了 request line 中的部分內容
+
+URL field 是指向 `url.URL` 類型的一個 pointer, `url.URL` 為一個 struct:
+
+```go
+type URL struct {
+	Scheme      string
+	Opaque      string    // encoded opaque data
+	User        *Userinfo // username and password information
+	Host        string    // host or host:port
+	Path        string    // path (relative paths may omit leading slash)
+	RawPath     string    // encoded path hint (see EscapedPath method)
+	ForceQuery  bool      // append a query ('?') even if RawQuery is empty
+	RawQuery    string    // encoded query values, without '?'
+	Fragment    string    // fragment for references, without '#'
+	RawFragment string    // encoded fragment hint (see EscapedFragment method)
+}
+```
+
+URL 通用格式為: scheme://[userinfo@]host/path[?query][#fragment]
+
+若不以斜槓開頭的 URL 被解釋為: scheme:opaque[?query][#fragment]
+
+![url_format](img/url_example.png)
+
+URL Query 是透過 RawQuery 提供實際查詢的 string, 如 "http://www.example.com/post?id=123&thread_id=13"
+
+另一種簡單的方法是透過 Request 的 Form field 來取得 key-value pair 資訊
+
+URL Fragment 主要用來標記 URL 中所標記資源中的某個資源, 若從 browser 發出的請求則無法提取 Fragment field value, browser 發送請求時會將 fragment 部分去除
+
+可以通過 `r.URL.Query()` 方法來查詢請求參數:
+
+```go
+// http://www.example.com/post?id=123&thread_id=456
+
+url := r.URL
+
+query := url.Query() // map[string][]string
+
+id := query["id"] // []string{"123"}
+
+threadId := query["thread_id"] // "456"
+```
+
+### Request Header
+
+Request/Response 的 headers 是通過 Header 類型來描述, 其為一個 map, 用來描述 HTTP Header 中的 key-value pair
+
+```go
+type Header map[string][]string
+```
+
+設置 key 時會創建一個空 []string 作為 value, value 中第一個元素就是新 header 的值
+
+為指定的 key 添加一個新的 header 值, 可直接執行 append 函數
+
+取得 Request Header 有三種方式:
+- r.Header: 返回 Header 類型的 map
+- r.Header["Accept-Encoding"]: 返回 [gzip,deflate] ([]string 類型)
+- r.Header.Get("Accept-Encoding"): 返回 gzip, deflate (string 類型)
+
+### Request Body
+
+Request/Response 的 bodies 都是使用 Body field 表示
+
+Body 是一個 `io.ReadCloser` interface, 其由兩個 interface 組成:
+- `Reader` interface
+- `Closer` interface
+
+`Reader` interface 定義了一個 `Read()` 函數:
+
+```go
+Read(p []byte) (n int, err error)
+```
+
+`Closer` interface 定義了一個 `Close()` 函數:
+
+```go
+Close() error
+```
+
+若想讀取 request body 內容, 可以調用 Body 的 Read 方法:
+
+```go
+package main
+
+import (
+	"fmt"
+	"net/http"
+)
+
+
+func main() {
+	server := http.Server{
+		Addr: ":8080",
+		Handler: nil,
+	}
+
+	http.HandleFunc("/post", func(w http.ResponseWriter, r *http.Request) {
+		length := r.ContentLength
+		body := make([]byte, length)
+		r.Body.Read(body)
+
+		fmt.Fprintln(w, string(body))
+	})
+
+	server.ListenAndServe()
+}
+```
+
+### Form
+
+HTML Form 中的資料會以 name-value pair 形式通過 POST 請求發送, 資料內容會放在 POST 請求中的 Body
+
+通過 POST 發送的 name-value pair format 可以通過 Form Content Type 指定, 也就是 enctype 屬性
+
+```HTML
+<form action="/process" method="post" enctype="apllication/x-www-form-urlencoded">
+  <input type="text" name="first name"/>
+  <input type="text" name="last name"/>
+  <input type="submit"/>
+</form>
+```
+
+Form enctype property:
+- default value: `application/x-www-form-urlencoded`
+- browser 至少要支持: `application/x-www-form-urlencoded`, `multipart/form-data`
+- 若為 HTML5 還要求支持 `text/plain`
+
+若 `enctype` 為 `application/x-www-form-urlencoded`, browser 會將 form data 編碼到 query string 中, 如:
+
+```go
+first_name=sau%20regy&last_name=chang
+```
+
+若 `enctype` 是 `multipart/form-data`:
+- 每個 name-value pair 會被轉換為一個 `MIME` message 部分
+- 每個部分都有自己的 `Content Type` 和 `Content Disposition`
+
+![form_multipart](img/form_multipart.png)
+
+針對簡單的文本, 則可直接使用 Form URL encoded; 若需要上傳大量資料, 如上傳文件, 則可使用 multipart-MIME, 甚至可以把 binary data 通過 `Base64` 編碼當作文本發送
+
+通過 form method property, 可以設置請求方法為 GET 或是 POST
+
+GET request 沒有 Body, 所有的資料都通過 URL 的 name-value pair 發送
+
+`Request` 函數允許從 URL/Body 中提取資料, 通過以下 field:
+- Form
+- PostForm
+- MultipartForm
+
+```go
+package main
+
+import (
+	"fmt"
+	"net/http"
+)
+
+
+func main() {
+	server := http.Server{
+		Addr: ":8080",
+		Handler: nil,
+	}
+
+	http.HandleFunc("/post", func(w http.ResponseWriter, r *http.Request) {
+		r.ParseForm()
+		fmt.Fprintln(w, r.Form)
+	})
+
+	server.ListenAndServe()
+}
+```
+
+- Form 中資料是 key-value pair
+- 先調用 `ParseForm` 或 `ParseMultipartForm` 來解析 Request
+- 再讀取對應的 Request Form, PostForm, MultipartFrom field
+
+Form 為 `url.Values` 類型:
+
+```go
+type Values map[string][]string
+```
+
+### PostForm
+
+> `Form` 和 `PostForm` 皆不支持 `multipart/form-data` enctype, 只支持 `application/x-www-form-urlencoded`, 若要使用 `multipart` 則需使用 `MultipartForm`
+
+在 Form 中如果只想取 first_name 這個 key 的 value, 可以使用 `r.Form["first_name"]`, 其會返回一個元素的 slice: ["Dave"]
+
+若 `Form` 和 URL 有相同的 key, 則其會放在同一個 slice 中, `Form` 中的值在前, URL 的值在後
+
+若只想要 `Form` 中的 key-value pair 而不要 URL 的, 可以使用 `PostForm` field
