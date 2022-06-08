@@ -10,6 +10,7 @@
   - [Transport.RoundTrip() Implementation](#transportroundtrip-implementation)
 - [http.Server](#httpserver)
   - [Handler](#handler)
+    - [http.Handle](#httphandle)
   - [HTTP Request Handle](#http-request-handle)
   - [HTTPS Request Handle](#https-request-handle)
 
@@ -543,6 +544,60 @@ type Handler interface {
 
 ![DefaultServeMux](img/defaultServeMux.png)
 
+### http.Handle
+
+可以使用 `http.Handle` 將某個 Handler 附加到 DefaultServeMux
+- http package 有一個 Handle 函數
+- ServerMux struct 也有一個 Handler 方法
+- 調用 `http.Handle` 實際上調用的是 `DefaultServeMux` 上的 Handle 方法
+
+`http.Handle` 函數簽名如下:
+
+```go
+// Handle registers the handler for the given pattern
+// in the DefaultServeMux.
+// The documentation for ServeMux explains how patterns are matched.
+func Handle(pattern string, handler Handler) { DefaultServeMux.Handle(pattern, handler) }
+```
+- 第一個參數為註冊的訪問路徑
+- 第二個參數為 上述提及 handler 來處理請求
+
+> 另一種方式可以使用 `http.HandleFunc()` 函數的方式來註冊 Handler, 將某個具有適當簽名的函數 f 適配成為一個 Handler, 此 Handler 具有方法 f
+
+```go
+func HandleFunc(pattern string, handler func(ResponseWriter, *Request)) {
+	DefaultServeMux.HandleFunc(pattern, handler)
+}
+```
+
+第二個參數為參數為 `http.ResponseWriter` 和 `http.Request` 的函數, 會直接調用 `DefaultServeMux.HandleFunc()` 方法
+
+```go
+func (mux *ServeMux) HandleFunc(pattern string, handler func(ResponseWriter, *Request)) {
+	if handler == nil {
+		panic("http: nil handler")
+	}
+	mux.Handle(pattern, HandlerFunc(handler))
+}
+```
+
+`DefaultServeMux.HandleFunc()` 方法 一樣會使用 `http.Handle()` 函數將所傳入的函數包裝為 Handler, **注意此處 HandlerFunc() 為函數類型, 其實現了 `ServeHTTP` 方法即 implement Handler interface**
+
+```go
+// The HandlerFunc type is an adapter to allow the use of
+// ordinary functions as HTTP handlers. If f is a function
+// with the appropriate signature, HandlerFunc(f) is a
+// Handler that calls f.
+type HandlerFunc func(ResponseWriter, *Request)
+
+// ServeHTTP calls f(w, r).
+func (f HandlerFunc) ServeHTTP(w ResponseWriter, r *Request) {
+	f(w, r)
+}
+```
+
+透過 `http.HandlerFunc` 類型使函數類型完成了 Handler 類型的轉換
+ 
 ## HTTP Request Handle
 
 使用 `net/http` package 提供的 `http.ListenAndServe()` 函數可以開啟一個 HTTP server, 並且在指定的 IP 和 port 上監聽 client request, 此函數簽名如下:
