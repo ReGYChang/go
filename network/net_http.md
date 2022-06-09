@@ -30,6 +30,12 @@
       - [FormValue()](#formvalue)
       - [FormFile()](#formfile)
       - [MultipartReader()](#multipartreader)
+  - [ResponseWriter](#responsewriter)
+    - [Write](#write)
+    - [WriteHeader](#writeheader)
+    - [Header](#header)
+    - [Response JSON](#response-json)
+    - [Build-in Response](#build-in-response)
 
 # net/http
 
@@ -1248,3 +1254,206 @@ func (r *Request) MultipartReader() (*multipart.Reader, error) {}
 - 不是將 Form 當成一個物件來處理, 也不是一次性獲得整個 map
 - 而是逐一檢查 Form value 再各個處理
 
+## ResponseWriter
+
+從 server 向 client return response 需要使用 `ResponseWriter`, 其為一個 interface, handler 用它來返回 response
+
+透過 `ResponseWriter` 來使用 private type `http.response`:
+
+```go
+type ResponseWriter interface {
+	Header() Header
+	Write([]byte) (int, error)
+	WriteHeader(statusCode int)
+}
+```
+
+`http.response` struct implement `ResponseWriter` 三個方法
+
+![response_mothods](img/http_response_methods.png)
+
+> 為何 Handler 的 `ServeHTTP(w ResponseWriter, r *Request)` 只有 Request 是 pointer type?
+
+因為 `*http.response` 實現了 `ResponseWriter` interface, 所以操作 `ResponseWriter` 就代表操作 `*http.response`, 故也是 pass by reference
+
+`ResponseWriter` 的 `Write` 方法接收一個 byte slice 作為參數, 然後將其寫入到 HTTP response 的 Body 中
+
+### Write
+
+若在 `Write` 方法被調用時 header 中沒有設定 content type, 那麼資料前 512 bytes 就會被用來檢測 content type
+
+```go
+package main
+
+import (
+	"net/http"
+)
+
+func writeExample(w http.ResponseWriter, r *http.Request){
+	str := `<html><head><title>Go Web</title></head><body><h1>Hello Go</h1></body></html>`
+	w.Write([]byte(str))
+}
+
+func main() {
+	server := http.Server{
+		Addr: ":8080",
+		Handler: nil,
+	}
+
+	http.HandleFunc("/write", writeExample)
+	server.ListenAndServe()
+}
+```
+
+使用 `curl` 測試:
+
+```go
+curl -i GET 'http://localhost:8080/write'
+curl: (6) Could not resolve host: GET
+HTTP/1.1 200 OK
+Date: Thu, 09 Jun 2022 06:33:03 GMT
+Content-Length: 77
+Content-Type: text/html; charset=utf-8
+
+<html><head><title>Go Web</title></head><body><h1>Hello Go</h1></body></html>%
+```
+
+### WriteHeader
+
+`WriteHeader` 方法接收一個整數類型 (http status code) 作為參數, 並將其作為 HTTP response status code 返回
+
+若此方法未被顯式調用, 則在第一次調用 `Write` 方法前會隱式調用 `WriteHeader(http.StatusOK)`
+
+`WriteHeader` 主要用來發送錯誤類 HTTP status code, 調用完之後還是可以寫入 `ResponseWriter`, 但無法再次修改 header
+
+```go
+package main
+
+import (
+	"fmt"
+	"net/http"
+)
+
+func writeHeaderExample(w http.ResponseWriter, r *http.Request){
+	w.WriteHeader(501)
+	fmt.Fprintln(w, "No such service, try next door")
+}
+
+func main() {
+	server := http.Server{
+		Addr: ":8080",
+		Handler: nil,
+	}
+
+	http.HandleFunc("/writeHeader", writeHeaderExample)
+	server.ListenAndServe()
+}
+```
+
+### Header
+
+`Header` 方法返回 `headers` 的 map, 可以進行修改, 修改後的 `headers` 將會體現在返回 client 的 HTTP response 中
+
+```go
+package main
+
+import (
+	"fmt"
+	"net/http"
+)
+
+func writeExample(w http.ResponseWriter, r *http.Request){
+	str := `<html><head><title>Go Web</title></head><body><h1>Hello Go</h1></body></html>`
+	w.Write([]byte(str))
+}
+
+func writeHeaderExample(w http.ResponseWriter, r *http.Request){
+	w.WriteHeader(501)
+	fmt.Fprintln(w, "No such service, try next door")
+}
+
+func headerExample(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("location", "www.google.com")
+	w.WriteHeader(302)
+}
+
+func main() {
+	server := http.Server{
+		Addr: ":8080",
+		Handler: nil,
+	}
+
+	http.HandleFunc("/write", writeExample)
+	http.HandleFunc("/writeHeader", writeHeaderExample)
+	http.HandleFunc("/header", headerExample)
+	server.ListenAndServe()
+}
+```
+
+使用 `curl` 測試:
+
+```go
+curl -i GET 'http://localhost:8080/header'
+curl: (6) Could not resolve host: GET
+HTTP/1.1 302 Found
+Location: www.google.com
+Date: Thu, 09 Jun 2022 06:50:32 GMT
+Content-Length: 0
+```
+
+### Response JSON
+
+```go
+package main
+
+import (
+	"fmt"
+	"net/http"
+	"encoding/json"
+)
+
+type Post struct {
+	User string
+	Threads []string
+}
+
+func jsonExample(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	post := &Post{
+		User: "Regy Chang",
+		Threads: []string{"first", "second", "third"},
+	}
+	json, _ := json.Marshal(post)
+	w.Write(json)
+}
+
+func main() {
+	server := http.Server{
+		Addr: ":8080",
+		Handler: nil,
+	}
+
+	http.HandleFunc("/json", jsonExample)
+	server.ListenAndServe()
+}
+```
+
+使用 `curl` 測試:
+
+```go
+curl -i GET 'http://localhost:8080/json'
+curl: (6) Could not resolve host: GET
+HTTP/1.1 200 OK
+Content-Type: application/json
+Date: Thu, 09 Jun 2022 06:56:18 GMT
+Content-Length: 58
+
+{"User":"Regy Chang","Threads":["first","second","third"]}%
+```
+
+### Build-in Response
+
+- `NotFound` 函數, 包裝一個 404 status code 和一個額外的資訊
+- `ServeFile` 函數, 從 file system 提供文件返回給請求者
+- `ServeContent` 函數, 其可以把實現了 `io.ReadSeeker` interface 的任何物件中的內容返回給請求者; 另外還可以處理 Range request, 若只請求了資源的部分內容則可以預期響應, 而 `ServeFile` 或 `io.Copy` 則無法
+- `Redirect` 函數, 告訴 client 重定向到另一個 URL
