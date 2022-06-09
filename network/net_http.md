@@ -26,6 +26,10 @@
     - [Request Body](#request-body)
     - [Form](#form)
     - [PostForm](#postform)
+    - [MultipartForm](#multipartform)
+      - [FormValue()](#formvalue)
+      - [FormFile()](#formfile)
+      - [MultipartReader()](#multipartreader)
 
 # net/http
 
@@ -1088,3 +1092,159 @@ type Values map[string][]string
 若 `Form` 和 URL 有相同的 key, 則其會放在同一個 slice 中, `Form` 中的值在前, URL 的值在後
 
 若只想要 `Form` 中的 key-value pair 而不要 URL 的, 可以使用 `PostForm` field
+
+### MultipartForm
+
+要使用 `MultipartForm` field 需要先調用 `ParseMultipartForm` 方法, 該方法會在必要時調用 `ParseForm` 方法, 參數為需要讀取資料的長度
+
+`MultipartForm` 只包含表單的 key-value pair, 其返回類型是一個 struct 而不是 map, 其中包含兩個 map:
+
+```go
+type Form struct {
+	Value map[string][]string
+	File  map[string][]*FileHeader
+}
+```
+
+```go
+package main
+
+import (
+	"fmt"
+	"net/http"
+)
+
+
+func main() {
+	server := http.Server{
+		Addr: ":8080",
+		Handler: nil, 
+	}
+
+	http.HandleFunc("/post", func(w http.ResponseWriter, r *http.Request) {
+		r.ParseMultipartForm(1024)
+		fmt.Fprintln(w, r.MultipartForm)
+	})
+
+	server.ListenAndServe()
+}
+```
+
+#### FormValue()
+
+另外調用 Request `FormValue` 方法會返回 Form field 中指定 key 對應的第一個 value, **不需再調用 `ParseForm` 或 `ParseMultipartForm`**
+
+`PostFormValue` 方法也一樣, 但只能讀取 PostForm field, 且 `FormValue` 和 `PostFormValue` 都會調用 `ParseMultipartForm` 方法 
+
+用 `multipart/form-data` 實作上傳文件:
+
+```go
+package main
+
+import (
+	"fmt"
+	"io/ioutil"
+	"log"
+	"net/http"
+)
+
+func process(w http.ResponseWriter, r *http.Request){
+	r.ParseMultipartForm(1024)
+
+	fileHeader := r.MultipartForm.File["uploaded"][0]
+	file, err := fileHeader.Open()
+	if err != nil {
+		log.Fatal("Upload file error")
+	}
+
+	data, err := ioutil.ReadAll(file)
+	if err != nil {
+		log.Fatal("Read file error")
+	}
+
+	fmt.Fprintln(w, string(data))
+}
+
+func main() {
+	server := http.Server{
+		Addr: ":8080",
+		Handler: nil,
+	}
+
+	http.HandleFunc("/upload", process)
+
+	server.ListenAndServe()
+
+}
+```
+
+`multipart/form-data` 最常見的應用場景就是上傳文件:
+- 首先調用 `ParseMultipartForm` 方法
+- 從 MultipartForm struct 的 File field 中獲得 FileHeader, 並調用其方法 `Open()` 來獲得文件
+- 可以使用 `ioutil.ReadAll` 函數將文件內容讀到 byte slice 中
+
+#### FormFile()
+
+上傳文件也可以使用 `FormFile()` 方法實現:
+
+```go
+package main
+
+import (
+	"fmt"
+	"io/ioutil"
+	"log"
+	"net/http"
+)
+
+func process(w http.ResponseWriter, r *http.Request){
+	// r.ParseMultipartForm(1024)
+
+	// fileHeader := r.MultipartForm.File["uploaded"][0]
+	// file, err := fileHeader.Open()
+
+	file, _, err := r.FormFile("uploaded")
+
+	if err != nil {
+		log.Fatal("upload file error")
+	}
+
+	data, err := ioutil.ReadAll(file)
+	if err != nil {
+		log.Fatal("Read file error")
+	}
+
+	fmt.Fprintln(w, string(data))
+}
+
+func main() {
+	server := http.Server{
+		Addr: ":8080",
+		Handler: nil,
+	}
+
+	http.HandleFunc("/upload", process)
+
+	server.ListenAndServe()
+
+}
+```
+
+使用 `FormFile()` 方法則無須調用 `ParseMultipartForm`, 其會返回**指定 key 對應的第一個 value**, 會同時返回 File 和 FileHeader 及 Error, 若只上傳一個文件可以使用這種方法
+
+> ParseForm 這類方法只能處理 `application/x-www-form-urlencoded` 編碼的資料, 無法處理 `application/json`
+
+#### MultipartReader()
+
+Request `MultipartReader()` 方法也可以用來讀取 Form data, 其簽名如下:
+
+```go
+func (r *Request) MultipartReader() (*multipart.Reader, error) {}
+```
+
+若 request 為 `multipart/form-data` 或 `multipart` 混合的 POST method, 則 `MultipartReader` 返回一個 MIME multipart reader; 否則返回 nil 及 error
+
+可以使用該方法代替 `ParseMultipartForm` 把請求的 body 作為 stream 處理:
+- 不是將 Form 當成一個物件來處理, 也不是一次性獲得整個 map
+- 而是逐一檢查 Form value 再各個處理
+
