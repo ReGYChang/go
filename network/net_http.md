@@ -17,6 +17,7 @@
       - [StripPrefix](#stripprefix)
       - [TimeoutHandler](#timeouthandler)
       - [FileServer](#fileserver)
+  - [DefaultServeMux](#defaultservemux)
   - [HTTP Request Handle](#http-request-handle)
   - [HTTPS Request Handle](#https-request-handle)
 - [HTTP Message](#http-message)
@@ -802,6 +803,157 @@ func main() {
 }
 ```
  
+## DefaultServeMux
+
+`http.ListenAndServe` 函數第二個參數若傳入 nil, 表示底層會使用默認 `DefaultServeMux` 實現將 `HandleFunc` 函數傳入的 handler 函數轉化為基於 closure 方式定義的 router:
+
+```go
+http.HandleFunc("/", sayHelloWorld)
+err := http.ListenAndServe(":9091", nil)
+```
+
+`DefaultServeMux` 所屬的類型是 `ServeMux`:
+
+```go
+var DefaultServeMux = &defaultServeMux
+var defaultServeMux ServeMux
+```
+
+`ServeMux` 資料結構如下:
+
+```go
+type ServeMux struct {
+    mu    sync.RWMutex. // 由於請求涉及併發處理, 因此需要 lock
+    m     map[string]muxEntry // routing rules map, 存放 URL 路徑與 Handler 映射關係
+    es    []muxEntry // MuxEntry slice(按最長到最短排序)
+    hosts bool       // routing rules 中是否包含 host 資訊
+}
+```
+
+這邊關注 `muxEntry` 資料結構:
+
+```go
+type muxEntry struct {
+    h   Handler       // Handler implementation
+    pattern string    // pattern string
+}
+```
+
+最後來看 `Handler` 定義, 其為一個 interface:
+
+```go
+type Handler interface {
+    ServeHTTP(ResponseWriter, *Request) // routing handle implementation
+}
+```
+
+之前定義的 `sayHelloWorld` 函數並沒有實現 `Handler` interface, 之所有可以成功添加到 routing rules map 是因爲在底層通過 `HandlerFunc()` 函數將其強制轉化成了 `HandlerFunc` 類型, 而 `HandlerFunc` 類型實現了 `ServeHTTP` 方法, 這樣 `sayHelloWorld` 函數也就實現了 `Handler` interface
+
+```go
+func (mux *ServeMux) HandleFunc(pattern string, handler func(ResponseWriter, *Request)) {
+    if handler == nil {
+      panic("http: nil handler")
+    }
+    mux.Handle(pattern, HandlerFunc(handler))
+}
+
+...
+
+type HandlerFunc func(ResponseWriter, *Request)
+
+func (f HandlerFunc) ServeHTTP(w ResponseWriter, r *Request) {
+    f(w, r)
+}
+```
+
+對於 `sayHelloWorld` 函數來說已經變成了 `HandlerFunc` 類型的函數類型, 當在其實體上調用 `ServeHTTP` 方法時調用的就是 `sayHelloWorld` 方法本身
+
+當在 `DefaultServeMux.HandleFunc` 中調用 `mux.Handle` 方法時, 實際上是將其路由映射規則保存到 `DefaultServeMux` routing rules map 中
+
+```go
+func (mux *ServeMux) Handle(pattern string, handler Handler) {
+  mux.mu.Lock()
+  defer mux.mu.Unlock()
+
+  if pattern == "" {
+    panic("http: invalid pattern")
+  }
+  if handler == nil {
+    panic("http: nil handler")
+  }
+  if _, exist := mux.m[pattern]; exist {
+    panic("http: multiple registrations for " + pattern)
+  }
+
+  if mux.m == nil {
+    mux.m = make(map[string]muxEntry)
+  }
+  e := muxEntry{h: handler, pattern: pattern}
+  mux.m[pattern] = e
+  if pattern[len(pattern)-1] == '/' {
+    mux.es = appendSorted(mux.es, e)
+  }
+
+  if pattern[0] != '/' {
+    mux.hosts = true
+  }
+}
+```
+
+這裡 `pattern` 字符串對應的請求路徑 `/`, `handler` 對應的是 `sayHelloWorld` 函數
+
+保存好 routing rules 之後, client requests 如何分發? `DefaultServeMux` 會調用 `ServeMux` 實現的 `ServeHTTP` 方法:
+
+```go
+func (mux *ServeMux) ServeHTTP(w ResponseWriter, r *Request) {
+    if r.RequestURI == "*" {
+        w.Header().Set("Connection", "close")
+        w.WriteHeader(StatusBadRequest)
+        return
+    }
+    
+    h, _ := mux.Handler(r)
+    h.ServeHTTP(w, r)
+}
+```
+
+如上所示, 當 routing handler 收到請求後, 若 URL 路徑是 `"*"` 則關閉連接, 否則調用 `mux.Handler(r)` 並返回對應請求路徑匹配的 Handler, 然後執行 `h.ServeHTTP(w, r)`, 也就是調用對應路由 Handler 的 `ServeHTTP` 方法, 以 `/` 路由為例, 即調用 `sayHelloWorld`
+
+了解了默認的 `DefaultServeMux` 的實現, 就可以編寫自定義 routing handler, 只需要 implement `Handler` interface, 再將其實體傳遞給 `http.ListenAndServe` 函數即可:
+
+```go
+package main
+
+import (
+    "fmt"
+    "net/http"
+)
+
+type MyHander struct {
+
+}
+
+func (handler *MyHander) ServeHTTP(w http.ResponseWriter, r *http.Request)  {
+    if r.URL.Path == "/" {
+        sayHelloGolang(w, r)
+        return
+    }
+    http.NotFound(w, r)
+    return
+}
+
+func sayHelloGolang(w http.ResponseWriter, r *http.Request) {
+    fmt.Fprintf(w, "Hello Golang!")
+}
+
+func main()  {
+    handler := MyHander{}
+    http.ListenAndServe(":9091", &handler)
+}
+```
+
+上述 routing handler 實現很簡單, 沒有在應用啟動時初始化路由映射規則, 而是啟動後根據請求參數動態判斷做分發, 這樣會影響性能且使用不靈活, 可以使用其他自定義 router libary, 如 `gorilla/mux`
+
 ## HTTP Request Handle
 
 使用 `net/http` package 提供的 `http.ListenAndServe()` 函數可以開啟一個 HTTP server, 並且在指定的 IP 和 port 上監聽 client request, 此函數簽名如下:
