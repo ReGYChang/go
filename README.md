@@ -40,6 +40,7 @@
   - Gin
 # Network
   - [net/http](network/net_http.md)
+  - [gorilla/mux](network/gorilla_mux.md)
   - [socket](network/socket.md)
   - [WebSocket](network/websocket.md)
   - [Remote Procedure Call](network/rpc.md)
