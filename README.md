@@ -32,6 +32,7 @@
   - Basic Authentication, OAuth, JWT, etc
   - SOLIC, YAGNI, KISS
   - [System Design](general/system_design.md)
+  - [Design Pattern](general/design_pattern.md)
 # CLI
   - cobra
 # Web Frameworks & Routers
