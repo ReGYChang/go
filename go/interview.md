@@ -1,5 +1,9 @@
 - [CS](#cs)
   - [CPU](#cpu)
+- [Syntax](#syntax)
+  - [int](#int)
+  - [channel](#channel)
+  - [map](#map)
   - [json](#json)
   - [const](#const)
   - [string](#string)
@@ -15,6 +19,8 @@
 ## CPU
 
 1. 哪種效率更高? 為何?
+
+Hint: 計算機組成原理, CPU 處理器, 暫存器, 多級緩存
 
 ```go
 const matrixLength = 20000
@@ -38,8 +44,23 @@ func bar() {
             matrixA[i][j] = matrixA[i][j] + matrixA[j][i]    
         }
 }
+```
 
 # Syntax
+
+## int
+
+1. 以下運算結果為何? 為什麼?
+
+Hint: 補碼, 無號數
+
+```go
+func main() {
+    var a uint = 1
+    var b uint = 2
+    fmt.Println(a-b)
+}
+```
 
 ## channel
 
@@ -66,6 +87,7 @@ func bar() {
     - 函數什麼也不輸出, 正常返回
     - 函數什麼也不輸出, 陷入阻塞(blocking)
 
+3. go 如何實現 channel? Unbuffered 跟 buffered channel 差別在哪? 為什麼是 thread-safe?
 
 ## map
 
@@ -239,4 +261,10 @@ func WaitTimeout(wg *sync.WaitGroup, timeout time.Duration) bool {
     // 如果 timeout 到了超時時間返回 true
     // 如果 WaitGroup 自然結束返回 false
 }
+```
+
+2. 設計三個函數分別打印 "cat", "dog", "fish", 要求每個函數各起一個 goroutine, 並按照順序打印各 100 次
+
+```go
+
 ```
