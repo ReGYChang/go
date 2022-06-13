@@ -1,10 +1,47 @@
-- [Syntax](#syntax)
-  - [Channel](#channel)
-  - [Map](#map)
+- [CS](#cs)
+  - [CPU](#cpu)
+  - [json](#json)
+  - [const](#const)
+  - [string](#string)
+  - [method](#method)
+  - [select](#select)
+  - [slice](#slice)
+  - [goroutine](#goroutine)
+- [Coding](#coding)
+
+
+# CS
+
+## CPU
+
+1. 哪種效率更高? 為何?
+
+```go
+const matrixLength = 20000
+
+func foo() {
+    matrixA := createMatrix(matrixLength)
+    matrixB := createMatrix(matrixLength)
+
+    for i := 0; i < matrixLength; i++ {
+        for i := 0; i < matrixLength; i++ {
+            matrixA[i][j] = matrixA[i][j] + matrixA[i][j]    
+        }
+}
+
+func bar() {
+    matrixA := createMatrix(matrixLength)
+    matrixB := createMatrix(matrixLength)
+
+    for i := 0; i < matrixLength; i++ {
+        for i := 0; i < matrixLength; i++ {
+            matrixA[i][j] = matrixA[i][j] + matrixA[j][i]    
+        }
+}
 
 # Syntax
 
-## Channel
+## channel
 
 1. 下面關於通道(channel)的描述正確的是（單選）?
     - 讀nil通道會觸發panic
@@ -30,16 +67,17 @@
     - 函數什麼也不輸出, 陷入阻塞(blocking)
 
 
-## Map
+## map
 
 1. 下面的代碼存在什麼問題？
-   ```golang
-    var FruitColor map[string]string
-    
-    func AddFruit(name, color string) {
-        FruitColor[name] =color
-    }
-    ```
+
+```golang
+var FruitColor map[string]string
+
+func AddFruit(name, color string) {
+    FruitColor[name] =color
+}
+```
 
 ## json
 
