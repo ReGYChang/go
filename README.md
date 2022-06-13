@@ -7,9 +7,8 @@
 </p>
 
 # [Go](go/README.md)
-- go cmd
+- package, init, tools, repo, dependency
 - [var, const, type, function, package](go/var_const_type_function_package.md)
-- [code blocks, scopes](go/code_blocks_scopes.md)
 - [array, slice, map](go/array_slice_map.md)
 - [pointer, struct, method](go/pointer_struct_methods.md)
 - [interface](go/interface.md)
@@ -21,6 +20,7 @@
 - [learn Go dependency management tool](go/pkg_tools.md)
 - semantic versioning
 - version, scripts, repository and other properties
+- concurrency patterns
 - [interview](go/interview.md)
 
 # SQL fundamentals
@@ -75,10 +75,14 @@
       - Frameworks
           - Testify
       - Assertion
+  - Benchmarking
 # Virtualizaion
   - [Docker](virtualization/docker.md)
   - Kubernetes
 # Good to Know Libraries
+  - Logging
+  - Encoding/Decoding
+  - Input and output
   - Validator
   - Glow
   - GJson
