@@ -205,6 +205,144 @@ Summary:
 
 ## Factory Design Pattern
 
+`Factory Pattern` 是一種 Creational pattern, 也是最常用的 pattern 之一, 調用方通過工廠製造並獲取物件, 可以不必關注物件創建的細節和構建的邏輯
+
+在 `Factory Pattern` 中調用者只和 factory 互動, 並告訴 factory 具體獲得哪種類型的物件, factory 負責與對應的 struct 互動並 reture 所需的物件
+
+以下是 `Factory pattern` UML:
+
+![factory_pattern_UML](img/factory_pattern_UML.png)
+
+下面是一個 `Factory Pattern` 範例:
+- 提供一個 interface `iGun`, 定義槍擁有的方法
+- 提供一個 `gun` struct, 並實現 `iGun` interface
+- 兩個 instances `ak47` 和 `maverick`, 其都具備 `gun` struct 並實現了 `iGun` 方法, 其可視為 `iGun` 子類
+- `main()` 作為調用方, 依賴 `gunFactory` 來創建 `ak47` 和 `maverick` instance 並應用
+
+對應 UML:
+
+![factory_demo_UML](img/factory_demo_UML.png)
+
+具體程式碼如下:
+
+iGun.go
+
+```go
+package main
+ 
+type iGun interface {
+    setName(name string)
+    setPower(power int)
+    getName() string
+    getPower() int
+}
+```
+
+gun.go
+
+```go
+package main
+ 
+type gun struct {
+    name  string
+    power int
+}
+ 
+func (g *gun) setName(name string) {
+    g.name = name
+}
+ 
+func (g *gun) getName() string {
+    return g.name
+}
+ 
+func (g *gun) setPower(power int) {
+    g.power = power
+}
+ 
+func (g *gun) getPower() int {
+    return g.power
+}
+```
+
+ak47.go
+
+```go
+package main
+ 
+type ak47 struct {
+    gun
+}
+ 
+func newAk47() iGun {
+    return &ak47{
+        gun: gun{
+            name:  "AK47 gun",
+            power: 4,
+        },
+    }
+}
+```
+
+maverick.go
+
+```go
+package main
+ 
+type maverick struct {
+    gun
+}
+ 
+func newMaverick() iGun {
+    return &maverick{
+        gun: gun{
+            name:  "Maverick gun",
+            power: 5,
+        },
+    }
+}
+```
+
+gunFactory.go
+
+```go
+package main
+ 
+import "fmt"
+ 
+func getGun(gunType string) (iGun, error) {
+    if gunType == "ak47" {
+        return newAk47(), nil
+    }
+    if gunType == "maverick" {
+        return newMaverick(), nil
+    }
+    return nil, fmt.Errorf("Wrong gun type passed")
+}
+```
+
+main.go
+
+```go
+package main
+ 
+import "fmt"
+ 
+func main() {
+    ak47, _ := getGun("ak47")
+    maverick, _ := getGun("maverick")
+    printDetails(ak47)
+    printDetails(maverick)
+}
+ 
+func printDetails(g iGun) {
+    fmt.Printf("Gun: %s", g.getName())
+    fmt.Println()
+    fmt.Printf("Power: %d", g.getPower())
+    fmt.Println()
+}
+```
+
 ## Builder Design Pattern
 
 ## Prototype Design Pattern [x]
