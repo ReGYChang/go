@@ -12,6 +12,8 @@
   - [Custom Matcher Function](#custom-matcher-function)
   - [Subrouting](#subrouting)
   - [Registered URLs](#registered-urls)
+- [Middleware](#middleware)
+- [Static Files](#static-files)
 
 # gorilla/mux
 
@@ -308,3 +310,65 @@ log.Println("create post link: ", createUrl)
 showUrl, _ := r.Get("posts.show").URL("id", "1")
 log.Println("show post list: ", showUrl)
 ```
+
+# Middleware
+
+![middleware](img/middleware.png)
+
+Middleware 典型的應用場景包含 authentication, logging, request header operations 和 `ResponseWriter Hijack`
+
+一個經典的 Mux routing middleware 通常通過一個 clousure 來定義, 可以在 clousure function 中處理傳入的 request 和 response instances 或增加額外的業務邏輯, 再調用傳入的 handler 繼續後續 request handle
+
+比如可以這樣定義一個 logging middleware:
+
+```go
+func loggingMiddleware(next http.Handler) http.Handler {
+    return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+        // Do stuff here
+        log.Println(r.RequestURI)
+        // Call the next handler, which can be another middleware in the chain, or the final handler.
+        next.ServeHTTP(w, r)
+    })
+}
+```
+
+要將上述 mux logging middleware apply 到所有 routes 上可以通過 `Use` 方法:
+
+```go
+r := mux.NewRouter()
+r.Use(loggingMiddleware)
+```
+
+也可以將其 apply 到 subrouter 以限制其 scope:
+
+```go
+postRouter := r.PathPrefix("/posts").Subrouter()
+postRouter.Use(loggingMiddleware)
+```
+
+下面範例實現 mux 版本的 token check middleware:
+
+```go
+func checkToken(next http.Handler) http.Handler {
+    return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+        // Do stuff here
+        token := r.FormValue("token")
+        if token == "regy.dev" {
+            log.Printf("Token check success: %s\n", r.RequestURI)
+            // Call the next handler, which can be another middleware in the chain, or the final handler.
+            next.ServeHTTP(w, r)
+        } else {
+            http.Error(w, "Forbidden", http.StatusForbidden)
+        }
+    })
+}
+
+// apply middleware to subrouter
+postRouter := r.PathPrefix("/posts").Subrouter()
+postRouter.Use(checkToken)
+```
+
+這樣只有傳遞了正確的 `token` 參數才可以正常訪問路由
+
+# Static Files
+
