@@ -15,6 +15,12 @@
 - [Middleware](#middleware)
 - [Static Files](#static-files)
 - [Testing Handlers](#testing-handlers)
+- [Directory Structure](#directory-structure)
+  - [Project Initial](#project-initial)
+  - [Router Implementation](#router-implementation)
+  - [Start Web Server](#start-web-server)
+  - [Define routes and handler methods](#define-routes-and-handler-methods)
+  - [Testing](#testing)
 
 # gorilla/mux
 
@@ -489,3 +495,231 @@ func TestHealthCheckHandler(t *testing.T) {
 ```
 
 ![health_check_test](../network/img/health_check_test.png)
+
+# Directory Structure
+
+為了讓程式碼組織更加清晰, 需要將 server, router, routes, handler methods 拆分成, 這樣會使得程式碼更容易維護
+
+## Project Initial
+
+首先創建一個空目錄 `github.com/regy/goweb`, 目錄結構如下:
+
+```
+├── handlers
+│   ├── common.go
+│   ├── post.go
+│   └── user.go
+├── main.go
+└── routes
+    ├── router.go
+    └── web.go
+```
+
+再來初始化 Go Module, 並將模組路徑替換成本地路徑:
+
+```go
+go mod init github.com/regy/goweb
+go mod edit -replace github.com/regy/goweb=/path/to/goweb
+```
+
+## Router Implementation
+
+在 routes path 下創建 `web.go`, 定義所有 web request routes:
+
+```go
+package routes
+
+import (
+	"net/http"
+
+	"github.com/regy/goweb/handlers"
+)
+
+// define WebRoute struct for single route
+type WebRoute struct {
+    Name        string
+    Method      string
+    Pattern     string
+    HandlerFunc http.HandlerFunc
+}
+
+// declare WebRoutes slice to store all web routes
+type WebRoutes []WebRoute
+
+// define all web routes variable
+var routes = WebRoutes{
+    WebRoute{
+        "Home",
+        "GET",
+        "/",
+        handlers.Home,
+    },
+    WebRoute{
+        "Posts",
+        "GET",
+        "/posts",
+        handlers.GetPosts,
+    },
+    WebRoute{
+        "User",
+        "GET",
+        "/user/{id}",
+        handlers.GetUser,
+    },
+}
+```
+
+這裡定義的一個 `WebRoute` struct 來表示單個路由, 其中包含 route name, request methods, matching string patterns 及對應的 handler methods, router 可以根據這些配置 requests dispatcher
+
+再來定義一個 `WebRoutes` slice 存放所有 `WebRoute` type routes
+
+並在 `routes` path 下創建一個 `router.go` 用來定義 router, 這裡使用 `gorilla/mux` 中的 implementation:
+
+```go
+go get github.com/gorilla/mux
+```
+
+然後編寫 `router.go`:
+
+```go
+package routes
+
+import "github.com/gorilla/mux"
+
+// return mux.Router type pointer as handler to use
+func NewRouter() *mux.Router {
+
+    // create mux.Router
+    router := mux.NewRouter().StrictSlash(true)
+
+    // for loop all webRoutes define in web.go
+    for _, route := range routes {
+        // register web routes to router
+        router.Methods(route.Method).
+            Path(route.Pattern).
+            Name(route.Name).
+            Handler(route.HandlerFunc)
+    }
+
+    return router
+}
+```
+
+在 `NewRouter` 函數中創建 `mux.Router` instance 並將 `web.go` 中定義的所有的 web routes 都註冊到 router 中, 以便處理 user requests 的 routes matching 和 dispatch
+
+## Start Web Server
+
+```go
+package main
+
+import (
+	"log"
+	"net/http"
+
+	"github.com/regy/goweb/routes"
+)
+
+func main() {
+	startWebServer("8080")
+}
+
+func startWebServer(port string) {
+	r := routes.NewRouter()
+	http.Handle("/", r)
+
+	log.Println("Starting HTTP service at " + port)
+	err := http.ListenAndServe(":" + port, nil)
+
+	if err != nil {
+		log.Println("An error occured starting HTTP listener at port " + port)
+		log.Println("Error: " + err.Error())
+	}
+}
+```
+
+將 web server 啟動邏輯封裝到 `startWebServer` 函數中實現, 該函數需要傳入 port 參數
+
+## Define routes and handler methods
+
+最後只需要有 routes 和對應的 handlers 就可以啟動 Web Server 處理 user requests
+
+在 `handlers` path 下創建三個文件: `common.go`, `post.go`, `user.go`, 分別處理通用請求, 文章資源和用戶資源, 首先在 `common.go` 中實現 home page request handler function:
+
+```go
+package handlers
+
+import (
+    "io"
+    "net/http"
+)
+
+func Home(w http.ResponseWriter, r *http.Request)  {
+    io.WriteString(w, "Welcome to my blog site")
+}
+```
+
+再來在 `post.go` 定義文章列表對應 handler function:
+
+```go
+package handlers
+
+import (
+    "io"
+    "net/http"
+)
+
+func GetPosts(w http.ResponseWriter, r *http.Request)  {
+    io.WriteString(w, "All posts")
+}
+```
+
+以及在 `user.go` 中定義獲取指定 user 對應 handler function:
+
+```go
+package handlers
+
+import (
+    "github.com/gorilla/mux"
+    "io"
+    "net/http"
+)
+
+func GetUser(w http.ResponseWriter, r *http.Request)  {
+    // Get user from DB by id...
+    params := mux.Vars(r)
+    id := params["id"]
+    io.WriteString(w, "Return user info with id = " + id)
+}
+```
+
+最後就可以在 `routes/web.go` 中添加 routes:
+
+```go
+// define all web routes variable
+var routes = WebRoutes{
+    WebRoute{
+        "Home",
+        "GET",
+        "/",
+        handlers.Home,
+    },
+    WebRoute{
+        "Posts",
+        "GET",
+        "/posts",
+        handlers.GetPosts,
+    },
+    WebRoute{
+        "User",
+        "GET",
+        "/user/{id}",
+        handlers.GetUser,
+    },
+}
+```
+
+至此一個完整的 Web Server 即完成
+
+## Testing
+
+![web_server_test](../network/img/web_server_test.png)
