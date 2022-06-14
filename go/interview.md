@@ -1,5 +1,6 @@
 - [CS](#cs)
   - [CPU](#cpu)
+  - [Memory](#memory)
 - [Syntax](#syntax)
   - [int](#int)
   - [channel](#channel)
@@ -45,6 +46,14 @@ func bar() {
         }
 }
 ```
+
+## Memory
+
+1. CS 中常見幾種 Memory 分配方案?
+
+2. Go 記憶體分配與管理方案?
+
+3. 為什麼很多小物件會造成 GC 壓力?
 
 # Syntax
 
@@ -222,6 +231,8 @@ func AddFruit(name, color string) {
         wg.Wait()
     }
     ```
+
+2. Thread 有哪幾種 model? Goroutine 實現原理與優勢為何?
 
 # Coding
 
