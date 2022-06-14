@@ -4,6 +4,7 @@
     - [init()](#init)
     - [sync.Once](#synconce)
   - [Factory Design Pattern](#factory-design-pattern)
+  - [Abstract Factory Pattern](#abstract-factory-pattern)
   - [Builder Design Pattern](#builder-design-pattern)
   - [Prototype Design Pattern [x]](#prototype-design-pattern-x)
 - [Structural](#structural)
@@ -342,6 +343,234 @@ func printDetails(g iGun) {
     fmt.Println()
 }
 ```
+
+## Abstract Factory Pattern
+
+Abstract factory pattern 即是對 factory pattern 的一層抽象, UML 大致如下:
+
+![abstract_factory_pattern](img/abstract_factory_pattern.png)
+
+假設有兩家生產運動服的工廠, 現在消費者想要購買一套運動服, 包含 short 和 shoe, 通常會在同一家工廠購買整套的運動服, 此時就可以用到 abstract factory pattern
+
+消費者需要的產品有兩種: short 和 shoe
+
+生產產品的工廠有兩家: nike 和 adidas
+
+nike 和 adidas 可以視為 `iSportsFactory` interface implementation
+
+另外再為具體產品定義兩個 interface:
+
+`iShort`, 其兩個實現分別為 `nikeShort` 和 `adidasShort`
+`iShoe`, 其兩個實現分別為 `nikeShoe` 和 `adidasShoe`
+
+具體程式碼如下:
+
+iSportsFactory.go
+
+```go
+package pattern
+
+import (
+	"fmt"
+)
+
+type iSportsFactory interface {
+	makeShoe() iShoe
+	makeShort() iShort
+}
+
+func getSportsFactory(brand string) (iSportsFactory, error) {
+	if brand == "adidas" {
+		return &adidas{}, nil
+	}
+	if brand == "nike" {
+		return &nike{}, nil
+	}
+	switch {
+	case brand == "adidas":
+		return &adidas{}, nil
+	case brand == "nike":
+		return &nike{}, nil
+	}
+
+	return nil, fmt.Errorf("Wrong brand type passed")
+}
+```
+
+iShort.go
+
+```go
+package main
+ 
+type iShort interface {
+    setLogo(logo string)
+    setSize(size int)
+    getLogo() string
+    getSize() int
+}
+ 
+type short struct {
+    logo string
+    size int
+}
+ 
+func (s *short) setLogo(logo string) {
+    s.logo = logo
+}
+ 
+func (s *short) getLogo() string {
+    return s.logo
+}
+ 
+func (s *short) setSize(size int) {
+    s.size = size
+}
+ 
+func (s *short) getSize() int {
+    return s.size
+}
+```
+
+iShoe.go
+
+```go
+package main
+ 
+type iShoe interface {
+    setLogo(logo string)
+    setSize(size int)
+    getLogo() string
+    getSize() int
+}
+ 
+type shoe struct {
+    logo string
+    size int
+}
+ 
+func (s *shoe) setLogo(logo string) {
+    s.logo = logo
+}
+ 
+func (s *shoe) getLogo() string {
+    return s.logo
+}
+ 
+func (s *shoe) setSize(size int) {
+    s.size = size
+}
+ 
+func (s *shoe) getSize() int {
+    return s.size
+}
+```
+
+nike.go
+
+```go
+package main
+ 
+type nike struct {
+}
+ 
+type nikeShoe struct {
+    shoe
+}
+ 
+type nikeShort struct {
+    short
+}
+ 
+func (n *nike) makeShoe() iShoe {
+    return &nikeShoe{
+        shoe: shoe{
+            logo: "nike",
+            size: 14,
+        },
+    }
+}
+ 
+func (n *nike) makeShort() iShort {
+    return &nikeShort{
+        short: short{
+            logo: "nike",
+            size: 14,
+        },
+    }
+}
+```
+
+adidas.go
+
+```go
+package main
+ 
+type adidas struct {
+}
+ 
+type adidasShoe struct {
+    shoe
+}
+ 
+type adidasShort struct {
+    short
+}
+ 
+func (a *adidas) makeShoe() iShoe {
+    return &adidasShoe{
+        shoe: shoe{
+            logo: "adidas",
+            size: 14,
+        },
+    }
+}
+ 
+func (a *adidas) makeShort() iShort {
+    return &adidasShort{
+        short: short{
+            logo: "adidas",
+            size: 14,
+        },
+    }
+}
+```
+
+main.go
+
+```go
+package main
+ 
+import "fmt"
+ 
+func main() {
+    adidasFactory, _ := getSportsFactory("adidas")
+    nikeFactory, _ := getSportsFactory("nike")
+    nikeShoe := nikeFactory.makeShoe()
+    nikeShort := nikeFactory.makeShort()
+    adidasShoe := adidasFactory.makeShoe()
+    adidasShort := adidasFactory.makeShort()
+    printShoeDetails(nikeShoe)
+    printShortDetails(nikeShort)
+    printShoeDetails(adidasShoe)
+    printShortDetails(adidasShort)
+}
+ 
+func printShoeDetails(s iShoe) {
+    fmt.Printf("Logo: %s", s.getLogo())
+    fmt.Println()
+    fmt.Printf("Size: %d", s.getSize())
+    fmt.Println()
+}
+ 
+func printShortDetails(s iShort) {
+    fmt.Printf("Logo: %s", s.getLogo())
+    fmt.Println()
+    fmt.Printf("Size: %d", s.getSize())
+    fmt.Println()
+}
+```
+
+
 
 ## Builder Design Pattern
 
