@@ -487,3 +487,5 @@ func TestHealthCheckHandler(t *testing.T) {
     }
 }
 ```
+
+![health_check_test](../network/img/health_check_test.png)
