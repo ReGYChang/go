@@ -96,7 +96,7 @@ type single struct {
  
 var singleInstance *single
  
-func GetInstance() *single {
+func GetLazyInstance() *single {
     if singleInstance == nil {
         lock.Lock()
         defer lock.Unlock()
