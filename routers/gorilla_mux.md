@@ -7,6 +7,11 @@
   - [Path Prefix](#path-prefix)
   - [Matching Domain](#matching-domain)
   - [URL Schemes](#url-schemes)
+  - [Header Values](#header-values)
+  - [Query Values](#query-values)
+  - [Custom Matcher Function](#custom-matcher-function)
+  - [Subrouting](#subrouting)
+  - [Registered URLs](#registered-urls)
 
 # gorilla/mux
 
@@ -179,3 +184,127 @@ r.Handle("/zh/hello/{name}", &HelloWorldHandler{}).Methods("GET").Host("zh.goweb
 
 如此一來只有 `HTTPS` request 才能訪問對應 routing rules, 對於 `HTTP` request 則會返回 `404` status code
 
+## Header Values
+
+可以在 `gorilla/mux` 路由定義中通過 `Headers` 方法設置 request header matching
+
+下面範例中 request header 必須包含 `X-Requested-With` 且值為 `XMLHttpRequest` 才可以訪問指定路由 `/request/header`:
+
+```go
+r.HandleFunc("/request/header", func(w http.ResponseWriter, r *http.Request) {
+    header := "X-Requested-With"
+    fmt.Fprintf(w, "Including request header[%s=%s]", header, r.Header[header])
+}).Headers("X-Requested-With", "XMLHttpRequest")
+```
+
+這樣做的意義在於限制 client 只能通過 Ajax request 訪問此路由
+
+## Query Values
+
+除了 request header 之外, 還可以通過 `Queries` 方法限定 query values
+
+下面範例中 query values 必須包含 `token` 且值為 `test` 才能訪問指定路由 `/query/string`:
+
+```go
+r.HandleFunc("/query/string", func(w http.ResponseWriter, r *http.Request) {
+    query := "token"
+    fmt.Fprintf(w, "Including query value[%s=%s]", query, r.FormValue(query))
+}).Queries("token", "test")
+```
+
+## Custom Matcher Function
+
+`gorilla/mux` router 支持通過 `MatcherFunc` 方法自定義 routing matching rules, 在該方法中可以獲取到 request instance `request`, 這樣就可以取得所有的 user request info 並對其進行判斷, 符合預期的 requests 才能匹配並訪問路由
+
+下面範例限定只有來自 `https://regy.dev` domain 的 requests 才可以匹配到 `/custom/matcher` 路由:
+
+```go
+r.HandleFunc("/custom/matcher", func(w http.ResponseWriter, r *http.Request) {
+    fmt.Fprintf(w, "Requests from specific domain: %s", r.Referer())
+}).MatcherFunc(func(request *http.Request, match *mux.RouteMatch) bool {
+    return request.Referer() == "https://regy.dev"
+})
+```
+
+## Subrouting
+
+`gorilla/mux` 支持路由分組和命名, 以及根據命名路由生成對應 URL
+
+`gorilla/mux` 基於 subrouter 來實現路由分組功能, 下面範例以文章 CRUD 為例, 將文章相關 routing rules 劃分到 routing prefix 為 `/posts` 的 subrouter 中:
+
+```go
+func listPosts(w http.ResponseWriter, r *http.Request) {
+    fmt.Fprintf(w, "List posts")
+}
+
+func createPost(w http.ResponseWriter, r *http.Request) {
+    fmt.Fprintf(w, "Create post")
+}
+
+func updatePost(w http.ResponseWriter, r *http.Request) {
+    fmt.Fprintf(w, "Update post")
+}
+
+func deletePost(w http.ResponseWriter, r *http.Request) {
+    fmt.Fprintf(w, "Delete post")
+}
+
+func showPost(w http.ResponseWriter, r *http.Request) {
+    fmt.Fprintf(w, "Show post")
+}
+
+...
+
+// group routes（base on subrouter + path prefix）
+postRouter := r.PathPrefix("/posts").Subrouter()
+postRouter.HandleFunc("/", listPosts).Methods("GET")
+postRouter.HandleFunc("/create", createPost).Methods("POST")
+postRouter.HandleFunc("/update", updatePost).Methods("PUT")
+postRouter.HandleFunc("/delete", deletePost).Methods("DELETE")
+postRouter.HandleFunc("/show", showPost).Methods("GET")
+```
+
+如此一來 `/posts` prefix 會印用到後面所有基於 `postRouter` subrouter 的 routing rules 上, 且針對不同操作還限制了對應的 request methods, 測試上述路由訪問:
+
+```go
+curl http://localhost:8080/posts/posts/
+curl http://localhost:8080/posts/posts/create -X POST
+curl http://localhost:8080/posts/posts/update -X PUT
+curl http://localhost:8080/posts/posts/delete -X DELETE
+curl http://localhost:8080/posts/posts/show -X GET
+```
+
+若上述 router 是後台管理路由, 還可以結合 subrouter 近一步劃分:
+
+```go
+postRouter := r.PathPrefix("/posts").Host("admin.goweb.test").Subrouter()
+```
+
+如此一來只有 domain 為 `admin.goweb.test` 時才可以訪問對應路由, 提高了安全性
+
+## Registered URLs
+
+`gorilla/mux` 支援路由命名, 通過 `Name` 方法在 routing rules 中指定:
+
+```go
+postRouter := r.PathPrefix("/posts").Subrouter()
+postRouter.HandleFunc("/", listPosts).Methods("GET").Name("posts.index")
+postRouter.HandleFunc("/create", createPost).Methods("POST").Name("posts.create")
+postRouter.HandleFunc("/update", updatePost).Methods("PUT").Name("posts.update")
+postRouter.HandleFunc("/delete", deletePost).Methods("DELETE").Name("posts.delete")
+postRouter.HandleFunc("/show/{id:[0-9]+}", showPost).Methods("GET").Name("posts.show")
+```
+
+可以像下面這樣根據上述路由命名生成與之對應的 URL:
+
+```go
+// print matching routes URL
+indexUrl, _ := r.Get("posts.index").URL()
+log.Println("posts list link: ", indexUrl)
+
+createUrl, _ := r.Get("posts.create").URL()
+log.Println("create post link: ", createUrl)
+
+showUrl, _ := r.Get("posts.show").URL("id", "1")
+log.Println("show post list: ", showUrl)
+```
