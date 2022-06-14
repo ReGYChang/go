@@ -14,6 +14,7 @@
   - [Registered URLs](#registered-urls)
 - [Middleware](#middleware)
 - [Static Files](#static-files)
+- [Testing Handlers](#testing-handlers)
 
 # gorilla/mux
 
@@ -398,3 +399,91 @@ func main()  {
 ```
 
 當請求 `http://localhost:8080/status/app.js` 文件時, 會到 `static` path 下尋找 `app.js`, 若找不到則會返回 404, 否則返回 file 作為響應
+
+# Testing Handlers
+
+對應用來說, health check 無非是檢查應用本身是否可用, 及其依賴的核心服務是否可用, 這些核心服務通常包括 DB, Cache 等
+
+下面範例為最簡化版本的 health check api, 只檢查了應用本身是否可用, 判斷方式是其是否 正常訪問並 return 200 status code
+
+```go
+// server.go
+
+package main
+
+import (
+    "github.com/gorilla/mux"
+    "io"
+    "log"
+    "net/http"
+)
+
+func HealthCheckHandler(w http.ResponseWriter, r *http.Request) {
+    w.Header().Set("Content-Type", "application/json")
+    w.WriteHeader(http.StatusOK)
+    // Furthermore, we can check DB, Cache status via PING command and return the status within response 
+    io.WriteString(w, `{"alive": true}`)
+}
+
+func main() {
+    r := mux.NewRouter()
+    r.HandleFunc("/health", HealthCheckHandler)
+    log.Fatal(http.ListenAndServe("localhost:8080", r))
+}
+```
+
+可以通過 `curl -v http://localhost:8080/health` 測試 api `/health` 是否可用:
+
+![health_check_api](../network/img/health_check_api.png)
+
+除了通過 `curl` 對 HTTP api 進行測試, 也可以編寫測試程式碼對 HTTP api 進行測試, 這裡使用 Go `httptest` package 來編寫
+
+`httptest` 可用於模擬 web server, 來測試 `net/http` package 發送的 HTTP request 和捕獲 HTTP response 的方法, 要編寫一個 HTTP 測試步驟如下:
+- create HTTP Multiplexer
+- apply testing handler methods to multiplexer and test
+- base on `net/http` methods create a `Request` instance to simulate client requests(include request URL and parameters)
+- base on `net/http` methods create a `ResponseRecorder` instance and pass to multiplexer `ServeHTTP` method to get responses
+- Finally get response status code and instance from `ResponseRecorder` and judge if test case pass
+
+再來按照上述流程編寫 HTTP test, HTTP test 和 Unit Test 約定規則一樣, 因此需要在 `server.go` 同層目錄下創建一個測試文件 `server_test.go` 並編寫測試程式碼:
+
+```go
+package main
+
+import (
+    "net/http"
+    "net/http/httptest"
+    "testing"
+)
+
+func TestHealthCheckHandler(t *testing.T) {
+    // 初始化 router 並添加被測試的 handler methods
+    mux := http.NewServeMux()
+    mux.HandleFunc("/health", HealthCheckHandler)
+
+    // create 一個 request instance 模擬 client requests, 其中包含 request methods, URL, parameters 等
+    req, err := http.NewRequest("GET", "/health", nil)
+    if err != nil {
+        t.Fatal(err)
+    }
+
+    // 創建 ResponseRecorder 捕捉響應
+    rr := httptest.NewRecorder()
+
+    // 傳入測試請求和響應實體並執行請求
+    mux.ServeHTTP(rr, req)
+
+    // 檢查 status code（通過 ResponseRecorder 獲得）是否為 200, 若不是則測試不通過
+    if status := rr.Code; status != http.StatusOK {
+        t.Errorf("handler returned wrong status code: got %v want %v",
+            status, http.StatusOK)
+    }
+
+    // 检查响应实体是否符合预期结果，如果不是，则测试不通过
+    expected := `{"alive": true}`
+    if rr.Body.String() != expected {
+        t.Errorf("handler returned unexpected body: got %v want %v",
+            rr.Body.String(), expected)
+    }
+}
+```
