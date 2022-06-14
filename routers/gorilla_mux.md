@@ -372,3 +372,29 @@ postRouter.Use(checkToken)
 
 # Static Files
 
+HTTP Server 除了處理動態資源外, 也有處理靜態資源的能力, 如 HTML, CSS, javascript, 圖片等
+
+處理靜態資源需要借助 `PathPrefix()` 方法指定靜態資源所在 path prefix, 然後在 request handler 中通過 `http.FileServer` 直接返回文件內容本身作為響應:
+
+```go
+func main()  {
+    r := mux.NewRouter()
+    r.Use(loggingMiddleware)
+
+    // parsing server start parameters dir as static resources web root path
+    // default .
+    var dir string
+    flag.StringVar(&dir, "dir", ".", "static resources path")
+    flag.Parse()
+
+    // handle http://localhost:8000/static/<filename> static routes
+    r.PathPrefix("/static/").Handler(http.StripPrefix("/static/", http.FileServer(http.Dir(dir))))    
+    
+    // other routes
+    ...
+    
+    log.Fatal(http.ListenAndServe(":8080", r))
+}
+```
+
+當請求 `http://localhost:8080/status/app.js` 文件時, 會到 `static` path 下尋找 `app.js`, 若找不到則會返回 404, 否則返回 file 作為響應
