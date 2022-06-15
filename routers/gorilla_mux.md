@@ -24,6 +24,8 @@
 - [Get HTTP Message Body From Request](#get-http-message-body-from-request)
   - [Request Struct](#request-struct)
   - [Request URL](#request-url)
+  - [Request Header](#request-header)
+  - [Request Body](#request-body)
 
 # gorilla/mux
 
@@ -845,3 +847,118 @@ func loggingRequestInfo(next http.Handler) http.Handler {
 ![fragment_test_server](../network/img/fragment_test_server.png)
 
 可以看到 Scheme, Host 和 Fragment 都是空的, Scheme 需要根據是否啟用 HTTPS 進行設置, Host 為空是因為沒有通過 proxy 訪問 HTTP server, 且在 localhost 環境中 Host 始終為空
+
+## Request Header
+
+Request header 和 response header 都是通過 `http.Request.Header` 類型表示, `Header` 是一個 key-value pair map, key 是 string, value 是 string[] slice
+
+`Header` 提供了 CRUD 方法用於對 request header 進行讀取與設置
+
+要獲取某個 request header value 只需要透過 `Header` 物件提供的 `Get` 方法並傳入對應的 field name 即可, 比如:
+
+```go
+r.Header.Get("User-Agent")
+```
+
+若要打印整個 request 只需要傳入整個 `r.Header` 物件到打印函數即可
+
+再來修改 `routes/router.go` middleware function `loggingRequestInfo` 並新增打印 request header, 將原本打印 URL struct 改為打印 URL string:
+
+```go
+package routes
+
+import (
+	"fmt"
+	"net/http"
+
+	"github.com/gorilla/mux"
+)
+
+// return mux.Router type pointer as handler to use
+func NewRouter() *mux.Router {
+
+	// create mux.Router
+	router := mux.NewRouter().StrictSlash(true)
+
+	// registe logging middleware
+	router.Use(loggingRequestInfo)
+
+	// for loop all webRoutes define in web.go
+	for _, route := range routes {
+		// register web routes to router
+		router.Methods(route.Method).
+			Path(route.Pattern).
+			Name(route.Name).
+			Handler(route.HandlerFunc)
+	}
+
+	return router
+}
+
+// record request logging messages middleware
+func loggingRequestInfo(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		fmt.Printf("Request URL: %s\n", r.URL)
+		fmt.Printf("User Agent: %s\n", r.Header.Get("User-Agent"))
+		fmt.Printf("Request Header: %v\n", r.Header)
+		next.ServeHTTP(w, r)
+	})
+}
+```
+
+通過 `Header` 的 `Add` 方法新增 request header:
+
+```go
+r.Header.Add("test", "value1")
+```
+
+通過 `Header` 提供的 `Set` 方法修改 request header:
+
+```go
+r.Header.Set("test", "value2")
+```
+
+通過 `Header` 提供的 `Del` 方法刪除 request header:
+
+```go
+r.Header.Del("test")
+```
+
+## Request Body
+
+Request body 和 response body 都是通過 `Body` field 表示, 該 field 實現了 `ioReader` 和 `ioCloser` interface, 為 `io.ReadCloser` 類型
+
+- `io.Reader` 提供了 `Read` 方法, 用於讀取傳入的 byte slice 並返回讀取的 byte 數及 error
+- `io.Closer` 提供了 `Close` 方法, 因此可以在 `Body` 上調用 `Read` 方法讀取 request body 內容, 並調用 `Close` 方法釋放系統資源
+
+對於 request body 來說對應的 `Body` 訪問路徑是 `http.Request.Body`, 下面範例演示 request body 的讀取, 在 `goweb/handlers/post.go` 中新增一個 `AddPost` handler function:
+
+```go
+func AddPost(w http.ResponseWriter, r *http.Request)  {
+    len := r.ContentLength   // get request body length
+    body := make([]byte, len)  // create byte slice to store request bodies
+    r.Body.Read(body)        // call Read method to read request body and return bytes to body
+    io.WriteString(w, string(body))  // return request body as response body
+}
+```
+
+由於 GET request 沒有 request body, 所以需要通過 POST/PUT/DELETE 之類的 request 進行測試, 在 `routes/web.go` 中新增一個 Web route:
+
+```go
+WebRoute{
+    "NewPost",
+    "POST",
+    "/post/add",
+    handlers.AddPost,
+},
+```
+
+以 `curl -id "title=test&content=hello" http://localhost:8080/post/add` 來測試:
+
+![request_body_test](../network/img/request_body_test.png)
+
+- `-i` 表示輸出 HTTP response 詳細 message
+- `-` 表示傳遞的 form data
+
+> 通常不會一次性獲取所有 request body info, 而是通過類似 `FormValue` 之類方法獲取每個 request parameter
+
