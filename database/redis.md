@@ -132,13 +132,13 @@ Relational Database 在 ranking 方面查詢速度普遍偏慢, 可以借住 red
 
 ![redis_data_types](img/redis_data_types.png)
 
-| Type   | Value                                | r/w performance                                                                                                             |
-| ------ | ------------------------------------ | --------------------------------------------------------------------------------------------------------------------------- |
-| String | String, int, float                   | 對 String 或 String 部分操作; 對 int 或 float 進行遞增或遞減                                                                |
-| List   | Linked List, 每個節點都有一個 String | 對 Linked List 頭尾 push 或 pop, 讀取單個或多個元素; 根據值查找或刪除元素                                                   |
-| Set    | 包含 String 的無序集合               | String 集合, 確認是否存在新增, 讀取, 刪除; 計算交集, 聯級, 差集等                                                           |
-| Hash   | 包含 key-value pair 的無序 hash table     | 新增, 讀取, 刪除單個元素                                                                                                    |
-| Zset   | 包含 key-value pair 的有序 hash table     | String 成員與 float 之間的有序映射; 元素排列順序由 score 大小決定; 新增, 讀取, 刪除單個元素以及根據 score 範圍或成員來讀取元素 |
+| Type   | Value                                 | r/w performance                                                                                                                |
+| ------ | ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| String | String, int, float                    | 對 String 或 String 部分操作; 對 int 或 float 進行遞增或遞減                                                                   |
+| List   | Linked List, 每個節點都有一個 String  | 對 Linked List 頭尾 push 或 pop, 讀取單個或多個元素; 根據值查找或刪除元素                                                      |
+| Set    | 包含 String 的無序集合                | String 集合, 確認是否存在新增, 讀取, 刪除; 計算交集, 聯級, 差集等                                                              |
+| Hash   | 包含 key-value pair 的無序 hash table | 新增, 讀取, 刪除單個元素                                                                                                       |
+| Zset   | 包含 key-value pair 的有序 hash table | String 成員與 float 之間的有序映射; 元素排列順序由 score 大小決定; 新增, 讀取, 刪除單個元素以及根據 score 範圍或成員來讀取元素 |
 
 ### String
 
@@ -251,7 +251,7 @@ Redis Set 透過 hash table 實現, 新增, 刪除, 查詢的時間複雜度都�
 | --------- | ------------------------------------- | -------------------- |
 | SADD      | 向 Set 新增一個或多個 item            | SADD key value       |
 | SCARD     | 讀取 Set 成員數                       | SCARD key            |
-| SMEMBERS  | 返回 Set 中所有成員                   | SMEMBERS key member  |
+| SMEMBERS  | 返回 Set 中所有成員                   | SMEMBERS key         |
 | SISMEMBER | 判斷 member 元素是否是 Set key 的成員 | SISMEMBER key member |
 
 其他 set operation 參考: [https://www.runoob.com/redis/redis-sets.html](https://www.runoob.com/redis/redis-sets.html)
@@ -734,10 +734,142 @@ block 0 表示永遠 blocking 直到訊息到來, block 1000 表示 blocking 1s,
 
 # Pub/Sub
 
+> Redis Pub/Sub 是一種 message communication model: pub 負責發送訊息, sub 負責接收訊息
+
+Redis `SUBSCRIBE` 指令可以讓 client subscribe 任意數量的 channel, 每當有新 message 發送到被訂閱的 channel 時, message 就會被發送給所有 subscribe channel 的 clients
+
+下圖展示了 channel1 以及 subscribe 此 channel 的三個 clients: client2, client5 和 client1 之間的關係:
+
+![pub_sub_example](img/pub_sub_example.png)
+
+當有新的 message 通過 `PUBLISH` 發送到 channel1 時, 這個 message 就會被發送給訂閱它的三個 clients:
+
+![pub_sub_example](img/pub_sub_example2.png)
+
 ## Based on Channel
+
+Pub/Sub 包含兩種角色, publisher 可以向指定的 channel 發送 message; Subscriber 可以訂閱一個或多個 channel, 所有 subscribe channel 的 subscriber 都會收到 message
+
+![pub_sub_baseon_channel](img/pub_sub_baseon_channel.png)
+
+> Publisher publish message
+
+使用 `PUBLISH`:
+
+```go
+127.0.0.1:6379> publish channel:1 hi
+(integer) 1
+```
+
+Return 表示接受到這條 message 的 subscriber 數量, 發出去的 message 不會做持久化, 也就是當有 client subscribe channel:1 後只能接收到後續 publish 的 message, 無法接收之前的
+
+> Subscriber subsribe channel
+
+使用 `SUBSCRIBE`, 可同時 subscribe 多個 channels:
+
+```go
+127.0.0.1:6379> subscribe channel:1
+Reading messages... (press Ctrl-C to quit)
+1) "subscribe" // message type
+2) "channel:1" // channel
+3) "hi" // message content
+```
+
+執行 `SUBSCRIBE` 後無法使用 `SUBSCRIBE`, `UNSUBSCRIBE`, `PSUBSCRIBE` 和 `PUNSUBSCRIBE` 四個屬於 `pub/sub` 之外的指令, 否則會報錯
+
+進入 subscribe status 後 client 可能收到 3 種類型回覆, 每種類型回覆都包含三個值, 第一個值為 message type, 第二三個值可能根據 message type 而有所不同
+
+Message type 值可能為以下三種:
+- `subscribe`: 表示 subscribe 成功後 return, 第二個值為 subscribe 的 channel 名稱, 第三個值為當前 client subscribe channels 數量
+- `message`: 表示接收 message 成功後 return, 第二個值表示產生 message 的 channel 名稱, 第三個值為 message content
+- `unsubscribe`: 表示成功取消 subscribe channel, 第二個值是對應的 channel 名稱, 第三個值是當前 client subscribe channels 數量, 當此值為 0 時 client 會退出訂閱狀態, 之後就可以執行其他非 `pub/sub` 指令
 
 ## Based on Pattern
 
+若有某個/某些 pattern 和此 channel match, 那麼所有 subscribe 這個 channel 的 clients 也同樣會收到 message
+
+當 `tweet.shop.*` pattern 匹配了 `tweet.shop.kindle` channel 和 `tweet.shop.ipad` channel, 且有三個不同的 clients 分別 subscribe 他們三個:
+
+![pub_sub_baseon_pattern](img/pub_sub_baseon_pattern.png)
+
+當有 message 發送到 `tweet.shop.kindle` channel 時, 除了 `clientX` 和 `clientY` 之外還會發送給 subscribe `tweet.shop.*` pattern 的 `client123` 和 `client256`
+
+![pub_sub_baseon_pattern](img/pub_sub_baseon_pattern2.png)
+
+另一方面若接收到 message 的是 channel `tweet.shop.ipad`, `client123` 和 `client256`同樣會收到 message:
+
+![pub_sub_baseon_pattern](img/pub_sub_baseon_pattern3.png)
+
+通配符中 `?` 表示一個占位符, `*` 表示任意個占位符(包含0), `?*` 表示一個以上占位符
+
+Publish:
+
+```go
+127.0.0.1:6379> publish c m1
+(integer) 0
+127.0.0.1:6379> publish c1 m1
+(integer) 1
+127.0.0.1:6379> publish c11 m1
+(integer) 0
+127.0.0.1:6379> publish b m1
+(integer) 1
+127.0.0.1:6379> publish b1 m1
+(integer) 1
+127.0.0.1:6379> publish b11 m1
+(integer) 1
+127.0.0.1:6379> publish d m1
+(integer) 0
+127.0.0.1:6379> publish d1 m1
+(integer) 1
+127.0.0.1:6379> publish d11 m1
+(integer) 1
+```
+
+PSubscribe:
+
+```go
+127.0.0.1:6379> psubscribe c? b* d?*
+Reading messages... (press Ctrl-C to quit)
+1) "psubscribe"
+2) "c?"
+3) (integer) 1
+1) "psubscribe"
+2) "b*"
+3) (integer) 2
+1) "psubscribe"
+2) "d?*"
+3) (integer) 3
+1) "pmessage"
+2) "c?"
+3) "c1"
+4) "m1"
+1) "pmessage"
+2) "b*"
+3) "b"
+4) "m1"
+1) "pmessage"
+2) "b*"
+3) "b1"
+4) "m1"
+1) "pmessage"
+2) "b*"
+3) "b11"
+4) "m1"
+1) "pmessage"
+2) "d?*"
+3) "d1"
+4) "m1"
+1) "pmessage"
+2) "d?*"
+3) "d11"
+4) "m1"
+```
+
+>❗️Note:
+- 使用 `PSUBSCRIBE` 指令可以重複訂閱同個 channal, 當有 message 時期會收到兩條 messages
+- `PUNSUBSCRIBE` 指令可以退訂指定規則, 用法為 `punsubscribe [pattern [pattern ...]]`, 若不帶參數則會退訂所有規則
+- 使用 `PUNSUBSCRIBE` 只能退訂通過 `PSUBSCRIBE` 訂閱的規則, 不會直接影響 `SUBSCRIBE` 訂閱的 channels; `UNSUBSCRIBE` 同理
+- `PUNSUBSCRIBE` 指令退訂某個規則時不會將其中通配符展開, 而是進行嚴格字符串匹配, 所以 `PUNSUBSCRIBE *` 無法退訂 `c*` 規則, 必須使用 `PUNSUBSCRIBE c*` 才可退訂
 # Event
 
 # Transaction
