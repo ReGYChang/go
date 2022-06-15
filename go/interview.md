@@ -21,7 +21,6 @@
 
 1. 哪種效率更高? 為何?
 
-Hint: 計算機組成原理, CPU 處理器, 暫存器, 多級緩存
 
 ```go
 const matrixLength = 20000
@@ -31,7 +30,7 @@ func foo() {
     matrixB := createMatrix(matrixLength)
 
     for i := 0; i < matrixLength; i++ {
-        for i := 0; i < matrixLength; i++ {
+        for j := 0; j < matrixLength; j++ {
             matrixA[i][j] = matrixA[i][j] + matrixA[i][j]    
         }
 }
@@ -41,11 +40,13 @@ func bar() {
     matrixB := createMatrix(matrixLength)
 
     for i := 0; i < matrixLength; i++ {
-        for i := 0; i < matrixLength; i++ {
+        for i := 0; j < matrixLength; j++ {
             matrixA[i][j] = matrixA[i][j] + matrixA[j][i]    
         }
 }
 ```
+
+> Hint: 計算機組成原理, CPU 處理器, 暫存器, 多級緩存
 
 ## Memory
 
@@ -61,7 +62,6 @@ func bar() {
 
 1. 以下運算結果為何? 為什麼?
 
-Hint: 補碼, 無號數
 
 ```go
 func main() {
@@ -70,6 +70,8 @@ func main() {
     fmt.Println(a-b)
 }
 ```
+
+Hint: 補碼, 無號數
 
 ## channel
 
