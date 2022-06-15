@@ -21,6 +21,9 @@
   - [Start Web Server](#start-web-server)
   - [Define routes and handler methods](#define-routes-and-handler-methods)
   - [Testing](#testing)
+- [Get HTTP Message Body From Request](#get-http-message-body-from-request)
+  - [Request Struct](#request-struct)
+  - [Request URL](#request-url)
 
 # gorilla/mux
 
@@ -723,3 +726,122 @@ var routes = WebRoutes{
 ## Testing
 
 ![web_server_test](../network/img/web_server_test.png)
+
+# Get HTTP Message Body From Request
+
+首先來看一下 HTTP request, 一個完整的 HTTP GET request mesage 結構如下圖:
+
+![request_message_body](../network/img/request_message_body.png)
+
+其中包含了 `request line`, `request headers` 和 `request message body` 三個部分:
+- `request line` 中包含了 request method, URL 和 HTTP 版本
+- `request headers` 包含了 HTTP request field
+- 對於 GET 請求來說沒有提交 form data, 所以 request body 為空
+
+## Request Struct
+
+Go 通過一個 `Request` struct 來表示 HTTP request message, 在 `net/http` package 中, 其中包含 request URL, request header, request body, form data 等:
+- URL: request URL
+- Method: request method
+- Proto: HTTP 版本
+- Header: request header(map 類型 key-value 集合)
+- Body: request body(實現了 `io.ReadCloser` interface 的 read-only type)
+- Form, PostForm, MultipartForm: request form 相關 field, 用於儲存 request form data
+
+## Request URL
+
+在 Go 中 `http.Request` struct 中, 用於表示請求 URL 的 URL field 是一個 `url.URL` 類型的 pointer:
+
+```go
+type URL struct {
+	Scheme      string
+	Opaque      string    // encoded opaque data
+	User        *Userinfo // username and password information
+	Host        string    // host or host:port
+	Path        string    // path (relative paths may omit leading slash)
+	RawPath     string    // encoded path hint (see EscapedPath method)
+	ForceQuery  bool      // append a query ('?') even if RawQuery is empty
+	RawQuery    string    // encoded query values, without '?'
+	Fragment    string    // fragment for references, without '#'
+	RawFragment string    // encoded fragment hint (see EscapedFragment method)
+}
+```
+
+- `Scheme`: 表示使用 `HTTP` 還是 `HTTPS`
+- `User`: 對於一些需要 authentication 才能訪問的應用需要提供 `User` 資訊
+- `Host`: 表示 domain/host 資訊, 若 server listen port 不是默認的 80 port 還需要通過 `:port` 來補充 port 資訊
+- `Path`: 表示 HTTP request path, 一般應用首頁是空字符串, 或 `/`
+- `Query`: 表示 URL 中的查詢字符串, 也就是 URL 中 `?` 之後的部分
+- `Fragment`: 表示 URL 中的錨點資訊, 也就是 URL 中 `#` 之後的部分
+
+因此常見的 URL 完整格式如下:
+
+```go
+scheme://[user@]host/path[?query][#fragment]
+```
+
+若不包含 `/` 則 URL 解析後結果如下:
+
+```go
+scheme:opaque[?query][#fragment]
+```
+
+例如對於 `https://regy.dev/books/golang-tutorials?page=2#comments` 而言:
+- `Scheme` 是 `https`
+- `Host` 是 `regy.dev`
+- `Path` 是 `/books/golang-tutorials`
+- `RawQuery` 是 `page=2`
+- `Fragment` 是 `comments`
+
+若 request 是從 browser 發出則無法獲取 URL 中 `Fragment` 資訊, 這邊再以 `github.com/regy/goweb` 舉例, 在 `routes/router.go` 新增以下程式碼:
+
+```go
+package routes
+
+import (
+	"encoding/json"
+	"log"
+	"net/http"
+
+	"github.com/gorilla/mux"
+)
+
+// return mux.Router type pointer as handler to use
+func NewRouter() *mux.Router {
+
+	// create mux.Router
+	router := mux.NewRouter().StrictSlash(true)
+
+	// registe logging middleware
+	router.Use(loggingRequestInfo)
+
+	// for loop all webRoutes define in web.go
+	for _, route := range routes {
+		// register web routes to router
+		router.Methods(route.Method).
+			Path(route.Pattern).
+			Name(route.Name).
+			Handler(route.HandlerFunc)
+	}
+
+	return router
+}
+
+// record request logging messages middleware
+func loggingRequestInfo(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// print request URL
+		url, _ := json.Marshal(r.URL)
+		log.Println(string(url))
+		next.ServeHTTP(w, r)
+	})
+}
+```
+
+通過新增一個 `loggingRequestInfo` middleware 紀錄所有請求 URL detail, 通過 JSON 對 URL 物件進行編碼以提升可讀性
+
+以 `curl http://localhost:8080/posts\?page\=1\#comments` 測結果如下:
+
+![fragment_test_server](../network/img/fragment_test_server.png)
+
+可以看到 Scheme, Host 和 Fragment 都是空的, Scheme 需要根據是否啟用 HTTPS 進行設置, Host 為空是因為沒有通過 proxy 訪問 HTTP server, 且在 localhost 環境中 Host 始終為空
