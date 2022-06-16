@@ -7,17 +7,16 @@
 </p>
 
 # [Go](go/README.md)
-- package, init, tools, repo, dependency
-- [var, const, type, function, package](go/var_const_type_function_package.md)
+- [package, init, tools, repo, dependency](go/pkg_init_tools_repo_dependency.md)
+- [var, const, type, pointer](go/var_const_type_pointer.md)
+- [function, defer, closure](go/function_defer_closure.md)
 - [array, slice, map](go/array_slice_map.md)
-- [pointer, struct, method](go/pointer_struct_methods.md)
-- [interface](go/interface.md)
-- [goroutine, channel, buffer, select, mutex](go/go_channel_buffer_select_mutex.md)
-- [defer, error, panic, recover](go/defer_error_panic_recover.md)
-- [anonymous function, closure](go/anonymouse_closure.md)
-- [higher-order function](go/higher_order_func.md)
+- [packages](go/packages.md)
+- [struct, method](go/struct_methods.md)
+- [interface, reflection](go/interface_reflection.md)
 - [I/O](go/io.md)
-- [learn Go dependency management tool](go/pkg_tools.md)
+- [error, panic, recover, test](go/error_panic_recover_test.md)
+- [goroutine, channel, buffer, select, mutex](go/go_channel_buffer_select_mutex.md)
 - semantic versioning
 - version, scripts, repository and other properties
 - concurrency patterns
