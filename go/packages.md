@@ -1,6 +1,7 @@
 - [Standard Library](#standard-library)
 - [regexp package](#regexp-package)
 - [Lock & sync package](#lock--sync-package)
+- [Large Numbers & math/big](#large-numbers--mathbig)
 
 # Standard Library
 
@@ -161,3 +162,55 @@ Go 中 lock 機制是透過 `sync` package 中 `Mutex` 實現
 
 另一個常用的 `Once` 型別變數的方法 `once.Do(call)` 可以確保呼叫函數只能被呼叫一次
 
+# Large Numbers & math/big
+
+在 Go 中使用 `float64` 型別進行浮點數運算, 返回的結果將精確到 15 位, 足以滿足大多數的需求, 但如果對精度有嚴格要求則不能使用浮點數, 在記憶體中其只能被以近似值表示
+
+對於整數的高精度計算 Go 提供了 `math/big` package, 有用來表示大整數的 `big.Int` 和表示大有理數的 `big.Rat` 型別(可以表示為 2/5 或 3.1416 這樣的分數，而不是無理數或 π)
+
+這些型別可以實現任意位型別的數字, 缺點是需要更大的記憶體空間及 CPU effort, 使其處理上相較基本型別要慢很多
+
+大的整型數是透過 `big.NewInt(n)` 構建, 其中 `n` 為 `int64` 型別整數; 而大有理數透過 `big.NewRat(n, d)` 方法構建, 其中 `n` (分子) 和 `d` (分母) 都是 `int64` 型別整數
+
+所有大數型別都有像 `Add()` 和 `Mul()` 這樣的方法, 其作用於作為 receiver 的整數和有理數, 大多情況下其修改 receiver 並直接以 receiver return
+
+```go
+// big.go
+package main
+
+import (
+	"fmt"
+	"math"
+	"math/big"
+)
+
+func main() {
+	// Here are some calculations with bigInts:
+	im := big.NewInt(math.MaxInt64)
+	in := im
+	io := big.NewInt(1956)
+	ip := big.NewInt(1)
+	ip.Mul(im, in).Add(ip, im).Div(ip, io)
+	fmt.Printf("Big Int: %v\n", ip)
+	// Here are some calculations with bigInts:
+	rm := big.NewRat(math.MaxInt64, 1956)
+	rn := big.NewRat(-1956, math.MaxInt64)
+	ro := big.NewRat(19, 56)
+	rp := big.NewRat(1111, 2222)
+	rq := big.NewRat(1, 1)
+	rq.Mul(rm, rn).Add(rq, ro).Mul(rq, rp)
+	fmt.Printf("Big Rat: %v\n", rq)
+}
+
+/* Output:
+Big Int: 43492122561469640008497075573153004
+Big Rat: -37/112
+*/
+```
+
+output:
+
+```go
+Big Int: 43492122561469640008497075573153004
+Big Rat: -37/112
+```
