@@ -1,5 +1,6 @@
 - [Standard Library](#standard-library)
 - [regexp package](#regexp-package)
+- [Lock & sync package](#lock--sync-package)
 
 # Standard Library
 
@@ -149,3 +150,14 @@ func main() {
 `Compile()` 函式也可能返回一個錯誤, 在使用時忽略對錯誤的判斷是因為確信自己正則表示式是有效的, 當用戶輸入或從資料中獲取正則表示式的時候, 我們有必要去檢驗它的正確性
 
 另外我們也可以使用 `MustCompile()` 方法, 它可以像 `Compile()` 方法一樣檢驗正則的有效性, 但是當正則不合法時程式將 `panic()`
+
+# Lock & sync package
+
+Go 中 lock 機制是透過 `sync` package 中 `Mutex` 實現
+
+`sync.Mutex` 為互斥鎖, 其作用為確保同一時間只有一個 thread 能進入 critical section
+
+`sync.RWMutex` 為讀寫鎖, 能透過 `RLock()` 允許同時間多個 read operations, 但還是只能有一個 thread 進行 write operation
+
+另一個常用的 `Once` 型別變數的方法 `once.Do(call)` 可以確保呼叫函數只能被呼叫一次
+
