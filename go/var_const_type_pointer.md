@@ -6,7 +6,6 @@
 - [Type](#type)
   - [Type Assertion](#type-assertion)
   - [Type Switch](#type-switch)
-- [Function](#function)
 
 # Variable
 
@@ -481,28 +480,3 @@ hello is string
 > Summary
 - 若值為 `nil`, 匹配的是 `case nil`
 - 若值在 switch-case 中並沒有匹配對應類型, 那麼匹配的是 default
-
-# Function
-
-function 宣告使用關鍵字 `func`, 可有多個參數及多個返回值. package main 中的 func main() 約定為可執行程式的入口
-
-```go
-func funcName(param1 Type1, param2 Type2, ...) (return1 Type3, ...) {
-    // body
-}
-```
-
-```go
-func add(num1 int, num2 int) int {
-	return num1 + num2
-}
-
-func div(num1 int, num2 int) (int, int) {
-	return num1 / num2, num1 % num2
-}
-func main() {
-	quo, rem := div(100, 17)
-	fmt.Println(quo, rem)     // 5 15
-	fmt.Println(add(100, 17)) // 117
-}
-```
