@@ -5,6 +5,11 @@
   - [context.go](#contextgo)
   - [router.go](#routergo)
 - [gee.go](#geego-1)
+- [Dynamic Routing](#dynamic-routing)
+  - [Trie Tree Implementation](#trie-tree-implementation)
+  - [trie.go](#triego)
+  - [Router](#router)
+  - [Context & handle Updated](#context--handle-updated)
 
 # Create Gee Web Framework
 
@@ -331,3 +336,246 @@ func (engine *Engine) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 ```
 
 在調用 `router.handle` 之前構建了 `Context` instance, 目前 `Context` 僅封裝了原本的兩個參數
+
+# Dynamic Routing
+
+使用 map 來儲存路由表只能針對靜態路由索引, 無法支持類似 `/hello/:name` 這樣的動態索引, 即一條路由規則可以匹配某個 pattern 而非一條固定的路由, 如 `/hello/:name` 可以匹配 `/hello/regy`, `/hello/chang` 等
+
+動態路由有多種實現方式, 如開源的 `gorouter` 支持在路由規則中嵌入正則表達式; 另一個開源 `httprouter` 則不支持正則表達式
+
+![trie_tree](img/trie_tree.png)
+
+實現動態路由最常用的資料結構為 prefix tree(trie tree), 其每個節點的子節點都擁有相同的 prefix, 非常適用於 routes matching
+
+例如定義以下路由規則:
+- /:lang/doc
+- /:lang/tutorial
+- /:lang/intro
+- /about
+- /p/blog
+- /p/related
+
+以 trie tree 表示如下:
+
+![trie_tree_example](img/trie_tree_example.png)
+
+HTTP request path 是由 `/` 分隔的多段構成, 因此每一段可以作為 tire tree 的一個 node, 通過 tree 結構查詢, 若過程中每個 node 不滿足條件則說明沒有匹配到路由, 查詢結束
+
+## Trie Tree Implementation
+
+動態路由具備以下兩個功能:
+- 參數匹配: 如 `/p/:lang/doc` 可以匹配 `/p/c/doc` 和 `/p/go/doc`
+- 通配符 `*`: 如 `/static/*filepath` 可以匹配 `/static/fav.ico`, 也可以匹配 `/static/js/node.js`, 這種 pattern 常用於 static server, 能夠遞迴匹配子路徑
+
+## trie.go
+
+```go
+type node struct {
+	pattern  string // 待匹配路由如 /p/:lang
+	part     string // 路由中的一部分如 :lang
+	children []*node // 子節點如 [doc, tutorial, intro]
+	isWild   bool // 是否精準匹配, part 包含 : 或 * 時為 true
+}
+```
+
+為了實現動態路由匹配加上了 `isWild` 參數, 即當匹配了 `/p/go/doc` 這個路由時, 第一層節點 `p` 精準匹配到了 `p`, 第二層節點 `go` 模糊匹配到了 `:lang`, 將會把 `lang` 這個參數賦值為 `go` 繼續下一層匹配
+
+將匹配邏輯包裝為一個輔助函數:
+
+```go
+// 第一個匹配成功的節點用於插入
+func (n *node) matchChild(part string) *node {
+	for _, child := range n.children {
+		if child.part == part || child.isWild {
+			return child
+		}
+	}
+	return nil
+}
+
+// 所有匹配成功的節點用於查找
+func (n *node) matchChildren(part string) []*node {
+	nodes := make([]*node, 0)
+	for _, child := range n.children {
+		if child.part == part || child.isWild {
+			nodes = append(nodes, child)
+		}
+	}
+	return nodes
+}
+```
+
+對於 routing 來說最重要的是 registe 和 match, 開發時 registe routing rules 映射 handler, 訪問時 match routing rule 查找對應的 handler
+
+Trie tree 需要 node insert 與 search 功能, 遞迴查詢每一層 node, 如果沒有匹配到當前 part 的 node 則新建一個
+
+需注意 `/p/:lang/doc` 只有在第三層的 node, 即 `doc` node 才會設置 pattern 為 `/p/:lang/doc`, `p` 和 `:lang` 節點的 pattern field 為空, 因此可以以 `n.pattern == ""` 來判斷 route matching 是否成功
+
+如 `/p/python` 雖然能成功匹配到 `:lang`, 但 `:lang` node patten 值為空, 因此匹配失敗
+
+查詢功能同樣是遞迴查詢每一層節點, 當匹配到 `*` 或第 len(parts) 層節點則匹配失敗
+
+```go
+func (n *node) insert(pattern string, parts []string, height int) {
+	if len(parts) == height {
+		n.pattern = pattern
+		return
+	}
+
+	part := parts[height]
+	child := n.matchChild(part)
+	if child == nil {
+		child = &node{part: part, isWild: part[0] == ':' || part[0] == '*'}
+		n.children = append(n.children, child)
+	}
+	child.insert(pattern, parts, height+1)
+}
+
+func (n *node) search(parts []string, height int) *node {
+	if len(parts) == height || strings.HasPrefix(n.part, "*") {
+		if n.pattern == "" {
+			return nil
+		}
+		return n
+	}
+
+	part := parts[height]
+	children := n.matchChildren(part)
+
+    for _, child := range children {
+		result := child.search(parts, height+1)
+		if result != nil {
+			return result
+		}
+	}
+
+	return nil
+}
+```
+
+## Router
+
+接下來是將 Trie tree 印用到 router 中, 使用 `roots` 來儲存每種 request method 的 Trie tree root node, 並使用 `handlers` 儲存每種 request method 的 `HandlerFunc`
+
+`getRoute` 函數中還解析了 `:` 和 `*` 兩種通配符參數並返回一個 map, 如 `/p/go/doc` 匹配到 `/p/:lang/doc`, 解析結果為 `{lang: "go"}`, `/static/css/geektutu.css` 匹配到 `/static/*filepath` 解析結果為 `{filepath: "css/geektutu.css"}`
+
+```go
+package gee
+
+import (
+	"net/http"
+	"strings"
+)
+
+type router struct {
+	roots    map[string]*node
+	handlers map[string]HandlerFunc
+}
+
+func newRouter() *router {
+	return &router{
+		roots:    make(map[string]*node),
+		handlers: make(map[string]HandlerFunc),
+	}
+}
+
+// Only one * is allowed
+func parsePattern(pattern string) []string {
+	vs := strings.Split(pattern, "/")
+
+	parts := make([]string, 0)
+	for _, item := range vs {
+		if item != "" {
+			parts = append(parts, item)
+			if item[0] == '*' {
+				break
+			}
+		}
+	}
+	return parts
+}
+
+func (r *router) addRoute(method string, pattern string, handler HandlerFunc) {
+	parts := parsePattern(pattern)
+
+	key := method + "-" + pattern
+	_, ok := r.roots[method]
+	if !ok {
+		r.roots[method] = &node{}
+	}
+	r.roots[method].insert(pattern, parts, 0)
+	r.handlers[key] = handler
+}
+
+func (r *router) getRoute(method string, path string) (*node, map[string]string) {
+	searchParts := parsePattern(path)
+	params := make(map[string]string)
+	root, ok := r.roots[method]
+
+	if !ok {
+		return nil, nil
+	}
+
+	n := root.search(searchParts, 0)
+
+	if n != nil {
+		parts := parsePattern(n.pattern)
+		for index, part := range parts {
+			if part[0] == ':' {
+				params[part[1:]] = searchParts[index]
+			}
+			if part[0] == '*' && len(part) > 1 {
+				params[part[1:]] = strings.Join(searchParts[index:], "/")
+				break
+			}
+		}
+		return n, params
+	}
+
+	return nil, nil
+}
+```
+
+## Context & handle Updated
+
+在 `HandlerFunc` 中希望能夠訪問到解析的參數, 因此需要對 `Context` object 新增一個屬性和方法來提供對路由參數的訪問
+
+將解析後的參數儲存到 `Params` 中, 可以通過 `c.Param("lang")` 方式獲取到對應的參數值
+
+context.go
+
+```go
+type Context struct {
+	// origin objects
+	Writer http.ResponseWriter
+	Req    *http.Request
+	// request info
+	Path   string
+	Method string
+	Params map[string]string
+	// response info
+	StatusCode int
+}
+
+func (c *Context) Param(key string) string {
+	value, _ := c.Params[key]
+	return value
+}
+```
+
+router.go
+
+```go
+func (r *router) handle(c *Context) {
+	n, params := r.getRoute(c.Method, c.Path)
+	if n != nil {
+		c.Params = params
+		key := c.Method + "-" + n.pattern
+		r.handlers[key](c)
+	} else {
+		c.String(http.StatusNotFound, "404 NOT FOUND: %s\n", c.Path)
+	}
+}
+```
+
+在調用匹配到的 handler 前, 將解析出來的路由參數賦值給 `c.Params`, 這樣能在 handler 中通過 `Context` 物件訪問到具體的值
