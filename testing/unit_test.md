@@ -1,4 +1,5 @@
 - [Unit Test](#unit-test)
+- [Stress Test](#stress-test)
 
 # Unit Test
 
@@ -120,3 +121,58 @@ func Test_Division_2(t *testing.T) {
 PASS
 ok      gotest    0.013s
 ```
+
+
+# Stress Test
+
+壓力測試主要用來檢測函數(方法) 的效能, 和編寫 unit test 方式類似, 需注意以下幾點:
+- 壓力測試案例必須遵循以下格式, 其中 XXX 可以是任意字母數字的組合, 但是首字母不能是小寫字母:
+
+```go
+func BenchmarkXXX(b *testing.B) { ... }
+```
+
+- `go test` default 不會執行壓力測試的函數, 如果要執行壓力測試需要帶上參數 `-test.bench`, 語法為 `-test.bench="test_name_regex"`, 如 `go test -test.bench=".*"` 表示測試全部的壓力測試函數
+- 在壓力測試案例中記得在迴圈內使用 `testing.B.N` 以使測試可以正常運行
+- 檔名也必須以 `_test.go` 結尾
+
+下面是一個壓力測試檔案 `bench_test.go` :
+
+```go
+package gotest
+
+import (
+    "testing"
+)
+
+func Benchmark_Division(b *testing.B) {
+    for i := 0; i < b.N; i++ { //use b.N for looping
+        Division(4, 5)
+    }
+}
+
+func Benchmark_TimeConsumingFunction(b *testing.B) {
+    b.StopTimer() //呼叫該函式停止壓力測試的時間計數
+
+    //做一些初始化的工作，例如讀取檔案資料，資料庫連線之類別的,
+    //這樣這些時間不影響我們測試函式本身的效能
+
+    b.StartTimer() //重新開始時間
+    for i := 0; i < b.N; i++ {
+        Division(4, 5)
+    }
+}
+```
+
+執行 `go test bench_test.go -test.bench=".*"` 可以看到以下結果：
+
+```go
+Benchmark_Division-4                            500000000          7.76 ns/op         456 B/op          14 allocs/op
+Benchmark_TimeConsumingFunction-4            500000000          7.80 ns/op         224 B/op           4 allocs/op
+PASS
+ok      gotest    9.364s
+```
+
+上面結果顯示沒有執行任何 `TestXXX` 的 unit test function, 只執行了壓力測試函數
+
+`Benchmark_Division` 執行了 500000000 次, 每次的執行平均時間是 7.76 ns
