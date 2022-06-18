@@ -11,6 +11,9 @@
   - [Router](#router)
   - [Context & handle Updated](#context--handle-updated)
   - [Unit Test](#unit-test)
+- [Group Control](#group-control)
+  - [Nested Route Group](#nested-route-group)
+  - [Unit Test](#unit-test-1)
 
 # Create Gee Web Framework
 
@@ -697,4 +700,160 @@ hello geektutu, you're at /hello/geektutu
 
 $ curl "http://localhost:9999/assets/css/geektutu.css"
 {"filepath":"css/geektutu.css"}
+```
+
+# Group Control
+
+Group control 是指路由分組, 因為在真實應用場景中往往某一組路由需要相似的管理, 如:
+- 以 `/post` 開頭的路由可匿名訪問
+- 以 `/admin` 開頭的路由需要 authentication
+- 以 `api` 開頭的路由是 RESTful api, 可以介接第三方平台, 需要第三方平台 authentication
+
+大部分情況下路由分組是以相同的 prefix 來區分, 且支援分組嵌套, 如 `/post` 是一個 group, `/post/a` 和 `/post/b` 可以是此 group 下的 subgroup, 作用在 `/post` group 上的 middleware 也都會套用在 subgroup 上, subgroup 也可以套用自己的 middleware
+
+Middleware 可以給 framework 提供無限擴展能力, 套用在分組上可以使效益更明顯, 而不只是共享相同的 route prefix, 如 `/admin` group 可以套用 authentication middleware, `/` group 套用 logging middleware, 意味所有路由都套用此 middleware
+
+## Nested Route Group
+
+一個 `Group` 物件需要有 prefix 屬性, 如 `/` 或 `api`, 要支持分組嵌套還需要知道當前 group 的 parent
+
+Middleware 是套用在 group 上, 則還需要儲存套用在當前 group 的 middleware
+
+之前調用函數 `(*Engine).addRoute()` 來映射所有路由規則和 Handler, 若 `Group` 物件直接映射路由規則的話應該會這樣調用:
+
+```go
+r := gee.New()
+v1 := r.Group("/v1")
+v1.GET("/", func(c *gee.Context) {
+	c.HTML(http.StatusOK, "<h1>Hello Gee</h1>")
+})
+```
+
+那麼 `Group` 物件還需要有訪問 `Router` 的能力, 為了方便可以在 `Group` 中保留一個  `Engine` pointer, 可以通過 `Engine` 間接訪問各種接口
+
+`Group` 定義如下:
+
+gee.go
+
+```go
+RouterGroup struct {
+	prefix      string
+	middlewares []HandlerFunc // support middleware
+	parent      *RouterGroup  // support nesting
+	engine      *Engine       // all groups share a Engine instance
+}
+```
+
+還可以進一步抽象, 將 `Engine` 作為最頂層的 group, 也就是 `Engine` 擁有 `RouterGroup` 所有的功能:
+
+```go
+Engine struct {
+	*RouterGroup
+	router *router
+	groups []*RouterGroup // store all groups
+}
+```
+
+接下來就可以將和路由相關的函數都叫給 `RouterGroup` 來實現:
+
+```go
+// New is the constructor of gee.Engine
+func New() *Engine {
+	engine := &Engine{router: newRouter()}
+	engine.RouterGroup = &RouterGroup{engine: engine}
+	engine.groups = []*RouterGroup{engine.RouterGroup}
+	return engine
+}
+
+// Group is defined to create a new RouterGroup
+// remember all groups share the same Engine instance
+func (group *RouterGroup) Group(prefix string) *RouterGroup {
+	engine := group.engine
+	newGroup := &RouterGroup{
+		prefix: group.prefix + prefix,
+		parent: group,
+		engine: engine,
+	}
+	engine.groups = append(engine.groups, newGroup)
+	return newGroup
+}
+
+func (group *RouterGroup) addRoute(method string, comp string, handler HandlerFunc) {
+	pattern := group.prefix + comp
+	log.Printf("Route %4s - %s", method, pattern)
+	group.engine.router.addRoute(method, pattern, handler)
+}
+
+// GET defines the method to add GET request
+func (group *RouterGroup) GET(pattern string, handler HandlerFunc) {
+	group.addRoute("GET", pattern, handler)
+}
+
+// POST defines the method to add POST request
+func (group *RouterGroup) POST(pattern string, handler HandlerFunc) {
+	group.addRoute("POST", pattern, handler)
+}
+```
+
+注意 `addRoute` 函數, 調用了 `group.engine.router.addRoute` 來實現路由映射, 由於 `Engine` 某種意義上繼承了 `RouterGroup` 的所有屬性和方法, 因為 `(*Engine).engine` 是指向自己, 如此一來既可以像原來一樣新增路由, 也可以通過 grouping 新增路由
+
+## Unit Test
+
+main.go
+
+```go
+func main() {
+	r := gee.New()
+	r.GET("/index", func(c *gee.Context) {
+		c.HTML(http.StatusOK, "<h1>Index Page</h1>")
+	})
+	v1 := r.Group("/v1")
+	{
+		v1.GET("/", func(c *gee.Context) {
+			c.HTML(http.StatusOK, "<h1>Hello Gee</h1>")
+		})
+
+		v1.GET("/hello", func(c *gee.Context) {
+			// expect /hello?name=geektutu
+			c.String(http.StatusOK, "hello %s, you're at %s\n", c.Query("name"), c.Path)
+		})
+	}
+	v2 := r.Group("/v2")
+	{
+		v2.GET("/hello/:name", func(c *gee.Context) {
+			// expect /hello/geektutu
+			c.String(http.StatusOK, "hello %s, you're at %s\n", c.Param("name"), c.Path)
+		})
+		v2.POST("/login", func(c *gee.Context) {
+			c.JSON(http.StatusOK, gee.H{
+				"username": c.PostForm("username"),
+				"password": c.PostForm("password"),
+			})
+		})
+
+	}
+
+	r.Run(":9999")
+}
+```
+
+gee_test.go
+
+```go
+package gee
+
+import "testing"
+
+func TestNestedGroup(t *testing.T) {
+	r := New()
+	v1 := r.Group("/v1")
+	v2 := v1.Group("/v2")
+	v3 := v2.Group("/v3")
+	if v2.prefix != "/v1/v2" {
+		t.Fatal("v2 prefix should be /v1/v2")
+	}
+	if v3.prefix != "/v1/v2/v3" {
+		t.Fatal("v2 prefix should be /v1/v2")
+	}
+}
 ```
