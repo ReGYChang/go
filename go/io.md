@@ -1,6 +1,7 @@
 - [I/O](#io)
   - [Reader Interface](#reader-interface)
   - [Writer Interface](#writer-interface)
+  - [Types Implement io.Reader and io.Writer](#types-implement-ioreader-and-iowriter)
 
 # I/O
 
@@ -93,4 +94,41 @@ func Println(a ...interface{}) (n int, err error) {
 ```
 
 顯然 `fmt.Println` 會將內容輸出到標準中
+
+## Types Implement io.Reader and io.Writer
+
+通過上述例子可以發現 `os.File` 同時實現了這兩個 interface, 還可以看到 `os.Stdin/Stdout` 這樣的程式碼, 其在 `os` package 中聲明如下:
+
+```go
+var (
+    Stdin  = NewFile(uintptr(syscall.Stdin), "/dev/stdin")
+    Stdout = NewFile(uintptr(syscall.Stdout), "/dev/stdout")
+    Stderr = NewFile(uintptr(syscall.Stderr), "/dev/stderr")
+)
+```
+
+也就是說 `Stdin/Stdout/Stderr` 只是三個特殊的文件型別的標示(os.File 的 instance), 自然也實現了 `io.Reader` 和 `io.Writer`
+
+通過查看標準庫文件列出實現了 `io.Reader` 和 `io.Writer` interface 的型別:
+- `os.File` 同時實現了 `io.Reader` 和 `io.Writer`
+- `strings.Reader` 實現了 `io.Reader`
+- `bufio.Reader/Writer` 分别實現了 `io.Reader` 和 `io.Writer`
+- `bytes.Buffer` 同時實現了 `io.Reader` 和 `io.Writer`
+- `bytes.Reader` 實現了 `io.Reader`
+- `compress/gzip.Reader/Writer` 分别實現了 `io.Reader` 和 `io.Writer`
+- `crypto/cipher.StreamReader/StreamWriter` 分别實現了 `io.Reader` 和 `io.Writer`
+- `crypto/tls.Conn` 同时實現了 `io.Reader` 和 `io.Writer`
+- `encoding/csv.Reader/Writer` 分别實現了 `io.Reader` 和 `io.Writer`
+- `mime/multipart.Part` 實現了 `io.Reader`
+- `net/conn` 分别實現了 `io.Reader` 和 `io.Writer`(Conn interface 定義了 Read/Write)
+
+除此之外 `io` package 本身也有這兩個 interface 的實現型別, 如:
+- Implement `Reader`: `LimitedReader`, `PipeReader`, `SectionReader`
+- Implement `Writer`: `PipeWriter`
+
+以上型別較常使用的有: `os.File`, `strings.Reader`, `bufio.Reader/Writer`, `bytes.Buffer`, `bytes.Reader`
+
+>💡TIP:
+
+從 interface 命名可以觀察到, 在 Go 中 interface 的命名約定是以 `er` 結尾, 這裡並非強制要求, 標準庫中有些 interface 也不是以 `er` 結尾
 
