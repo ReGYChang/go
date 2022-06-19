@@ -1,5 +1,6 @@
 - [I/O](#io)
   - [Reader Interface](#reader-interface)
+  - [Writer Interface](#writer-interface)
 
 # I/O
 
@@ -60,4 +61,36 @@ data, err = ReadFrom(strings.NewReader("from string"), 12)
 >💡TIP:
 
 `io.EOF` 變數的定義為 `var EOF = errors.New("EOF")`, 其為 `error` 型別, 根據 reader interface 說明, 在 n > 0 且資料被讀取完的情況下, 返回的 `error` 可能是 `EOF` 也有可能是 nil
+
+## Writer Interface
+
+`Writer` interface 定義如下:
+
+```go
+type Writer interface {
+    Write(p []byte) (n int, err error)
+}
+```
+
+官方文檔對於該 interface 方法說明:
+
+`Write` 將 len(p) 個 bytes 從 p 中寫入到基本資料流中, 返回從 p 中被寫入的 bytes 數量 n(0 <= n <= len(p)) 及任何遇到引起寫入提前結束的 error
+
+若 `Write` 返回的 n < len(p), 它就必須返回一個 non-nil error
+
+與 `Reader` 相同, 所有實現 `Write` 方法的型別都實現了 `Writer` interface
+
+這裡通過標準庫的例子來了解 `Writer` 用法:
+
+在 `fmt` package 有一組函數 `Fprint/Fprintf/Frpintln`, 它們接收一個 `io.Writer` 型別參數, 它們接收一個 `io.Writer` 型別的參數(第一個參數), 也就是其將資料格式化輸出到 `io.Writer` 中
+
+以 `fmt.Fprintln` 為例, 並同時看一下 `fmt.Println` 函數 source code:
+
+```go
+func Println(a ...interface{}) (n int, err error) {
+    return Fprintln(os.Stdout, a...)
+}
+```
+
+顯然 `fmt.Println` 會將內容輸出到標準中
 
