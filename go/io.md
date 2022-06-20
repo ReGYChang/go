@@ -11,6 +11,10 @@
   - [ReadAll](#readall)
   - [ReadDir](#readdir)
   - [ReadFile & WriteFile](#readfile--writefile)
+- [fmt](#fmt)
+  - [Printing](#printing)
+    - [Sample](#sample)
+    - [Placeholder](#placeholder)
 
 # I/O
 
@@ -444,3 +448,81 @@ func WriteFile(filename string, data []byte, perm os.FileMode) error
 
 `ReadFile` source code 中先獲取文件大小, 當大小 < 1e9 時才會用到文件的大小, 按 source code 注視的說法 `FileInfo` 不會很精確地獲取文件大小
 
+# fmt
+
+`fmt` package 實現了格式化 I/O 函數, 類似於 C 的 `printf` 和 `scanf`
+
+`fmt` package 的官方文件中對 `Printing` 和 `Scanning` 有很詳細的說明, 這裡直接引用文件說明
+
+以下範例中使用到的型別或變數定義:
+
+```go
+type Website struct {
+    Name string
+}
+
+// define struct variable
+var site = Website{Name:"studygolang"}
+```
+
+## Printing
+
+### Sample
+
+```go
+type user struct {
+    name string
+}
+
+func main() {
+    u := user{"tang"}
+    //Printf 格式化輸出
+    fmt.Printf("% + v\n", u)     //格式化輸出結構
+    fmt.Printf("%#v\n", u)       //輸出值的 Go 語言表示方法
+    fmt.Printf("%T\n", u)        //輸出值的類型的 Go 語言表示
+    fmt.Printf("%t\n", true)     //輸出值的 true 或 false
+    fmt.Printf("%b\n", 1024)     //二進位表示
+    fmt.Printf("%c\n", 11111111) //數值對應的 Unicode 編碼字符
+    fmt.Printf("%d\n", 10)       //十進位表示
+    fmt.Printf("%o\n", 8)        //八進位表示
+    fmt.Printf("%q\n", 22)       //轉化為十六進制並附上單引號
+    fmt.Printf("%x\n", 1223)     //十六進位表示, 用a-f表示
+    fmt.Printf("%X\n", 1223)     //十六進位表示, 用A-F表示
+    fmt.Printf("%U\n", 1233)     //Unicode表示
+    fmt.Printf("%b\n", 12.34)    //無小數部分, 兩位指數的科學計數法6946802425218990p-49
+    fmt.Printf("%e\n", 12.345)   //科學計數法, e表示
+    fmt.Printf("%E\n", 12.34455) //科學計數法, E表示
+    fmt.Printf("%f\n", 12.3456)  //有小數部分, 無指數部分
+    fmt.Printf("%g\n", 12.3456)  //根據實際情況採用%e或%f輸出
+    fmt.Printf("%G\n", 12.3456)  //根據實際情況採用%E或%f輸出
+    fmt.Printf("%s\n", "wqdew")  //直接輸出字符串或者[]byte
+    fmt.Printf("%q\n", "dedede") //雙引號括起來的字符串
+    fmt.Printf("%x\n", "abczxc") //每個字節用兩字節十六進位表示, a-f表示
+    fmt.Printf("%X\n", "asdzxc") //每個字節用兩字節十六進位表示, A-F表示
+    fmt.Printf("%p\n", 0x123)    //0x開頭的十六進制數表示
+}
+```
+
+### Placeholder
+
+|format|	meaning|
+|--|--|
+|%%|	A% literal|
+|%b|	A binary integer value (Radix 2), or a floating-point number with exponent 2 expressed in scientific counting|
+|%c|	Character type. You can input numbers according toASCII codeThe corresponding character is converted to the corresponding character|
+|%d|	A decimal value (base 10)|
+|%e|	A floating-point number or complex number represented by scientific notation E|
+|%E|	A floating-point number or complex number represented by scientific notation E|
+|%f|	A floating point number or complex number represented by standard counting|
+|%g|	Floating point number or complex number represented by% e or% F, either of which is output in the most compact way|
+|%G|	Floating point number or complex number represented by% e or% F, either of which is output in the most compact way|
+|%o|	An octal numeric value (base 8)|
+|%p|	The address of a value in hexadecimal (base 16), prefixed with0x, the letters are lowercasea - fexpress.|
+|%q|	Use go syntax and escape when necessary, string or byte slice [] byte enclosed in double quotation marks, or number enclosed in single quotation marks|
+|%s|	String. Outputs the characters in the string up to the empty characters in the string (string in characters)\0End, this\0(i.e. null character)|
+|%t|	withtrueperhapsfalseBoolean value of output|
+|%T|	The type of value output using go syntax|
+|%U|	An integer code point represented in Unicode notation. The default value is 4 numeric characters|
+|%v|	The built-in or user-defined value output in the default format, or the user-defined value output in the string () mode of its type, if this method exists|
+|%x|	Integer value in hexadecimal (base is hexadecimal), numbera-fUse lowercase representation|
+|%X|	Integer value in hexadecimal (base is hexadecimal), numberA-FUse uppercase|
