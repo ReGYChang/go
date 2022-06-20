@@ -6,6 +6,8 @@
   - [ReaderFrom & WriterTo interface](#readerfrom--writerto-interface)
   - [Seeker interface](#seeker-interface)
   - [Closer interface](#closer-interface)
+- [ioutil](#ioutil)
+  - [NopCloser](#nopcloser)
 
 # I/O
 
@@ -346,3 +348,25 @@ type Closer interface {
 `os.File`, `compress` package, 資料庫連線, `Socket` 等需要手動關閉的資源都實現了 `Closer` interface
 
 實際場景中經常將 `Close` 方法調用放在 `defer` 語句中
+
+# ioutil
+
+雖然 `io` package 提供了不少型別, 方法和函數, 但有時使用起來不是很方便, 比如讀取一個文件中所有的內容
+
+為此, `ioutil` 中提供了一些常用的 I/O 操作函數
+
+## NopCloser
+
+有時候需要傳遞一個 `ioReadCloser` instance, 而目前只有一個 `io.Reader` instance, 如 `strings.Reader`, 此時就需要 `NopCloser` 來包裝轉換成 `ioReadCloser`
+
+如在 `net/http` package 中的 `NewRequest`, 需要接收一個 `io.Reader` 參數, 但實際上 `http.Request` 的 `Body` 是 `io.ReaderCloser` 型別
+
+若傳遞的 `io.Reader` 也實現了 `io.ReadCloser` interface 則直接轉換, 否則可以透過 `ioutil.NopCloser` 來包裝:
+
+```go
+rc, ok := body.(io.ReadCloser)
+if !ok && body != nil {
+    rc = ioutil.NopCloser(body)
+}
+```
+
