@@ -2,6 +2,7 @@
   - [Reader Interface](#reader-interface)
   - [Writer Interface](#writer-interface)
   - [Types Implement io.Reader and io.Writer](#types-implement-ioreader-and-iowriter)
+  - [ReaderAt 和 WriterAt interface](#readerat-和-writerat-interface)
 
 # I/O
 
@@ -131,4 +132,14 @@ var (
 >💡TIP:
 
 從 interface 命名可以觀察到, 在 Go 中 interface 的命名約定是以 `er` 結尾, 這裡並非強制要求, 標準庫中有些 interface 也不是以 `er` 結尾
+
+## ReaderAt 和 WriterAt interface
+
+`ReaderAt` interface 定義如下:
+
+```go
+type ReaderAt interface {
+    ReadAt(p []byte, off int64) (n int, err error)
+}
+```
 
