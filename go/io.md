@@ -74,7 +74,7 @@ type Writer interface {
 }
 ```
 
-官方文檔對於該 interface 方法說明:
+> 官方文檔對於該 interface 方法說明:
 
 `Write` 將 len(p) 個 bytes 從 p 中寫入到基本資料流中, 返回從 p 中被寫入的 bytes 數量 n(0 <= n <= len(p)) 及任何遇到引起寫入提前結束的 error
 
@@ -129,7 +129,7 @@ var (
 
 以上型別較常使用的有: `os.File`, `strings.Reader`, `bufio.Reader/Writer`, `bytes.Buffer`, `bytes.Reader`
 
->💡TIP:
+>💡TIP:｀
 
 從 interface 命名可以觀察到, 在 Go 中 interface 的命名約定是以 `er` 結尾, 這裡並非強制要求, 標準庫中有些 interface 也不是以 `er` 結尾
 
@@ -143,3 +143,70 @@ type ReaderAt interface {
 }
 ```
 
+> 官方文件中關於該 interface 方法說明如下:
+
+`ReadAt` 從 basic input source off set 開始, 將 `len(p)` bytes 讀取到 `p` 中, 並返回讀取的 bytes 數 `n(0 <= n <= len(p))` 及遇到的 error
+
+當 `ReadAt` 返回的 `n < len(p)` 時, 其也會在調用過程中返回一個 non-nil error 來解釋為何沒有 return 更多的 bytes, 在這點上 `ReadAt` 相較 `Read` 更嚴謹
+
+即使 `ReadAt` 返回的 `n < len(p)`, 它也會在調用過程中使用 `p` 的全部作為暫存空間; 若可讀取的數據不到 `len(p)` 字節, `ReadAt` 就會阻塞, 直到所有數據都可用或一個錯誤發生, 在這一點上 `ReadAt` 不同於 `Read`
+
+若 `n = len(p)` 個字節從輸入源的結尾處由 `ReadAt` 返回, `Read` 可能返回 `err == EOF` 或者 `err == nil`
+
+若 `ReadAt` 攜帶一個偏移量從輸入源讀取, `ReadAt` 應當既不影響偏移量也不被它所影響。
+
+可對相同的輸入源並行執行 `ReadAt` 調用
+
+由上可見 `ReaderAt` interface 可以從指定偏移量處開始讀取資料
+
+簡單程式碼示範如下:
+
+```go
+reader := strings.NewReader("regy.dev")
+p := make([]byte, 6)
+n, err := reader.ReadAt(p, 2)
+if err != nil {
+    panic(err)
+}
+fmt.Printf("%s, %d\n", p, n)
+```
+
+output:
+
+```go
+gy.dev, 6
+```
+
+`WriterAt` interface 定義如下:
+
+```go
+type WriterAt interface {
+    WriteAt(p []byte, off int64) (n int, err error)
+}
+```
+
+官方文件對於 `WriterAt` interface 的說明:
+
+`WriteAt` 從 `p` 中將 `len(p)` 個字節寫入到偏移量 off 處的基本數據流中, 它返回從 `p` 中被寫入的字節數 `n (0 <= n <= len(p))` 以及任何遇到的引起寫入提前停止的錯誤, 若 `WriteAt` 返回的 `n < len(p)`, 它就必須返回一個 non-nil 的錯誤。
+
+若 `WriteAt` 攜帶一個偏移量寫入到目標中, `WriteAt` 應當既不影響偏移量也不被它所影響
+
+若被寫區域沒有重疊, 可對相同的目標並行執行 `WriteAt` 調用
+
+可以通過此 interface 將資料寫入到資料流的特定偏移量之後
+
+通過程式碼範例演示 `WriteAt` 方法的使用(`os.File` 實現了 `WriterAt interface`):
+
+```go
+file, err := os.Create("writeAt.txt")
+if err != nil {
+    panic(err)
+}
+defer file.Close()
+file.WriteString("regy.dev")
+n, err := file.WriteAt([]byte("iro.meow"), 5)
+if err != nil {
+    panic(err)
+}
+fmt.Println(n)
+```
