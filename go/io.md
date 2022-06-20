@@ -3,6 +3,7 @@
   - [Writer Interface](#writer-interface)
   - [Types Implement io.Reader and io.Writer](#types-implement-ioreader-and-iowriter)
   - [ReaderAt 和 WriterAt interface](#readerat-和-writerat-interface)
+  - [ReaderFrom & WriterTo interface](#readerfrom--writerto-interface)
 
 # I/O
 
@@ -210,3 +211,67 @@ if err != nil {
 }
 fmt.Println(n)
 ```
+
+## ReaderFrom & WriterTo interface
+
+`ReaderFrom` 定義如下:
+
+```go
+type ReaderFrom interface {
+    ReadFrom(r Reader) (n int64, err error)
+}
+```
+
+> 官方文件關於此 interface methods 說明:
+
+`ReadFrom` 從 `r` 中讀取數據, 直到 `EOF` 或發生錯誤
+
+其返回值 `n` 為讀取的字節數, 除 `io.EOF` 之外, 在讀取過程中遇到的任何錯誤也將被返回
+
+如果 `ReaderFrom` 可用, `Copy` 函數就會使用它
+
+>❗️NOET:
+
+`ReaderFrom` 方法不會返回 `err == EOF`
+
+下面範例實現將文件中的資料全部讀取並顯示在標準輸出:
+
+```go
+file, err := os.Open("writeAt.txt")
+if err != nil {
+    panic(err)
+}
+defer file.Close()
+writer := bufio.NewWriter(os.Stdout)
+writer.ReadFrom(file)
+writer.Flush()
+```
+
+當然也可以通過 `ioutil` package 的 `ReadFile` 函數獲取文件全部內容, `ioutil.ReadFile` 其實也是通過 `ReadFrom` 方法實現(使用 `bytes.Buffer`, 其實現 `ReaderFrom` interface)
+
+若不使用 `ReadFrom` interfaace 而是用 `io.Reader` interface, 有兩個思路:
+- 先獲取文件大小(File 的 Stat 方法), 再定義一個相同大小的 `[]byte`, 通過 `Read` 一次性讀取
+- 定義一個小的 `[]byte`, 不斷調用 `Read` 直到遇到 `EOF` 並將所有讀取到的 `[]byte` 串接
+
+`WriteTo` 定義如下:
+
+```go
+type WriterTo interface {
+    WriteTo(w Writer) (n int64, err error)
+}
+```
+
+> 官方文件對於該 interface 說明如下:
+
+`WriteTo` 將數據寫入 `w` 中, 直到沒有數據可寫或發生錯誤, 其返回值 `n` 為寫入的字節數, 在寫入過程中遇到的任何錯誤也將被返回
+
+如果 `WriterTo` 可用, `Copy` 函數就會使用它
+
+以下程式碼示範將一段文本輸出到標準輸出:
+
+```go
+reader := bytes.NewReader([]byte("regy.dev"))
+reader.WriteTo(os.Stdout)
+```
+
+> 如果需要一次性從某個地方讀或寫到某個地方, 可以考慮使用 `io.ReaderFrom` 和 `io.WriterTo`
