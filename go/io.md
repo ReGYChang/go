@@ -5,6 +5,7 @@
   - [ReaderAt 和 WriterAt interface](#readerat-和-writerat-interface)
   - [ReaderFrom & WriterTo interface](#readerfrom--writerto-interface)
   - [Seeker interface](#seeker-interface)
+  - [Closer interface](#closer-interface)
 
 # I/O
 
@@ -329,3 +330,19 @@ const (
   SEEK_END int = 2 // seek relative to the end
 )
 ```
+
+## Closer interface
+
+`Closer` interface 定義如下:
+
+```go
+type Closer interface {
+    Close() error
+}
+```
+
+`Closer` interface 只有一個 `Close()` 方法, 用於關閉資料流
+
+`os.File`, `compress` package, 資料庫連線, `Socket` 等需要手動關閉的資源都實現了 `Closer` interface
+
+實際場景中經常將 `Close` 方法調用放在 `defer` 語句中
