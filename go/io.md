@@ -8,6 +8,9 @@
   - [Closer interface](#closer-interface)
 - [ioutil](#ioutil)
   - [NopCloser](#nopcloser)
+  - [ReadAll](#readall)
+  - [ReadDir](#readdir)
+  - [ReadFile & WriteFile](#readfile--writefile)
 
 # I/O
 
@@ -369,4 +372,75 @@ if !ok && body != nil {
     rc = ioutil.NopCloser(body)
 }
 ```
+
+## ReadAll
+
+很多時候需要一次性讀取 `io.Reader` 中的資料, Go 中提供了 `ReadAll` 這個函數, 用來從 `io.Reader` 中一次性讀取所有資料
+
+`ReadAll` 函數定義如下:
+
+```go
+func ReadAll(r io.Reader) ([]byte, error)
+```
+
+其是通過 `bytes.Buffe` 中的 `ReadFrom` 來實現讀取所有資料, 該函數成功調用後會返回 `err == nil` 而不是 `err == EOF`(無錯誤不處理)
+
+## ReadDir
+
+`ioutil.ReadDir` 會讀取目錄並返回排序好的文件與子目錄名([]os.FileInfo):
+
+```go
+func main() {
+    dir := os.Args[1]
+    listAll(dir,0)
+}
+
+func listAll(path string, curHier int){
+    fileInfos, err := ioutil.ReadDir(path)
+    if err != nil{fmt.Println(err); return}
+
+    for _, info := range fileInfos{
+        if info.IsDir(){
+            for tmpHier := curHier; tmpHier > 0; tmpHier--{
+                fmt.Printf("|\t")
+            }
+            fmt.Println(info.Name(),"\\")
+            listAll(path + "/" + info.Name(),curHier + 1)
+        }else{
+            for tmpHier := curHier; tmpHier > 0; tmpHier--{
+                fmt.Printf("|\t")
+            }
+            fmt.Println(info.Name())
+        }
+    }
+}
+```
+
+## ReadFile & WriteFile
+
+`ReadFile` 會讀取整個文件內容, 其實現與 `ReadAll` 類似, 不過 `ReadFile` 會先判斷文件大小, 給 `bytes.Buffer` 一個預定義的容量以避免額外分配記憶體
+
+`ReadFile` 函數簽名如下:
+
+```go
+func ReadFile(filename string) ([]byte, error)
+```
+
+> 函數官方文件說明:
+
+`ReadFile` 從指定文件中讀取資料並返回, 成功的調用返回 `error == nil` 而非 `error == EOF`, 因為本函數定義為讀取整個文件, 其不會將讀取返回的 `EOF` 視為應報告的錯誤(同 `ReadAll`)
+
+`WriteFile` 函數簽名如下:
+
+```go
+func WriteFile(filename string, data []byte, perm os.FileMode) error
+```
+
+> 函數官方文件說明:
+
+`WriteFile` 從資料寫入指定文件中, 當文件不存在時會根據 `perm` 指定的權限創建文件, 文件存在時會先清空文件內容, 對於 `perm` 參數一般可以指定為 `0666`
+
+>💡TIPS:
+
+`ReadFile` source code 中先獲取文件大小, 當大小 < 1e9 時才會用到文件的大小, 按 source code 注視的說法 `FileInfo` 不會很精確地獲取文件大小
 
