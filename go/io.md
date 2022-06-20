@@ -4,6 +4,7 @@
   - [Types Implement io.Reader and io.Writer](#types-implement-ioreader-and-iowriter)
   - [ReaderAt 和 WriterAt interface](#readerat-和-writerat-interface)
   - [ReaderFrom & WriterTo interface](#readerfrom--writerto-interface)
+  - [Seeker interface](#seeker-interface)
 
 # I/O
 
@@ -275,3 +276,56 @@ reader.WriteTo(os.Stdout)
 ```
 
 > 如果需要一次性從某個地方讀或寫到某個地方, 可以考慮使用 `io.ReaderFrom` 和 `io.WriterTo`
+
+## Seeker interface
+
+`Seeker` interface 定義如下:
+
+```go
+type Seeker interface {
+    Seek(offset int64, whence int) (ret int64, err error)
+}
+```
+
+> 官方文件關於此 interface methods 說明:
+
+Seek 設置下一次 Read 或 Write 的偏移量為 offset, 它的解釋取決於 whence： 
+- 0 表示相對於文件的起始處
+- 1 表示相對於當前的偏移
+- 2 表示相對於其結尾處, Seek 返回新的偏移量和一個錯誤(如果有的話)
+
+也就是說 `Seek` 方法是用於設置偏移量的, 這樣可以從某個特定位置開始操作資料流
+
+看起來跟 `ReaderAt/WriterAt` 有些類似, 不過 `Seeker` interface 更加靈活, 可以更好的控制讀寫資料流位置
+
+簡單範例程式碼: 獲取倒數第二個字符(須考慮 UTF-8 編碼)
+
+```go
+reader := strings.NewReader("今天天氣真好")
+reader.Seek(-6, io.SeekEnd)
+r, _, _ := reader.ReadRune()
+fmt.Printf("%c\n", r)
+```
+
+>💡TIPS
+
+`whence` 值在 `io` package 中定義了相應的常數:
+
+```go
+const (
+  SeekStart   = 0 // seek relative to the origin of the file
+  SeekCurrent = 1 // seek relative to the current offset
+  SeekEnd     = 2 // seek relative to the end
+)
+```
+
+原先 `os` package 中的常數已經被標註為 Deprecated:
+
+```go
+// Deprecated: Use io.SeekStart, io.SeekCurrent, and io.SeekEnd.
+const (
+  SEEK_SET int = 0 // seek relative to the origin of the file
+  SEEK_CUR int = 1 // seek relative to the current offset
+  SEEK_END int = 2 // seek relative to the end
+)
+```
