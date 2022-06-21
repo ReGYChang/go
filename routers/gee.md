@@ -16,6 +16,7 @@
 	- [Unit Test](#unit-test-1)
 - [Middleware](#middleware)
 	- [Design](#design)
+	- [Implementation](#implementation)
 
 # Create Gee Web Framework
 
@@ -973,3 +974,101 @@ func B(c *Context) {
 - `part2` 執行完畢, 結束
 
 最終調用順序為: part1 -> part3 -> Handler -> part 4 -> part2
+
+## Implementation
+
+定義 `Use` 函數, 將 middleware 應用到某個 Group
+
+```go
+// Use is defined to add middleware to the group
+func (group *RouterGroup) Use(middlewares ...HandlerFunc) {
+	group.middlewares = append(group.middlewares, middlewares...)
+}
+
+func (engine *Engine) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+	var middlewares []HandlerFunc
+	for _, group := range engine.groups {
+		if strings.HasPrefix(req.URL.Path, group.prefix) {
+			middlewares = append(middlewares, group.middlewares...)
+		}
+	}
+	c := newContext(w, req)
+	c.handlers = middlewares
+	engine.router.handle(c)
+}
+```
+
+`ServeHTTP` 函數也有變化, 當接收到一個具體請求時, 要判斷該請求適用於哪些 middleware, 這裡簡單通過 URL prefix 來判斷, 當得到 middleware list 後賦值給 `c.handlers`
+
+`handle` 函數中將從路由匹配得到的 `Handler` 新增到 `c.handlers` 中並執行 `c.Next()`
+
+router.go
+
+```go
+func (r *router) handle(c *Context) {
+	n, params := r.getRoute(c.Method, c.Path)
+
+	if n != nil {
+		key := c.Method + "-" + n.pattern
+		c.Params = params
+		c.handlers = append(c.handlers, r.handlers[key])
+	} else {
+		c.handlers = append(c.handlers, func(c *Context) {
+			c.String(http.StatusNotFound, "404 NOT FOUND: %s\n", c.Path)
+		})
+	}
+	c.Next()
+}
+```
+
+main.go
+
+```go
+func onlyForV2() gee.HandlerFunc {
+	return func(c *gee.Context) {
+		// Start timer
+		t := time.Now()
+		// if a server error occurred
+		c.Fail(500, "Internal Server Error")
+		// Calculate resolution time
+		log.Printf("[%d] %s in %v for group v2", c.StatusCode, c.Req.RequestURI, time.Since(t))
+	}
+}
+
+func main() {
+	r := gee.New()
+	r.Use(gee.Logger()) // global midlleware
+	r.GET("/", func(c *gee.Context) {
+		c.HTML(http.StatusOK, "<h1>Hello Gee</h1>")
+	})
+
+	v2 := r.Group("/v2")
+	v2.Use(onlyForV2()) // v2 group middleware
+	{
+		v2.GET("/hello/:name", func(c *gee.Context) {
+			// expect /hello/geektutu
+			c.String(http.StatusOK, "hello %s, you're at %s\n", c.Param("name"), c.Path)
+		})
+	}
+
+	r.Run(":9999")
+}
+```
+
+這個例子中將 `gee.Logger()` 應用於全局, 所有的路由都會應用此 middleware
+
+`onlyForV2()` 是用於功能測試, 僅在 `v2` 對應的 Group 中應用
+
+使用 `curl` 測試, 可以看到 v2 Group 2 個 middleware 都生效了:
+
+```go
+$ curl http://localhost:9999/
+>>> log
+2019/08/17 01:37:38 [200] / in 3.14µs
+
+(2) global + group middleware
+$ curl http://localhost:9999/v2/hello/geektutu
+>>> log
+2019/08/17 01:38:48 [200] /v2/hello/geektutu in 61.467µs for group v2
+2019/08/17 01:38:48 [200] /v2/hello/geektutu in 281µs
+```
