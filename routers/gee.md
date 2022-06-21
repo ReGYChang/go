@@ -1,19 +1,21 @@
 - [Create Gee Web Framework](#create-gee-web-framework)
-  - [main.go](#maingo)
-  - [gee.go](#geego)
+	- [main.go](#maingo)
+	- [gee.go](#geego)
 - [Context Design](#context-design)
-  - [context.go](#contextgo)
-  - [router.go](#routergo)
+	- [context.go](#contextgo)
+	- [router.go](#routergo)
 - [gee.go](#geego-1)
 - [Dynamic Routing](#dynamic-routing)
-  - [Trie Tree Implementation](#trie-tree-implementation)
-  - [trie.go](#triego)
-  - [Router](#router)
-  - [Context & handle Updated](#context--handle-updated)
-  - [Unit Test](#unit-test)
+	- [Trie Tree Implementation](#trie-tree-implementation)
+	- [trie.go](#triego)
+	- [Router](#router)
+	- [Context & handle Updated](#context--handle-updated)
+	- [Unit Test](#unit-test)
 - [Group Control](#group-control)
-  - [Nested Route Group](#nested-route-group)
-  - [Unit Test](#unit-test-1)
+	- [Nested Route Group](#nested-route-group)
+	- [Unit Test](#unit-test-1)
+- [Middleware](#middleware)
+	- [Design](#design)
 
 # Create Gee Web Framework
 
@@ -857,3 +859,117 @@ func TestNestedGroup(t *testing.T) {
 	}
 }
 ```
+
+# Middleware
+
+Middleware 簡單來說就是非業務的技術類組件, framework 本身不可能實現所有的業務功能, 因此其需要一個插口來讓使用者自定義功能並嵌入 framework 中
+
+對於 middleware 來說有兩個關鍵的重點:
+- 插入點的位置? 使用 framework 的人並不關心底層邏輯的具體實現為何, 若插入點過於底層則 middleware 邏輯就會過於複雜; 若插入點過於上層則和使用者自定義一組函數並每次在 `Handler` 中調用也沒有過多優勢
+- Middleware 輸入為何? Middleware 的輸入決定了可擴展的能力, 若暴露的參數太少則使用者發揮空間有限
+
+## Design
+
+這裡 middleware design 參考了 `Gin` framework
+
+`Gee` middleware 的定義與路由映射的 `Handler` 一致, 輸入參數為 `Context` 物件
+
+插入點位置在 framework 收到 request 後初始化 `Context` instance 後允許使用者自行定義的 middleware 做一些額外的處理, 如 logging, 及對 `Context` 物件進行二次加工
+
+另外通過調用 `(*Context).Next()` 函數, middleware 可等待使用者自己定義的 `Handler` 處理結束後再做一些額外操作, 例如計算本次 `Handler` 處理所花費的時間等, 即 `Gee` middleware 支持在請求處理的前後做額外操作
+
+舉例來說希望能夠支持如下定義的 middleware, `c.Next()` 表示等待執行其他的 middleware 或 `Handler`:
+
+```go
+func Logger() HandlerFunc {
+	return func(c *Context) {
+		// Start timer
+		t := time.Now()
+		// Process request
+		c.Next()
+		// Calculate resolution time
+		log.Printf("[%d] %s in %v", c.StatusCode, c.Req.RequestURI, time.Since(t))
+	}
+}
+```
+
+另外支持多個 middleware 依序調用
+
+Middleware 是應用在 `RouterGroup` 上, 應用在最頂層的 Group 相當於作用於全局, 所有的請求都會被 middleware 處理
+
+為何不將 middleware 綁定在每條路由規則上? 若如此還不如直接在 `Handler` 調用直觀, middleware 綁定在某條路由規則的功能通用性太差, 不適合定義為 middleware
+
+之前的 framework 設計是當收到 request 後 matching routes, 將 request 所有資訊保存於 `Context` 中
+
+Middleware 也不例外, 在接受到請求後應查詢所有應用於該路由的 middleware 並保存在 `Context` 中依序調用
+
+為何依序調用後還需在 `Context` 中保存呢? 因為在設計中, middleware 不僅作用在 `Handler` 前, 也可以作用在 `Handler` 後
+
+為此為 `Context` 添加了兩個參數並定義了 `Next` 方法:
+
+```go
+type Context struct {
+	// origin objects
+	Writer http.ResponseWriter
+	Req    *http.Request
+	// request info
+	Path   string
+	Method string
+	Params map[string]string
+	// response info
+	StatusCode int
+	// middleware
+	handlers []HandlerFunc
+	index    int
+}
+
+func newContext(w http.ResponseWriter, req *http.Request) *Context {
+	return &Context{
+		Path:   req.URL.Path,
+		Method: req.Method,
+		Req:    req,
+		Writer: w,
+		index:  -1,
+	}
+}
+
+func (c *Context) Next() {
+	c.index++
+	s := len(c.handlers)
+	for ; c.index < s; c.index++ {
+		c.handlers[c.index](c)
+	}
+}
+```
+
+`index` 是紀錄當前執行到第幾個 middleware, 當在 middleware 中調用 `Next` 方法時, 控制權就交給下一個 middleware, 直到調用到最後一個 middleware 後再由後往前, 調用每個 middleware 在 `Next` 方法之後定義的部分
+
+若將使用者在映射路由時定義的 `Handler` 添加到 `c.handlers` 中結果會如何?
+
+```go
+func A(c *Context) {
+    part1
+    c.Next()
+    part2
+}
+func B(c *Context) {
+    part3
+    c.Next()
+    part4
+}
+```
+
+假設應用了 middleware A, B, 和路由映射的 `Handler`, c.handlers 為 [A, B, Handler], c.index 初始化為 -1, 調用 `c.Next()` 後流程如下:
+- `c.index++`, `c.index` 變為 0
+- 0 < 3, 調用 `c.handlers[0]`, 即 A
+- 執行 `part1`, 調用 `c.Next()`
+- `c.index++`, `c.index` 變為 1
+- 1 < 3, 調用 `c.handlers[1]`, 即 B
+- 執行 `part3`, 調用 `c.Next()`
+- `c.index++`, `c.index` 變為 2
+- 2 < 3, 調用 `c.handlers[2]`, 即 `Handler`
+- `Handler` 調用完畢返回到 B 中的 `part4` 並執行
+- `part4` 執行完畢返回到 A 中的 `part2` 並執行
+- `part2` 執行完畢, 結束
+
+最終調用順序為: part1 -> part3 -> Handler -> part 4 -> part2
