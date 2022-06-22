@@ -1,6 +1,8 @@
 - [Git](#git)
   - [Installation](#installation)
   - [Create Repository](#create-repository)
+- [Version Control](#version-control)
+  - [Rewriting History](#rewriting-history)
 
 # Git
 
@@ -108,3 +110,135 @@ nothing to commit, working tree clean
 ```
 
 表示已將 `README.md` 提交成一個 commit, 所以目前工作目錄上已經清空了
+
+# Version Control
+
+當修改完程式碼之後透過 `git commit` 提交到 git repo 中, 如果哪天程式碼被改壞了或是誤刪了什麼文件, 依然可以從任意 commit 恢復而不會造成無法彌補的傷痛
+
+再嘗試修改文件, 並將修改提交到 git repo(修改 README.md 如下):
+
+```
+Git is a distributed version control system.
+Git is free software distributed under the GPL.
+```
+
+此時用 `git status` 查看:
+
+```shell
+➜  learngit git:(master) git status       
+On branch master
+Changes not staged for commit:
+  (use "git add <file>..." to update what will be committed)
+  (use "git restore <file>..." to discard changes in working directory)
+        modified:   README.md
+
+no changes added to commit (use "git add" and/or "git commit -a")
+```
+
+狀態又變為 `Changes not staged for commit` 並顯示 `README.md` 文件被修改, 然後嘗試提交:
+
+```shell
+➜  learngit git:(master) ✗ git commit -am 'second commit' 
+[master 5dcfc65] second commit
+ 1 file changed, 3 insertions(+), 2 deletions(-)
+```
+
+注意這裡 `git commit -am` 中的 `a` 參數等價於 `git add`
+
+接著使用 `git log` 可以查看 git repo 中的 history commit:
+
+```shell
+commit 5dcfc65acad6776f00c9375648ccb8b83315e603 (HEAD -> master)
+Author: ReGYChang <p714140432@gmail.com>
+Date:   Wed Jun 22 22:24:24 2022 +0800
+
+    second commit
+
+commit cbb0c143579ff7d2c21cd8c66d00d2a02458ae64
+Author: ReGYChang <p714140432@gmail.com>
+Date:   Wed Jun 22 22:08:24 2022 +0800
+
+    first commit
+```
+
+Git 的 `commit id` 由一串雜湊值表示, 這是一個 `SHA1` 計算出來的一個數字, 以十六進制表示, git 就是透過 `commit id` 來實現版本控制
+
+若覺得 `git log` 輸出內容太多, 也可以加上參數 `--oneline`:
+
+```shell
+5dcfc65 (HEAD -> master) second commit
+cbb0c14 first commit
+```
+
+如果要比較文件與上個版本的差異, 可以使用 `git diff` 查看:
+
+```shell
+➜  learngit git:(master) git diff 5dcfc65 cbb0c14
+
+diff --git a/README.md b/README.md
+index ce32b56..d8036c1 100644
+--- a/README.md
++++ b/README.md
+@@ -1,3 +1,2 @@
+-```
+-Git is a distributed version control system.
+-Git is free software distributed under the GPL.
+\ No newline at end of file
++Git is a version control system.
++Git is free software.
+\ No newline at end of file
+```
+
+## Rewriting History
+
+Git 中 `HEAD` 表示當前版本, 如果要回退到上個版本 `first commit`, 可以使用 `git reset`:
+
+```shell
+➜  learngit git:(master) git reset --hard cbb0c14                                          
+HEAD is now at cbb0c14 first commit
+```
+
+再用 `git log` 指令可以發現, 此時 `README.md` 文件的版本已經回退到 `first commit` 的版本, 而剛剛最新的版本 `second commit` 已經不見了:
+
+```shell
+commit cbb0c143579ff7d2c21cd8c66d00d2a02458ae64 (HEAD -> master)
+Author: ReGYChang <p714140432@gmail.com>
+Date:   Wed Jun 22 22:08:24 2022 +0800
+
+    first commit
+```
+
+若想再回到 `second commit` 的版本, 就再使用一次 `git reset` 即可:
+
+```shell
+➜  learngit git:(master) git reset --hard 5dcfc65       
+HEAD is now at 5dcfc65 second commit
+```
+
+Git 版本回退的速度非常快, 在內部有個指向當前版本的 `HEAD` pointer, 當回退版本時 git 只是把 `HEAD` pointer 從指向 `second commit` 改成指向 `first commit` 並把工作區文件更新了:
+
+```
+┌────┐
+│HEAD│
+└────┘
+   │
+   └──> ○ append GPL
+        │
+        ○ add distributed
+        │
+        ○ wrote a readme file
+
+👇
+
+┌────┐
+│HEAD│
+└────┘
+   │
+   │    ○ append GPL
+   │    │
+   └──> ○ add distributed
+        │
+        ○ wrote a readme file
+```
+
+那如果回退到某個版本後後悔, 想恢復到新版本怎麼辦?
