@@ -1253,3 +1253,7 @@ func main() {
 	r.Run(":9999")
 }
 ```
+
+訪問主頁模板正常渲染, CSS 靜態文件加載成功:
+
+![static_file_loading](img/html_template_test.png)
