@@ -34,6 +34,14 @@ func New() *Engine {
 	return engine
 }
 
+// Default use logging & recovery middlerwares
+func Default() *Engine {
+	engine := New()
+	engine.Use(Logger(), Recovery())
+	
+	return engine
+}
+
 // Group is defined to create a new RouterGroup
 // remember all groups share the same Engine instance
 func (group *RouterGroup) Group(prefix string) *RouterGroup {

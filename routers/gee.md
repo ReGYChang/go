@@ -19,6 +19,7 @@
 	- [Implementation](#implementation)
 - [HTML Template](#html-template)
 	- [HTML Template Render](#html-template-render)
+- [Panic Recover](#panic-recover)
 
 # Create Gee Web Framework
 
@@ -1257,3 +1258,162 @@ func main() {
 訪問主頁模板正常渲染, CSS 靜態文件加載成功:
 
 ![static_file_loading](img/html_template_test.png)
+
+# Panic Recover
+
+Go 中較常見的錯誤處理方法是返回 `error`, 由調用者決定後續該如何處理, 但如果是無法恢復的錯誤可以手動觸發 `panic`
+
+若在 runtime 中出現了像是 `index out of range` 的錯誤也會觸發 `panic`, 當前 runtime 會被終止
+
+Go 還提供了 `recover` 函數, 可以避免因為 `panic` 發生而導致整個 runtime 終止, `recover` 函數只在 `defer` 函數中生效
+
+```go
+// hello.go
+func test_recover() {
+	defer func() {
+		fmt.Println("defer func")
+		if err := recover(); err != nil {
+			fmt.Println("recover success")
+		}
+	}()
+
+	arr := []int{1, 2, 3}
+	fmt.Println(arr[4])
+	fmt.Println("after panic")
+}
+
+func main() {
+	test_recover()
+	fmt.Println("after recover")
+}
+```
+
+output:
+
+```go
+$ go run hello.go 
+defer func
+recover success
+after recover
+```
+
+通過上述程式, `recover` 捕獲了 `panic` 使得程式正常結束, `test_recover()` 中的 **after panic** 沒有執行, 當 `panic` 被觸發時控制權就交給了 `defer`
+
+而對於一個 web framework 而言錯誤處理機制是非常必要的, 若沒有完備的測試可能導致某些情況下出現空指針異常等狀況導致系統宕機, 必然是不可以接受
+
+為避免觸發 `panic` 導致 web server crash, 將在 framework 中新增一個簡單的錯誤處理機制, 即在此類錯誤發生時向使用者返回 `Internal Server Error`, 且在 log 中紀錄重要的錯誤訊息以方便錯誤定位
+
+實現 middlerwaer `recovery`:
+
+recovery.go
+
+```go
+func Recovery() HandlerFunc {
+	return func(c *Context) {
+		defer func() {
+			if err := recover(); err != nil {
+				message := fmt.Sprintf("%s", err)
+				log.Printf("%s\n\n", trace(message))
+				c.Fail(http.StatusInternalServerError, "Internal Server Error")
+			}
+		}()
+
+		c.Next()
+	}
+}
+```
+
+`Recovery` 實現非常簡單, 使用 `defer` 掛載上錯誤恢復函數, 在函數中調用 `recover()` 捕獲 `panic` 並將 stack frame 訊息打印在 log 中, 向使用者返回 `Internal Server Error`
+
+`trace()` 函數是用來獲取觸發 `panic` 的 stack frame info:
+
+```go
+// print stack trace for debug
+func trace(message string) string {
+	var pcs [32]uintptr
+	n := runtime.Callers(3, pcs[:]) // skip first 3 caller
+
+	var str strings.Builder
+	str.WriteString(message + "\nTraceback:")
+	for _, pc := range pcs[:n] {
+		fn := runtime.FuncForPC(pc)
+		file, line := fn.FileLine(pc)
+		str.WriteString(fmt.Sprintf("\n\t%s:%d", file, line))
+	}
+	return str.String()
+}
+```
+
+在 `trace()` 中調用了 `runtime.Callers(3, pcs[:])`, Callers 用來返回 call frames 的 programming counter, 第 0 個 Caller 是 Callers 本身, 第一個是上一層 trace, 第二個是在上一層的 `defer func`
+
+因此為了 log 更簡潔, 跳過了前三個 Caller
+
+再來通過 `runtime.FuncForPC(pc)` 獲取對應函數, 再通過 `fn.FileLine(pc)` 獲取到調用該函數的文件名及行數並打印在 log 中
+
+至此, 錯誤處理機制就完成了
+
+接下來進行測試:
+
+main.go
+
+```go
+package main
+
+import (
+	"net/http"
+
+	"gee"
+)
+
+func main() {
+	r := gee.Default()
+	r.GET("/", func(c *gee.Context) {
+		c.String(http.StatusOK, "Hello Geektutu\n")
+	})
+	// index out of range for testing Recovery()
+	r.GET("/panic", func(c *gee.Context) {
+		names := []string{"geektutu"}
+		c.String(http.StatusOK, names[100])
+	})
+
+	r.Run(":9999")
+}
+```
+
+先訪問主頁, 再訪問 `/panic` 故意觸發 panic, server 正常返回並可再一次成功訪問主頁, 說明 server 運作完全正常
+
+```go
+$ curl "http://localhost:9999"
+Hello Geektutu
+$ curl "http://localhost:9999/panic"
+{"message":"Internal Server Error"}
+$ curl "http://localhost:9999"
+Hello Geektutu
+```
+
+在 server log 可以看到以下訊息, 引發錯誤的原因和 stack frame 相關資訊, 可以很容易看到在 `/Users/regy/Github/Go/routers/code/gee/main.go:87` 出現了 `index out of range` 的錯誤:
+
+```go
+2022/06/22 17:43:55 Route  GET - /
+2022/06/22 17:43:55 Route  GET - /panic
+2022/06/22 17:44:07 [404] /v2/hello/geektutu in 9.375µs
+2022/06/22 17:44:23 [200] / in 86.709µs
+2022/06/22 17:44:30 runtime error: index out of range [100] with length 1
+Traceback: 
+        /usr/local/go/src/runtime/panic.go:839
+        /usr/local/go/src/runtime/panic.go:89
+        /Users/regy/Github/Go/routers/code/gee/main.go:87
+        /Users/regy/Github/Go/routers/code/gee/gee/context.go:40
+        /Users/regy/Github/Go/routers/code/gee/gee/recovery.go:37
+        /Users/regy/Github/Go/routers/code/gee/gee/context.go:40
+        /Users/regy/Github/Go/routers/code/gee/gee/logger.go:15
+        /Users/regy/Github/Go/routers/code/gee/gee/context.go:40
+        /Users/regy/Github/Go/routers/code/gee/gee/router.go:103
+        /Users/regy/Github/Go/routers/code/gee/gee/gee.go:124
+        /usr/local/go/src/net/http/server.go:2917
+        /usr/local/go/src/net/http/server.go:1967
+        /usr/local/go/src/runtime/asm_arm64.s:1264
+
+2022/06/22 17:44:30 [500] /panic in 1.105667ms
+2022/06/22 17:46:17 [200] / in 108.583µs
+```

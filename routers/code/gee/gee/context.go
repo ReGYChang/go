@@ -48,7 +48,7 @@ func (c *Context) Fail(code int, err string) {
 }
 
 func (c *Context) Param(key string) string {
-	value, _ := c.Params[key]
+	value := c.Params[key]
 	return value
 }
 
