@@ -21,12 +21,22 @@ Repository 中所有的文件都可以被 Git 管理, 舉凡每個文件的修�
 以下範例創建一個 repo:
 
 ```shell
-$ mkdir learngit
-$ cd learngit
-$ pwd
+➜  mkdir learngit
+➜  cd learngit
+➜  pwd
 /Users/regy/learngit
-$ git init
-Initialized empty Git repository in /Users/regy/learngit/.git/
+➜  learngit git init                                
+hint: Using 'master' as the name for the initial branch. This default branch name
+hint: is subject to change. To configure the initial branch name to use in all
+hint: of your new repositories, which will suppress this warning, call:
+hint: 
+hint:   git config --global init.defaultBranch <name>
+hint: 
+hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+hint: 'development'. The just-created branch can be renamed via this command:
+hint: 
+hint:   git branch -m <name>
+Initialized empty Git repository in /Users/regy/Github/test/learngit/.git/
 ```
 
 如此一來一個空的 repo 就建好了, 目錄下產生了一個 `.git` 目錄, 其為 Git 用來跟蹤管理 repo, 不要隨意動到其中的文件, 以免破壞了 git repo
@@ -46,21 +56,45 @@ Git is free software.
 
 首先將 `README.md` 放到 `learngit` 目錄下, 代表由此 git repo 來作管理
 
-此時 `README.md` 雖然被 Git 偵測到, 但目前屬於 `Untracked files`, 表示尚未是 Git 追蹤的對象
-
-需要使用 `git add` 將文件新增到 git stagin area 中才能將 `README.md` 加入到追蹤對象:
+使用 `git status` 查看當前 git repo 的狀態:
 
 ```shell
-$ git add README.md
+➜  learngit git:(master) ✗ git status
+On branch master
+
+No commits yet
+
+Untracked files:
+  (use "git add <file>..." to include in what will be committed)
+        README.md
+
+nothing added to commit but untracked files present (use "git add" to track)
 ```
 
-此時狀態會從 `Untracked files` 變成 `Changes to be committed`, 表示放在索引中的文件即將會被提交成一個新版本(commit)
+此時 `README.md` 雖然被 Git 偵測到, 但目前屬於 `Untracked files`, 表示尚未是 Git 追蹤的對象, 需要使用 `git add` 將文件新增到 git stagin area 中才能將 `README.md` 加入到追蹤對象:
+
+```shell
+➜  learngit git:(master) ✗ git add README.md
+```
+
+再使用 `git status` 查看會發現此時狀態會從 `Untracked files` 變成 `Changes to be committed`, 表示放在索引中的文件即將會被提交成一個新版本(commit)
+
+```shell
+➜  learngit git:(master) ✗ git status       
+On branch master
+
+No commits yet
+
+Changes to be committed:
+  (use "git rm --cached <file>..." to unstage)
+        new file:   README.md
+```
 
 此時可以用 `git commit` 提交一個新版本到 git repo:
 
 ```shell
-$ git commit -m "wrote a readme file"
-[master (root-commit) eaadf4e] wrote a readme file
+➜  learngit git:(master) ✗ git commit -m 'first commit'                 
+[master (root-commit) cbb0c14] first commit
  1 file changed, 2 insertions(+)
  create mode 100644 README.md
 ```
@@ -68,6 +102,7 @@ $ git commit -m "wrote a readme file"
 最後使用 `git status` 可以看到以下訊息:
 
 ```shell
+➜  learngit git:(master) git status                   
 On branch master
 nothing to commit, working tree clean
 ```
