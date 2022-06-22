@@ -17,6 +17,8 @@
 - [Middleware](#middleware)
 	- [Design](#design)
 	- [Implementation](#implementation)
+- [HTML Template](#html-template)
+	- [HTML Template Render](#html-template-render)
 
 # Create Gee Web Framework
 
@@ -1071,4 +1073,183 @@ $ curl http://localhost:9999/v2/hello/geektutu
 >>> log
 2019/08/17 01:38:48 [200] /v2/hello/geektutu in 61.467µs for group v2
 2019/08/17 01:38:48 [200] /v2/hello/geektutu in 281µs
+```
+
+# HTML Template
+
+現在主流開發模式採用前後端分離的模式, 即 Web backend 提供 RESTful API, 返回結構化資料(通常為 `JSON` 或 `XML`), frontend 使用 `AJAX` 技術請求所需的資料並利用 Javascript 渲染
+
+前後端分離的頁面是在 client 進行渲染, 而傳統的開發模式頁面渲染則在 server 完成, 要做到 server 渲染第一步就是要支持 Js, CSS 等靜態文件
+
+之前設計動態路由時, 支持通配符 `*` 匹配多級子路徑, 比如路由規則 `/assets/*filepath` 可以匹配 `/assets/` 開頭的所有地址, `/assets/js/geektutu.js` 匹配後參數 `filepath` 就賦值為 `js/geektutu.js`
+
+如果將所有靜態文件都放在 `/usr/web` 目錄下, 那麼 `filepath` 值即是該目錄下文件的相對位置, 映射到真實文件後返回即實現 static server
+
+`net/http` package 已經實現了找到文件並返回的功能, 因此要做的僅僅是解析請求地址並映射到 server 上文件的真實地址, 再交給 `http.FileServer` 處理即可
+
+gee.go
+
+```go
+// create static handler
+func (group *RouterGroup) createStaticHandler(relativePath string, fs http.FileSystem) HandlerFunc {
+	absolutePath := path.Join(group.prefix, relativePath)
+	fileServer := http.StripPrefix(absolutePath, http.FileServer(fs))
+	return func(c *Context) {
+		file := c.Param("filepath")
+		// Check if file exists and/or if we have permission to access it
+		if _, err := fs.Open(file); err != nil {
+			c.Status(http.StatusNotFound)
+			return
+		}
+
+		fileServer.ServeHTTP(c.Writer, c.Req)
+	}
+}
+
+// serve static files
+func (group *RouterGroup) Static(relativePath string, root string) {
+	handler := group.createStaticHandler(relativePath, http.Dir(root))
+	urlPattern := path.Join(relativePath, "/*filepath")
+	// Register GET handlers
+	group.GET(urlPattern, handler)
+}
+```
+
+為 `RouterGroup` 新增兩個方法, `Static` 這個方法是暴露給 framework user 的, user 可以將硬碟上某個文件夾 `root` 映射到路由 `relativePath`, 如:
+
+```go
+r := gee.New()
+r.Static("/assets", "/usr/geektutu/blog/static")
+// 或相对路径 r.Static("/assets", "./static")
+r.Run(":9999")
+```
+
+如此一來當 user 訪問 `localhost:9999/assets/js/geektutu.js` 會返回 `/usr/geektutu/blog/static/js/geektutu.js`
+
+## HTML Template Render
+
+Go 內置了 `text/template` 和 `html/template` 2 個 template 標準庫, 其中 `html/template` 為 `HTML` 提供了較完整的支持, 包括普通變數渲染, 列表渲染, 物件渲染等, 這裡直接使用 `html/template`
+
+```go
+Engine struct {
+	*RouterGroup
+	router        *router
+	groups        []*RouterGroup     // store all groups
+	htmlTemplates *template.Template // for html render
+	funcMap       template.FuncMap   // for html render
+}
+
+func (engine *Engine) SetFuncMap(funcMap template.FuncMap) {
+	engine.funcMap = funcMap
+}
+
+func (engine *Engine) LoadHTMLGlob(pattern string) {
+	engine.htmlTemplates = template.Must(template.New("").Funcs(engine.funcMap).ParseGlob(pattern))
+}
+```
+
+首先為 `Engine` 新增了 `*template.Template` 和 `template.FuncMap` 屬性, 前者將所有 template 加載進記憶體, 後者是所有的自定義 template render 函數
+
+另外分別提供了設置自定義渲染函數 `funcMap` 和加載 template 的方法
+
+接下來修改一下 `(*Context).HTML()` 方法, 讓其支援根據 template 文件名稱選擇 template 進行渲染
+
+context.go
+
+```go
+type Context struct {
+    // ...
+	// engine pointer
+	engine *Engine
+}
+
+func (c *Context) HTML(code int, name string, data interface{}) {
+	c.SetHeader("Content-Type", "text/html")
+	c.Status(code)
+	if err := c.engine.htmlTemplates.ExecuteTemplate(c.Writer, name, data); err != nil {
+		c.Fail(500, err.Error())
+	}
+}
+```
+
+在 `Context` 中新增成員變數 `engine *Engine`, 這樣就能夠通過 Context 訪問 `Engine` 中的 HTML templates, 實體化 `Context` 時還需要給 `c.engine` 賦值
+
+gee.go
+
+```go
+func (engine *Engine) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+	// ...
+	c := newContext(w, req)
+	c.handlers = middlewares
+	c.engine = engine
+	engine.router.handle(c)
+}
+```
+
+最終目錄結構:
+
+```go
+---gee/
+---static/
+   |---css/
+        |---geektutu.css
+   |---file1.txt
+---templates/
+   |---arr.tmpl
+   |---css.tmpl
+   |---custom_func.tmpl
+---main.go
+```
+
+```go
+<!-- templates/css.tmpl -->
+<html>
+    <link rel="stylesheet" href="/assets/css/geektutu.css">
+    <p>geektutu.css is loaded</p>
+</html>
+```
+
+main.go
+
+```go
+type student struct {
+	Name string
+	Age  int8
+}
+
+func FormatAsDate(t time.Time) string {
+	year, month, day := t.Date()
+	return fmt.Sprintf("%d-%02d-%02d", year, month, day)
+}
+
+func main() {
+	r := gee.New()
+	r.Use(gee.Logger())
+	r.SetFuncMap(template.FuncMap{
+		"FormatAsDate": FormatAsDate,
+	})
+	r.LoadHTMLGlob("templates/*")
+		r.Static("/assets", "./static")
+
+	stu1 := &student{Name: "Geektutu", Age: 20}
+	stu2 := &student{Name: "Jack", Age: 22}
+	r.GET("/", func(c *gee.Context) {
+		c.HTML(http.StatusOK, "css.tmpl", nil)
+	})
+	r.GET("/students", func(c *gee.Context) {
+		c.HTML(http.StatusOK, "arr.tmpl", gee.H{
+			"title":  "gee",
+			"stuArr": [2]*student{stu1, stu2},
+		})
+	})
+
+	r.GET("/date", func(c *gee.Context) {
+		c.HTML(http.StatusOK, "custom_func.tmpl", gee.H{
+			"title": "gee",
+			"now":   time.Date(2019, 8, 17, 0, 0, 0, 0, time.UTC),
+		})
+	})
+
+	r.Run(":9999")
+}
 ```
