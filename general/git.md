@@ -241,4 +241,15 @@ Git 版本回退的速度非常快, 在內部有個指向當前版本的 `HEAD` 
         ○ wrote a readme file
 ```
 
-那如果回退到某個版本後後悔, 想恢復到新版本怎麼辦?
+那如果回退到某個版本後後悔, 想恢復到新版本怎麼辦卻找不到新版本的 `commit id` 怎麼辦?
+
+在 git 中總是有後悔藥可以吃, 可以使用 `git reflog` 來查看之前使用過的指令:
+
+```shell
+5dcfc65 (HEAD -> master) HEAD@{0}: reset: moving to 5dcfc65
+cbb0c14 HEAD@{1}: reset: moving to cbb0c14
+5dcfc65 (HEAD -> master) HEAD@{2}: commit: second commit
+cbb0c14 HEAD@{3}: commit (initial): first commit
+```
+
+就可以找到更新版本的 `commit id` 並使用 `git reset` 來移動 `HEAD` pointer
