@@ -1,8 +1,16 @@
 - [Git](#git)
   - [Installation](#installation)
   - [Create Repository](#create-repository)
+    - [git init](#git-init)
+    - [git status](#git-status)
+    - [git add](#git-add)
+    - [git commit](#git-commit)
 - [Version Control](#version-control)
+    - [git log](#git-log)
+    - [git diff](#git-diff)
   - [Rewriting History](#rewriting-history)
+    - [git reset](#git-reset)
+    - [git reflog](#git-reflog)
 
 # Git
 
@@ -19,6 +27,8 @@ Linus 因為痛恨集中式的版本控制系統, 因此一直不願意使用 CV
 ## Create Repository
 
 Repository 中所有的文件都可以被 Git 管理, 舉凡每個文件的修改, 刪除都能被 Git 追蹤, 以便查看 codebase 歷史紀錄或是還原到某個時間點
+
+### git init
 
 以下範例創建一個 repo:
 
@@ -58,6 +68,8 @@ Git is free software.
 
 首先將 `README.md` 放到 `learngit` 目錄下, 代表由此 git repo 來作管理
 
+### git status
+
 使用 `git status` 查看當前 git repo 的狀態:
 
 ```shell
@@ -72,6 +84,8 @@ Untracked files:
 
 nothing added to commit but untracked files present (use "git add" to track)
 ```
+
+### git add
 
 此時 `README.md` 雖然被 Git 偵測到, 但目前屬於 `Untracked files`, 表示尚未是 Git 追蹤的對象, 需要使用 `git add` 將文件新增到 git stagin area 中才能將 `README.md` 加入到追蹤對象:
 
@@ -91,6 +105,8 @@ Changes to be committed:
   (use "git rm --cached <file>..." to unstage)
         new file:   README.md
 ```
+
+### git commit
 
 此時可以用 `git commit` 提交一個新版本到 git repo:
 
@@ -145,6 +161,8 @@ no changes added to commit (use "git add" and/or "git commit -a")
 
 注意這裡 `git commit -am` 中的 `a` 參數等價於 `git add`
 
+### git log
+
 接著使用 `git log` 可以查看 git repo 中的 history commit:
 
 ```shell
@@ -170,6 +188,8 @@ Git 的 `commit id` 由一串雜湊值表示, 這是一個 `SHA1` 計算出來�
 cbb0c14 first commit
 ```
 
+### git diff
+
 如果要比較文件與上個版本的差異, 可以使用 `git diff` 查看:
 
 ```shell
@@ -190,6 +210,8 @@ index ce32b56..d8036c1 100644
 ```
 
 ## Rewriting History
+
+### git reset
 
 Git 中 `HEAD` 表示當前版本, 如果要回退到上個版本 `first commit`, 可以使用 `git reset`:
 
@@ -242,6 +264,8 @@ Git 版本回退的速度非常快, 在內部有個指向當前版本的 `HEAD` 
 ```
 
 那如果回退到某個版本後後悔, 想恢復到新版本怎麼辦卻找不到新版本的 `commit id` 怎麼辦?
+
+### git reflog
 
 在 git 中總是有後悔藥可以吃, 可以使用 `git reflog` 來查看之前使用過的指令:
 
