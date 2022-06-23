@@ -24,7 +24,7 @@
 
 # SQL fundamentals
 # General Development Skills
-  - [Git]()
+  - [Git](general/git.md)
   - HTTP / HTTPS
   - Data Structures and Algorithms
   - Scrum, Kanban or other project strategies
