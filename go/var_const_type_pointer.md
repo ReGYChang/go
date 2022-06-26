@@ -6,6 +6,8 @@
 - [Type](#type)
   - [Type Assertion](#type-assertion)
   - [Type Switch](#type-switch)
+  - [Type Conversion](#type-conversion)
+    - [strconv](#strconv)
 - [Pointer](#pointer)
   - [Memory Allocation](#memory-allocation)
   - [Nil pointer & Wild pointer](#nil-pointer--wild-pointer)
@@ -485,6 +487,103 @@ hello is string
 > Summary
 - 若值為 `nil`, 匹配的是 `case nil`
 - 若值在 switch-case 中並沒有匹配對應類型, 那麼匹配的是 default
+
+## Type Conversion
+
+關於數值類型間的轉換只需要調用需轉換的目標類型對應函數即可:
+
+```go
+v1 := uint(16)   // 初始化 v1 型別為 unit
+v2 := int8(v1)   // 將 v1 轉型成 int8 型別並賦值 v2
+v3 := uint16(v2) // 將 v2 轉型為 uint16 型別並賦值 v3
+```
+
+>❗️在有號數及無號數, 高位數向低位數轉型時需要特別注意數字的 overflow 及 truncate 問題
+
+```go
+v1 := uint(-255)
+```
+
+由於 `uint` 是無號整數, 所以上述轉型會報 compile error:
+
+```go
+constant -255 overflows uint
+```
+
+改寫程式碼如下:
+
+```go
+v1 := uint(255)
+v2 := int8(v1)  // v2 = -1
+```
+
+由於 `int8` 能夠表示的數字範圍為 -128 - 127, 255 超出了其表示範圍, 因此會擷取後 8 位, `v1` 為無號整數且後八位都是 1, `int8` 為有號整數, 最高位數為符號位, 因此轉型後的數字 `v2` 為負數, `11111111` 是這個負數的補數, 因此 `v2` 最終轉型的結果為 -1
+
+整數與浮點數之間的轉型, 小數位數被丟棄:
+
+```go
+v1 := 99.99
+v2 := int(v1)  // v2 = 99
+```
+
+將整數轉型為浮點數:
+
+```go
+v1 := 99
+v2 := float64(v2)
+```
+
+字符串與其他型別之間的轉換:
+
+> 整數型別可以通過對應的 UTF-8 編碼轉型成對應的字符串
+
+```go
+v1 := 65
+v2 := string(v1)  // v2 = A
+
+v3 := 30028
+v4 := string(v3)  // v4 = 界
+```
+
+另外還可以將 byte array 或 `rune`(Unicode encoding) array 轉型為字符串:
+
+```go
+v1 := []byte{'h', 'e', 'l', 'l', 'o'}
+v2 := string(v1)  // v2 = hello
+
+v3 := []rune{114, 101, 103, 121}
+v4 := string(v3)  // v4 = regy
+```
+
+### strconv
+
+要實現字符串與其他基本型別間轉換可以通過 `strconv` package 提供的函數來完成:
+
+```go
+v1 := "100"
+v2, err := strconv.Atoi(v1)  // 將字符串轉為整數, v2 = 100
+
+v3 := 100
+v4 := strconv.Itoa(v3)   // 將整數轉為字符串, v4 = "100"
+
+v5 := "true"
+v6, err := strconv.ParseBool(v5)  // 將字符串轉為 bool
+v5 = strconv.FormatBool(v6)  // 將 bool 轉為字符串
+
+v7 := "100"
+v8, err := strconv.ParseInt(v7, 10, 64)   // 將字符串轉為整數, 第二個參數表示進制, 第三個參數表示最大位數
+v7 = strconv.FormatInt(v8, 10)   // 將整數轉為字符串, 第二個參數表示進制
+
+v9, err := strconv.ParseUint(v7, 10, 64)   // 將字符串轉為無號整數, 參數含義同 ParseInt
+v7 = strconv.FormatUint(v9, 10)  // 將字符串轉為無號整數, 參數含義同 FormatInt
+
+v10 := "99.99"
+v11, err := strconv.ParseFloat(v10, 64)   // 將字符串轉為浮點數, 第二個參數表示精度
+v10 = strconv.FormatFloat(v11, 'E', -1, 64)
+
+q := strconv.Quote("Hello, 世界")    // 為字符串加上引號
+q = strconv.QuoteToASCII("Hello, 世界")  // 將字符串轉為 ASCII 編碼
+```
 
 # Pointer
 
