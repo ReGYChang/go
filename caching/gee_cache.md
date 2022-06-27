@@ -267,3 +267,394 @@ func TestOnEvicted(t *testing.T) {
 	}
 }
 ```
+
+# Standalone Concurrent Cache
+
+- 使用 `sync.Mutex` 並實現 LRU cache 的 concurrent control
+- 實現 GeeCache 核心資料結構 `Group`, 當 cache 不存在時調用 callback function 獲取原始資料
+
+## sync.Mutex
+
+當多個 goroutines 同時讀寫同一個變數時, 在 high concurrency 的情況下有可能會發生衝突, 而確保同一時間只有一個 goroutine 可以訪問該變數以避免衝突, 稱為 mutex, mutex lock 可以解決此問題
+
+> `sync.Mutex` 是一個 mutex lock, 可以由不同的 goroutine 加鎖及解鎖
+
+Go 提供了 mutex lock `sync.Mutex`, 當一個 goroutine 獲得 lock 所有權後, 其他請求 lock 的 goroutine 就會 blocking 在 `Lock()` 方法的調用上, 直到 `Unlock()` 鎖被釋放
+
+假設有十個併發的 goroutines 打印同一個數字 100, 為了避免重複打印, 實現了 `printOnce(num int)` 函數, 並使用集合 set 來記錄打印過的數字, 若數字已打印過則不再打印
+
+```go
+var set = make(map[int]bool, 0)
+
+func printOnce(num int) {
+	if _, exist := set[num]; !exist {
+		fmt.Println(num)
+	}
+	set[num] = true
+}
+
+func main() {
+	for i := 0; i < 10; i++ {
+		go printOnce(100)
+	}
+	time.Sleep(time.Second)
+}
+```
+
+這段程式結果會是如何?
+
+有時候會打印 2 次, 有時候會打印 4 次, 有時候甚至還會觸發 panic, 因為對同一個資料結構 set 的訪問衝突, 再來使用 `mutex` 的 `Lock()` 和 `Unlock()` 方法將造成衝突的部分包起來:
+
+```go
+var m sync.Mutex
+var set = make(map[int]bool, 0)
+
+func printOnce(num int) {
+	m.Lock()
+	if _, exist := set[num]; !exist {
+		fmt.Println(num)
+	}
+	set[num] = true
+	m.Unlock()
+}
+
+func main() {
+	for i := 0; i < 10; i++ {
+		go printOnce(100)
+	}
+	time.Sleep(time.Second)
+}
+```
+
+這樣一來相同的數字只會被打印一次, 當一個 goroutine 調用了 `Lock()` 方法時, 其他的 goroutine 則會被 blocking, 直到 `Unlock()` 調用後將 lock 釋放, 如此一來就能避免衝突以實現互斥
+
+`Unlock()` 還有另一種寫法:
+
+```go
+func printOnce(num int) {
+	m.Lock()
+	defer m.Unlock()
+	if _, exist := set[num]; !exist {
+		fmt.Println(num)
+	}
+	set[num] = true
+}
+```
+
+## Support Concurrent R/W
+
+接下來使用 `sync.Mutex` 封裝 LRU 方法, 使其支援 concurrent R/W, 在此之前先抽象了一個 read only 的資料結構 `ByteView` 用來表示 cache 值, 是 GeeCache 核心資料結構之一
+
+geecache/byteview.go
+
+```go
+package geecache
+
+// A ByteView holds an immutable view of bytes.
+type ByteView struct {
+	b []byte
+}
+
+// Len returns the view's length
+func (v ByteView) Len() int {
+	return len(v.b)
+}
+
+// ByteSlice returns a copy of the data as a byte slice.
+func (v ByteView) ByteSlice() []byte {
+	return cloneBytes(v.b)
+}
+
+// String returns the data as a string, making a copy if necessary.
+func (v ByteView) String() string {
+	return string(v.b)
+}
+
+func cloneBytes(b []byte) []byte {
+	c := make([]byte, len(b))
+	copy(c, b)
+	return c
+}
+```
+
+- `ByteView` 只有一個資料成員 `b []byte`, `b` 將會儲存真實的 cache 值, 使用 `byte` 型別是為了能夠支持任意的資料結構儲存, 如 string, 圖片等
+- 實現 `Len() int` 方法, 在 `lru.Cache` 中要求被 cache 的物件必須實現 `Value` interface, 即 `Len()` 方法, 用於返回其所佔的記憶體大小
+- `b` 是 read only, 使用 `ByteSlice()` 方法返回一個 copy, 防止 cache 值被外部程式修改
+
+接著就可以幫 `lru.Cache` 新增併發特性了:
+
+geecache/cache.go
+
+```go
+package geecache
+
+import (
+	"geecache/lru"
+	"sync"
+)
+
+type cache struct {
+	mu         sync.Mutex
+	lru        *lru.Cache
+	cacheBytes int64
+}
+
+func (c *cache) add(key string, value ByteView) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.lru == nil {
+		c.lru = lru.New(c.cacheBytes, nil)
+	}
+	c.lru.Add(key, value)
+}
+
+func (c *cache) get(key string) (value ByteView, ok bool) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.lru == nil {
+		return
+	}
+
+	if v, ok := c.lru.Get(key); ok {
+		return v.(ByteView), ok
+	}
+
+	return
+}
+```
+
+- `cache.go` 實現非常簡單, 實體化 `lru`, 封裝 `get` 和 `add` 方法並增加 mutex lock `mu`
+- `add` 方法中判斷了 `c.lru` 是否為 nil, 若為 nil 再創建實體, 此為 `Lazy Initialization`, 將物件創建延遲到第一次使用該物件的時候, 用於提高性能並減少記憶體需求
+
+## Group
+
+`Group` 是 GeeCache 最核心的資料結構, 負責與使用者互動並且控制 cache value 與 get cache value 的流程
+
+```go
+                            true
+receive key --> check if be cached -----> return cache value (1)
+                |  false                         true
+                |-----> if get value from remote server -----> interact with remote server --> return (2)
+                            |  false
+                            |-----> call callback function to get the value and insert into cache --> return cache value (3)
+```
+
+將在 geecache.go 中實現主結構體 `Group`, 目前專案結構雛型已經完成了:
+
+```go
+geecache/
+    |--lru/
+        |--lru.go  // lru cache eviction strategy
+    |--byteview.go // cache value abstraction and package
+    |--cache.go    // concurrent control
+    |--geecache.go // interact with user, control cache storage and get
+```
+
+接下來先實現 (1) 和 (3), (2) 的部分後續再實現
+
+## Callback Getter
+
+若 cache 不存在, 應該從 datasource(file, database) 獲取資料並新增到 cache 中, 而 GeeCache 是否應該支持多種 datasource 的配置呢?
+
+結論是不應該, 原因如下:
+- Datasource 種類眾多, 無法一一實現
+- 擴展性不佳
+
+因此設計一個 callback function, 當 cache 不存在時則調用 callback, 以得到原始資料
+
+geecache/geecache.go
+
+```go
+// A Getter loads data for a key.
+type Getter interface {
+	Get(key string) ([]byte, error)
+}
+
+// A GetterFunc implements Getter with a function.
+type GetterFunc func(key string) ([]byte, error)
+
+// Get implements Getter interface function
+func (f GetterFunc) Get(key string) ([]byte, error) {
+	return f(key)
+}
+```
+
+- 定義 interface `Getter` 和 callback `Get(key string) ([]byte, error)`
+- 定義函數型別 `GetterFunc`, 並實現 `Getter` interface `Get` 方法
+- 函數型別實現某一個 interface 則稱為接口型函數, 方便調用者在調用時能夠傳入函數作為參數, 也能夠傳入實現此 interface 的 struct 作為參數
+
+寫一個 test case 保證 callback function 能夠正常運作:
+
+```go
+func TestGetter(t *testing.T) {
+	var f Getter = GetterFunc(func(key string) ([]byte, error) {
+		return []byte(key), nil
+	})
+
+	expect := []byte("key")
+	if v, _ := f.Get("key"); !reflect.DeepEqual(v, expect) {
+		t.Errorf("callback failed")
+	}
+}
+```
+
+- 這個 test case 中借助 `GetterFunc` 型別轉換, 將一個匿名 callback 轉換成 `Getter` interface `f`
+- 調用此 interface 方法 `f.Get(key string)`, 實際上即調匿名 callback function
+
+>💡TIP: 定義一個函數型別 F, 且實現 interface A 的方法, 並在此方法中調用自己, 這是 Go 中將其他函數(參數返回值定義與 F 一致)轉化為 interface A 的常用技巧
+
+接下來是最核心資料結構 `Group` 的定義:
+
+geecache/geecache.go
+
+```go
+// A Group is a cache namespace and associated data loaded spread over
+type Group struct {
+	name      string
+	getter    Getter
+	mainCache cache
+}
+
+var (
+	mu     sync.RWMutex
+	groups = make(map[string]*Group)
+)
+
+// NewGroup create a new instance of Group
+func NewGroup(name string, cacheBytes int64, getter Getter) *Group {
+	if getter == nil {
+		panic("nil Getter")
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	g := &Group{
+		name:      name,
+		getter:    getter,
+		mainCache: cache{cacheBytes: cacheBytes},
+	}
+	groups[name] = g
+	return g
+}
+
+// GetGroup returns the named group previously created with NewGroup, or
+// nil if there's no such group.
+func GetGroup(name string) *Group {
+	mu.RLock()
+	g := groups[name]
+	mu.RUnlock()
+	return g
+}
+```
+
+- 一個 `Group` 可以認為是一個 cache namespace, 每個 `Group` 擁有一個唯一的名稱 `name`, 如可以創建兩個 Group, cache 學生成績為 scores, cache 學生資訊則為 info
+- 第二個屬性為 `getter Getter`, 即 cache 未命中時獲取原始資料的 callback
+- 第三個屬性為 `mainCache cache`, 即一開始實現的 concurrent cache
+- 構建函數 `NewGroup` 用來實體化 `Group`, 且將 group 儲存在全局變數 `groups` 中
+- `GetGroup` 用來查找特定名稱的 `Group`, 這裡只使用 `RLock()`, 因為不涉及任何衝突變數的寫操作
+
+再來是 GeeCache 最核心的方法 `Get`:
+
+```go
+// Get value for a key from cache
+func (g *Group) Get(key string) (ByteView, error) {
+	if key == "" {
+		return ByteView{}, fmt.Errorf("key is required")
+	}
+
+	if v, ok := g.mainCache.get(key); ok {
+		log.Println("[GeeCache] hit")
+		return v, nil
+	}
+
+	return g.load(key)
+}
+
+func (g *Group) load(key string) (value ByteView, err error) {
+	return g.getLocally(key)
+}
+
+func (g *Group) getLocally(key string) (ByteView, error) {
+	bytes, err := g.getter.Get(key)
+	if err != nil {
+		return ByteView{}, err
+
+	}
+	value := ByteView{b: cloneBytes(bytes)}
+	g.populateCache(key, value)
+	return value, nil
+}
+
+func (g *Group) populateCache(key string, value ByteView) {
+	g.mainCache.add(key, value)
+}
+```
+
+- `Get` 方法實現了上述流程中的 (1) 和 (3)
+- (1): cache 不存在時則調用 `load` 方法, `load` 調用 `getLocally`(分散式場景會調用 `getFromPeer` 從其他節點獲取), `getLocally` 調用使用者 callback `g.getter.Get()` 來取得原始資料, 且將原始資料新增到 `mainCache` 中(通過 `populateCaceh` 方法)
+
+至此, standalone concurrent caching 即完成
+
+## Testing
+
+首先用一個 map 模擬耗時的 db:
+
+```go
+var db = map[string]string{
+	"Tom":  "630",
+	"Jack": "589",
+	"Sam":  "567",
+}
+```
+
+創建 `group` instance, 並測試 `Get` 方法:
+
+```go
+func TestGet(t *testing.T) {
+	loadCounts := make(map[string]int, len(db))
+	gee := NewGroup("scores", 2<<10, GetterFunc(
+		func(key string) ([]byte, error) {
+			log.Println("[SlowDB] search key", key)
+			if v, ok := db[key]; ok {
+				if _, ok := loadCounts[key]; !ok {
+					loadCounts[key] = 0
+				}
+				loadCounts[key] += 1
+				return []byte(v), nil
+			}
+			return nil, fmt.Errorf("%s not exist", key)
+		}))
+
+	for k, v := range db {
+		if view, err := gee.Get(k); err != nil || view.String() != v {
+			t.Fatal("failed to get value of Tom")
+		} // load from callback function
+		if _, err := gee.Get(k); err != nil || loadCounts[k] > 1 {
+			t.Fatalf("cache %s miss", k)
+		} // cache hit
+	}
+
+	if view, err := gee.Get("unknown"); err == nil {
+		t.Fatalf("the value of unknow should be empty, but %s got", view)
+	}
+}
+```
+
+這個 test case 主要測試兩種情況:
+- 在 cache 為空的情況下能夠通過 callback 獲取到 source data
+- 在 cache 存在情況下是否直接從 cache 中取得資料, 使用 `loadCounts` 統計某個 key 調用 callback function 的次數, 若次數大於 1 則表示調用了多次 callback function, 沒有 cache
+
+測試結果如下:
+
+```go
+$ go test -run TestGet
+2020/02/11 22:07:31 [SlowDB] search key Sam
+2020/02/11 22:07:31 [GeeCache] hit
+2020/02/11 22:07:31 [SlowDB] search key Tom
+2020/02/11 22:07:31 [GeeCache] hit
+2020/02/11 22:07:31 [SlowDB] search key Jack
+2020/02/11 22:07:31 [GeeCache] hit
+2020/02/11 22:07:31 [SlowDB] search key unknown
+PASS
+```
+
+可以觀察到當 cache 為空時調用了 callback function, 第二次訪問時則直接從 cache 中讀取
