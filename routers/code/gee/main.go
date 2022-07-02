@@ -1,8 +1,8 @@
 package main
 
 import (
-	"fmt"
 	"gee/gee"
+	"fmt"
 	"log"
 	"net/http"
 	"time"
