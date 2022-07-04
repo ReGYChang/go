@@ -3,6 +3,10 @@
   - [encoding/gob](#encodinggob)
     - [Gob En/Deconding Rules](#gob-endeconding-rules)
     - [Gob En/Deconding in Go](#gob-endeconding-in-go)
+- [gRPC](#grpc)
+  - [Protobuf](#protobuf)
+    - [Protobuf Setup](#protobuf-setup)
+    - [Protobuf Demo](#protobuf-demo)
 
 # RPC
 
@@ -131,3 +135,114 @@ func main() {
   fmt.Printf("%q: {%d,%d}, Tags: %v, Attr: %v\n", q.Name, *q.X, *q.Y, q.Tags, q.Attr)
 }
 ```
+
+# gRPC
+
+`gRPC` 是一個高性能且通用的 open source RPC framework, 其是由 Google 基於 mobile application development 開發並基於 `HTTP/2` 而設計, 支援 `ProtoBuf` 序列化標準及眾多開發語言
+
+與很多 RPC 系統類似, `gRPC` 也是基於以下理念: 定義一個 service, 指定其為能夠被遠端調用的方法(包含參數和返回型別), 在 server 實現 intereface, 並運行一個 gRPC server 來處理 client 調用, 在 client 擁有一個`存根`就像 server 一樣的方法
+
+`gRPC` 默認使用 `protocol buffers`, 其為 Google 開源的一套成熟的結構化資料序列化標準
+
+## Protobuf
+
+`Protocol buffers` 是一種與程式語言, 平台無耦合的資料交換格式, 用於序列化結構化資料, 較 XML, JSON 而言, `Protobuf` 序列化後的 data stream 更小, 傳輸速度更高, 且操作更簡單
+
+> Protocol buffers are a language-neutral, platform-neutral extensible mechanism for serializing structured data.
+
+`protoc` 主要用於 compile `protobuf(.proto)` 檔案和 runtime, 其為 C++ 編寫, release 下載地址如下: 
+
+[https://github.com/protocolbuffers/protobuf/releases
+](https://github.com/protocolbuffers/protobuf/releases
+)
+
+### Protobuf Setup
+
+Uncompress:
+
+```shell
+$ unzip protoc-3.14.0-linux-x86_64.zip -d protoc-3.14.0-linux-x86_64
+```
+
+Add env:
+
+```shell
+$ sudo vim /etc/profile 
+```
+
+Export env:
+
+```shell
+export PATH=$PATH:/home/regy/17x/protoc-3.14.0-linux-x86_64/bin
+```
+
+Active:
+
+```shell
+$ source /etc/profile
+```
+
+Check if install success:
+
+```shell
+$ protoc --version
+libprotoc 3.14.0
+```
+
+除了安裝 `protoc` 之外還需要安裝各個程式語言對應的 compile plugin, 以下為 Go compile plugin:
+
+```shell
+go get google.golang.org/protobuf/cmd/protoc-gen-go
+```
+
+### Protobuf Demo
+
+create `.proto` file: hello_world.proto
+
+```protobuf
+// 宣告 proto 版本, 只有 proto3 才支持 gRPC
+syntax = "proto3";
+// 將編譯後檔案輸出於 github.com/regy/grpc-go-example/helloworld/helloworld 目錄
+option go_package = "github.com/regy/grpc-go-example/helloworld/helloworld";
+// 指定當前 proto 檔案屬於 helloworld package
+package helloworld;
+
+// 定義一個 greeting service
+service Greeter {
+  // service 包含一個 SayHello 方法, HelloRequest, HelloReply 分别為此方法 input & output
+  rpc SayHello (HelloRequest) returns (HelloReply) {}
+}
+
+// 具體參數定義
+message HelloRequest {
+  string name = 1;
+}
+
+message HelloReply {
+  string message = 1;
+}
+```
+
+`protoc` compile:
+
+```shell
+# Syntax: protoc [OPTION] PROTO_FILES
+$ protoc --proto_path=IMPORT_PATH  --go_out=OUT_DIR  --go_opt=paths=source_relative path/to/file.proto
+```
+
+- `-proto_path or -I`: 指定 `import` path, 可以指定多個參數, compile 時按順序查找, 不指定時默認查找當前目錄
+  - `.proto` 也可以引入其他 `.proto` 檔案, 用於指定被 import 檔案位置
+- `-go_out`: 指定輸出檔案路徑
+
+```shell
+$ protoc --go_out=. hello_word.proto
+```
+
+compile 結束後會產生一個 `hello_world.pb.go` 檔案, 即 compile 完成
+
+> Compile Progress
+
+- parsing `.proto` 檔案, compile 成 `protobuf` 原生資料結構並保存於 memory
+- 將 `protobuf` 相關資料結構傳遞給對應程式語言的 compile plugin, 由 plugin 負責將接收到的 `protobuf` 原生資料結構渲染輸出為特定語言 template
+
+後續提到的 `gRPC Plugins`, `gRPC-Gateway` 也是 `protoc` compile plugin, 將 `.proto` 檔案 compile 成對應組件所需要的原始檔
