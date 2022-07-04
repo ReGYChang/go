@@ -28,6 +28,10 @@
     - [[git cherry-pick]](#git-cherry-pick)
   - [Rebase](#rebase)
     - [[git rebase]](#git-rebase)
+- [Remote Repository](#remote-repository)
+  - [Adding Remote Repositories](#adding-remote-repositories)
+    - [[git remote]](#git-remote)
+    - [[git push]](#git-push)
 
 # Git
 
@@ -58,7 +62,7 @@ Repository 中所有的文件都可以被 Git 管理, 舉凡每個文件的修�
 hint: Using 'master' as the name for the initial branch. This default branch name
 hint: is subject to change. To configure the initial branch name to use in all
 hint: of your new repositories, which will suppress this warning, call:
-hint: 
+hint:  
 hint:   git config --global init.defaultBranch <name>
 hint: 
 hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
@@ -898,3 +902,62 @@ git rebase main
 使用 `Rebase` 的優點主要是能獲得更清楚的 commit log, 其消除了不必要的 merge commit 並產生線性的 git graph 結構, 我們可以從 feature branch 的頂端一路向前追溯, 沒有任何 folk 即可追蹤到項目開始
 
 但相較於 `Merge`, `Rebase` 更加複雜且危險, 原因是其會重寫 commit log, 可能會影響到其他協同開發的人; 另外 `Merge` 附加的 merge commit 可以提示 merge 上游 branch 的時間點, 若此時間點對於開發團隊來說是重要的則不應使用 `Rebase`, 因為使用 `Rebase` 則無法獲取此資訊
+
+# Remote Repository
+
+Git 是分散式版本控制系統, 同一個 git repo 可以分散到不同的機器上, 剛開始有一台機器上有一個初始版本的程式碼庫, 別的機器可以 **clone** 這個 repo, 且每台機器上的 repo 都是相同的, 並無主次之分
+
+現實的運作方式為找一台運行 git 的 server, 每個人都可以從 server clone repo 到自己電腦上, 且可將各自的 commit push 到 server repo 中, 也可從 server pull 別人的 commit, 這即是 `Github` 運作的方式
+
+local git repo 跟 `Github` remote repo 之間的傳輸是通過 SSH 加密, 其使用 SSH key 識別使用者身份
+
+## Adding Remote Repositories
+
+下面演示如何將本地 repo 推送到 github server:
+
+先在 github 上 create repository
+
+![create_repo_github](img/create_repo_github.png)
+
+在 local 創建 git repo
+
+```go
+echo "# gitflow" >> README.md
+git init
+```
+
+將 `README.md` 新增進 `Staging Area` 並提交到 `Repository`
+
+```go
+git add README.md
+git commit -m "first commit"
+```
+
+### [git remote]
+
+此時可以將 local repo 與 remote repo 進行關聯, 在本地 repo 輸入:
+
+```go
+git branch -M main
+git remote add origin https://github.com/ReGYChang/gitflow.git
+```
+
+### [git push]
+
+由於新建的 remote repo 目前是空的, 使用 `git push` 指令將 local repo 程式碼推送到 remote repo, 並使用參數 `-u` 設定 `upstream`, 可以使 branch 開始追蹤指定的 remote branch
+
+```go
+git push -u origin main
+```
+
+設定好 branch upstream 後並成功推送, 可以使用 `git status` 查看, 會顯示追蹤的資訊:
+
+```go
+➜  gitflow git:(main) ✗ git status 
+On branch main
+Your branch is up to date with 'origin/main'.
+```
+
+`Your branch is up to date with 'origin/main'.` 表示目前 local `main` branch 與 remote branch 內容是一致的
+
+> ❗️ 注意如果創建 repository 時選了 `Add a README file`, 後續直接 `git push` 會出現 `failed to push some refs to https://github.com/ReGYChang/gitflow.git` 的錯誤, 因為新創建的 `README.md` 並不在 local repo 中導致, 需要先使用 `git pull --rebase origin master` 同步 remote repo 才能 `git push` 成功

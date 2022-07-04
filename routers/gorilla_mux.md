@@ -958,7 +958,7 @@ WebRoute{
 ![request_body_test](../network/img/request_body_test.png)
 
 - `-i` 表示輸出 HTTP response 詳細 message
-- `-` 表示傳遞的 form data
+- `-d` 表示傳遞的 form data
 
 > 通常不會一次性獲取所有 request body info, 而是通過類似 `FormValue` 之類方法獲取每個 request parameter
 
