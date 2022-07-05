@@ -32,6 +32,8 @@
   - SOLIC, YAGNI, KISS
   - [System Design](general/system_design.md)
   - [Design Pattern](general/design_pattern.md)
+  - [Domain-driven design](general/ddd.md)
+  - [Microservice](general/microservice.md)
 # CLI
   - cobra
 # Web Frameworks & Routers
