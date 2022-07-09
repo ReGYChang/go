@@ -8,6 +8,13 @@
     - [Goexit](#goexit)
     - [GOMAXPROCS](#gomaxprocs)
     - [Other](#other)
+- [Context](#context)
+  - [context Usage](#context-usage)
+    - [WithValue](#withvalue)
+    - [Timeout Control](#timeout-control)
+    - [WithCancel](#withcancel)
+    - [Custom Context](#custom-context)
+  - [Pros & Cons](#pros--cons)
 - [Channel](#channel)
   - [Unbuffered channel](#unbuffered-channel)
   - [Buffered channel](#buffered-channel)
@@ -401,6 +408,239 @@ func GC()
 調用觸發 GC 執行
 
 
+# Context
+
+> `context` 的功能就是在不同的 `goroutine` 之間同步請求的特定資料, signal 及請求處理的 deadline
+
+`context` package 是在 go@1.7 被引進標準庫中, 主要用來在多個 `goroutine` 之間傳遞 context infomation, 相同的 `context` 可以傳遞給運行不同 `goroutine` 中的函數, 且 context 對於多個 `goroutine` 同時使用是安全的
+
+`context` package 定義了 context 型別, 可以使用 `background`, `TODO` 創建一個 context, 在函數調用鏈之間傳遞 `context`, 也可以使用 `WithDeadline`, `WithTimeout`, `WithCancel` 或 `WithValue` 創建的修改副本來替換它
+
+## context Usage
+
+`context` package 主要提供了兩種方式創建 `context`:
+
+- `context.Background()`
+- `context.TODO()`
+
+這兩個函數等價, 官方給的定義為:
+
+- `context.Background()`: context default 值, 所有其他的 context 都應該由其衍生出來
+- `context.TODO`: 只在不確定應該使用哪一種 context 時使用
+
+因此在大多數情況下使用 `context.Background` 作為初始的 context 向下傳遞
+
+上面兩個函數是創建 root `context`, 並不具備任何功能, 具體實現還是要依靠 `context` package 提供的 `With` 函數:
+
+```go
+func WithCancel(parent Context) (ctx Context, cancel CancelFunc)
+func WithDeadline(parent Context, deadline time.Time) (Context, CancelFunc)
+func WithTimeout(parent Context, timeout time.Duration) (Context, CancelFunc)
+func WithValue(parent Context, key, val interface{}) Context
+```
+
+這四個函數都要依賴父 `Context` 衍生, 通過這些函數就創建了一顆 Context tree, tree 中的每個 node 都可以有任意多個 sub node, node layer 也可以有任意多個:
+
+![context_tree](img/context_tree.png)
+
+基於一個父 `Context` 可以隨意衍生節點, 如上圖所示, 基於 `Context.Background` 衍生出四個 sub context: `ctx1.0-cancel`, `ctx2.0-deadline`, `ctx3.0-timeout`, `ctx4.0-withvalue`, 即使其中的 `ctx1.0-cancel` 節點取消, 也不影響其他的父節點 degree
+
+### WithValue
+
+在日常業務開發過程中都希望能有一個 `trace_id` 串連所有的 log, 這就需要在 print log 時能夠獲取 `trace_id`, 就可以使用 `Context` 來傳遞, 通過 `WithValue` 來創建一個攜帶 `trace_id` 的 context, 並不斷傳遞下去:
+
+```go
+const (
+    KEY = "trace_id"
+)
+
+func NewRequestID() string {
+    return strings.Replace(uuid.New().String(), "-", "", -1)
+}
+
+func NewContextWithTraceID() context.Context {
+    ctx := context.WithValue(context.Background(), KEY,NewRequestID())
+    return ctx
+}
+
+func PrintLog(ctx context.Context, message string)  {
+    fmt.Printf("%s|info|trace_id=%s|%s",time.Now().Format("2006-01-02 15:04:05") , GetContextValue(ctx, KEY), message)
+}
+
+func GetContextValue(ctx context.Context,k string)  string{
+    v, ok := ctx.Value(k).(string)
+    if !ok{
+        return ""
+    }
+    return v
+}
+
+func ProcessEnter(ctx context.Context) {
+    PrintLog(ctx, "GoGoGo")
+}
+
+
+func main()  {
+    ProcessEnter(NewContextWithTraceID())
+}
+```
+
+output:
+
+```go
+2021-10-31 15:13:25|info|trace_id=7572e295351e478e91b1ba0fc37886c0|GoGoGo
+```
+
+基於 `context.Background` 創建一個攜帶 `trace_id` 的 context, 並通過 context tree 傳遞, 從中衍生出的任何 context 都會獲得此值, 最後打印日誌時就可以從 context 中將值取出並輸出到日誌中
+
+在使用 `WithValue` 時要注意以下四點:
+
+- 不建議使用 `context` 傳遞關鍵參數, 關鍵參數應該顯式聲明, 不應隱式處理, `context` 中最好是攜帶簽名, `trace_id` 這類值
+- 因為攜帶 `value` 也是 key-value 的格式, 為了避免 `context` 因多個 package 而產生衝突, key 建議採用 build-in type
+- 上面的例子是直接從當前 `context` 中查找, 若沒找到會從父 `context` 查找此值, 直到在某個父 `context` 中返回 `nil` 或找到對應的值為止
+- `context` 傳遞的資料中 key, value 都是 `interface` 型別, 此種型別在 compile time 無法確定型別, 所以在 type assertion 時記得確保安全
+
+### Timeout Control
+
+通常程式都會設置 timeout, 避免因為 server 長時間 response 消耗系統資源, 所以一些 web framework 或 rpc framework 都會採用 `withTimeout` 或 `withDeadline` 來做 timeout control
+
+當一次 request timeout 就會及時取消, 不會再往下執行
+
+`WithTimeout` 及 `WithDeadline` 功能相同, 但傳遞的時間參數不同, 其都會通過傳入的時間來自動取消 `Context`, 他們都會返回一個 `cancelFunc` 方法, 通過調用此方法可以提前取消, 不過在使用過程中還是建議在自動取消後同時也調用 `cancelFunc`
+
+`WithTimeout` 將持續時間作為參數輸入, 而 `WithDeadline` 則是以 `time.Duration` 作為參數輸入, 本質上 `WithTimeout` 內部也是調用 `WithDeadline`
+
+下面模擬一個請求的兩個 timeout control 的例子:
+
+timeout 並終止:
+
+```go
+func main()  {
+    HttpHandler()
+}
+
+func NewContextWithTimeout() (context.Context,context.CancelFunc) {
+    return context.WithTimeout(context.Background(), 3 * time.Second)
+}
+
+func HttpHandler()  {
+    ctx, cancel := NewContextWithTimeout()
+    defer cancel()
+    deal(ctx)
+}
+
+func deal(ctx context.Context)  {
+    for i:=0; i< 10; i++ {
+        time.Sleep(1*time.Second)
+        select {
+        case <- ctx.Done():
+            fmt.Println(ctx.Err())
+            return
+        default:
+            fmt.Printf("deal time is %d\n", i)
+        }
+    }
+}
+```
+
+output:
+
+```go
+deal time is 0
+deal time is 1
+context deadline exceeded
+```
+
+未 timeout 並終止:
+
+```go
+func main()  {
+    HttpHandler1()
+}
+
+func NewContextWithTimeout1() (context.Context,context.CancelFunc) {
+    return context.WithTimeout(context.Background(), 3 * time.Second)
+}
+
+func HttpHandler1()  {
+    ctx, cancel := NewContextWithTimeout1()
+    defer cancel()
+    deal1(ctx, cancel)
+}
+
+func deal1(ctx context.Context, cancel context.CancelFunc)  {
+    for i:=0; i< 10; i++ {
+        time.Sleep(1*time.Second)
+        select {
+        case <- ctx.Done():
+            fmt.Println(ctx.Err())
+            return
+        default:
+            fmt.Printf("deal time is %d\n", i)
+            cancel()
+        }
+    }
+}
+```
+
+output:
+
+```go
+deal time is 0
+context canceled
+```
+
+>❗️NOTE
+
+如果想在過程中另外起一個 `goroutine` 去處理其他任務且不會隨著請求結束而被取消的話, 必須使用 `context.Background()` 或 `context.TODO` 重新創建一個 context 並傳遞
+
+### WithCancel
+
+有時候為了完成一個複雜的請求而起多個 `goroutine` 去處理, 導致無法控制多個 `goroutine`, 此時可以使用 `WithCancel` 來創建一個 context 並傳遞到不同的 `goroutine` 中, 當想讓這些 `goroutine` 停止運行時可以直接調用 `cancel`
+
+```go
+func main()  {
+    ctx,cancel := context.WithCancel(context.Background())
+    go Speak(ctx)
+    time.Sleep(10*time.Second)
+    cancel()
+    time.Sleep(1*time.Second)
+}
+
+func Speak(ctx context.Context)  {
+    for range time.Tick(time.Second){
+        select {
+        case <- ctx.Done():
+            fmt.Println("I am gonna shut up")
+            return
+        default:
+            fmt.Println("balabalabalabala")
+        }
+    }
+}
+```
+
+### Custom Context
+
+`Context` 本質上是一個 interface, 可以通過實現 `Context` 來自定義 `Context`, 一般在實現 web 或 rpc framework 會自己封裝一層 context
+
+## Pros & Cons
+
+`context` package 設計的目的就是做 concurrency control, 以下總結幾點優缺點參考
+
+Pros:
+
+- 使用 `context` 可以更好的進行 concurrency control, 且能更好的管理 `goroutine` 濫用
+- `context` 攜帶者沒有任何功能限制, 可以傳遞任何資料
+- `context` package 解決了 `goroutine` 的 `cancelation` issue
+
+Cons:
+
+- 影響程式碼可讀性, 程式碼中很多函數的參數都有 `context`, 即使用不到也需要帶著參數傳遞
+- `context` 可以攜帶值, 沒有型別或大小限制, 也沒有任何約束, 如此一來容易導致濫用
+- `context` 隱式攜帶值, 可讀性較差
+- `context` `cancel` 和 `WithCacel` 的 error return 無法自定義 error, debug 較困難
+- 創建 sub context 實際上是創建 linked list node, 時間複雜度為 O(n), 當節點多了會導致效率變低
 
 # Channel
 
