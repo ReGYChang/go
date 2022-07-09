@@ -57,6 +57,8 @@
       - [Redis](database/redis.md)
   - Search Engines
       - ElasticSearch
+# Message Queue
+  - [Kafka](mq/kafka.md)
 # Caching
   - GCache
   - Distributed Cache
