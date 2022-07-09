@@ -63,8 +63,8 @@
       - [Go-Redis](go_redis.md)
   - [GeeCache](caching/gee_cache.md)
 # Logging
-  - Log Frameworks
-      - Zap
+    - [zerolog]()
+    - Zap
 # Real-Time Communication
   - Melody
   - Centrifugo
