@@ -63,8 +63,8 @@
       - [Go-Redis](go_redis.md)
   - [GeeCache](caching/gee_cache.md)
 # Logging
-    - [zerolog]()
-    - Zap
+  - [zerolog](logging/zerolog.md)
+  - Zap
 # Real-Time Communication
   - Melody
   - Centrifugo
@@ -83,6 +83,8 @@
   - [Docker](virtualization/docker.md)
   - Kubernetes
 # Good to Know Libraries
+  - Cmd
+    - [urfave/cli](library/urfave_cli.md)
   - Logging
   - Encoding/Decoding
   - Input and output
