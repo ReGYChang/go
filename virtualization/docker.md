@@ -1,16 +1,16 @@
 - [Docker Introduction](#docker-introduction)
-  - [Docker 為甚麼會出現](#docker-為甚麼會出現)
+  - [Why Docker?](#why-docker)
   - [What's docker](#whats-docker)
   - [Docker History](#docker-history)
-  - [聊聊 Docker](#聊聊-docker)
+  - [Talk about Docker](#talk-about-docker)
   - [Docker Features](#docker-features)
 - [Docker Installation](#docker-installation)
   - [Runtime Environment](#runtime-environment)
   - [Environment Check](#environment-check)
   - [Installation Steps](#installation-steps)
-  - [底層原理](#底層原理)
-    - [Docker 如何運作？](#docker-如何運作)
-    - [為何 Docker 比 VM 快？](#為何-docker-比-vm-快)
+  - [Theory](#theory)
+    - [How Docker Work？](#how-docker-work)
+    - [Why Docker Faster Than VM？](#why-docker-faster-than-vm)
 - [Docker CMD](#docker-cmd)
   - [Image CMD](#image-cmd)
   - [Container CMD](#container-cmd)
@@ -38,7 +38,7 @@
     - [USER](#user)
     - [WORKDIR](#workdir)
     - [ONBUILD](#onbuild)
-  - [測試](#測試)
+  - [Testing](#testing)
 - [Docker Network](#docker-network)
   - [Docker0](#docker0)
   - [Custom Network](#custom-network)
@@ -47,7 +47,7 @@
 
 # Docker Introduction
 
-## Docker 為甚麼會出現
+## Why Docker?
 
 - 環境配置麻煩，每台機器要部屬環境
 - 環境更換、版本更新導致服務不可用
@@ -82,7 +82,7 @@
     - 容器技術：隔離，鏡像( 最核心環境 4M + JDK + MySQL ) 十分輕巧，秒級啟動
     
 
-## 聊聊 Docker
+## Talk about Docker
 
 - 基於 Go 語言開發、開源項目
 - 文檔地址：[https://docs.docker.com/](https://docs.docker.com/)
@@ -236,16 +236,16 @@ $ sudo yum remove docker-ce docker-ce-cli [containerd.io](http://containerd.io/)
 $ sudo rm -rf /var/lib/docker
 ```
 
-## 底層原理
+## Theory
 
-### Docker 如何運作？
+### How Docker Work？
 
 ![img/Untitled%202.png](img/Untitled%202.png)
 
 - Docker 是一個 Client - Server 架構系統，Docker 的守護進程運行在主機上，通過 Socket 從客戶端訪問
 - Docker-Server 接收到 Docker-Client 請求並執行
 
-### 為何 Docker 比 VM 快？
+### Why Docker Faster Than VM？
 
 ![img/Untitled%203.png](img/Untitled%203.png)
 
@@ -1047,7 +1047,7 @@ RUN /usr/local/bin/python-build --dir /app/src
 
 使用 `ONBUILD` 指令的映像檔，推薦在標籤中註明，例如 `ruby:1.9-onbuild`
 
-## 測試
+## Testing
 
 > 創建 centos image
 > 
