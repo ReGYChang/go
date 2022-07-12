@@ -140,6 +140,19 @@ func main() {
 
 `gRPC` 是一個高性能且通用的 open source RPC framework, 其是由 Google 基於 mobile application development 開發並基於 `HTTP/2` 而設計, 支援 `ProtoBuf` 序列化標準及眾多開發語言
 
+`HTTP/2` 在 `HTTP/1.1` 的基礎上做了大量優化, `HTTP/1.1` 雖然引入了 `Keep-Alive` 機制復用 TCP connection, 但還是有許多問題:
+- 使用 `Keep-Alive` request 是 serializable(非 pipeline 時), 而 pipeline 時則有 `head-of-line blocking(HOL)` issue
+- 每次都需要傳輸不必要的 Header
+- 無法雙向通訊
+
+> HTTP/1.1 允許多個 request 復用 connection, 可以同時將 request 全部發送出去, 不需要等一個 return 再發第二個, 以提升 concurrency, 而 server 需要將 response 按照 pipeline 中發送的順序進行順序返回, 如果前面的 request blocking, 後面的 request/response 則會被動等待
+
+HTTP/2 則解決了這些問題, 並引入了新的機制:
+- 在 client/server 建立了 header table, 每次只發送 index 以縮減 header 體積
+- 建立 virtual channel, 將 data 拆分成多個 stream, 每個 steram 有自己的 id 及 piority, 且 stream 可以雙向傳輸, 每個 stream 可以拆成多個 frames, 可以將 request 切成多個 stream 發送, 每個 stream 獨立返回, 以避開 HTTP/1.1 serializable 或 `HOL` 問題
+
+基於 HTTP/2 data stream 機制, gRPC client/server 可以實現批次優化, client 可以累積 request 一次性發送給 server, server 也可以批次返回結果, 以實現 stream rpc
+
 與很多 RPC 系統類似, `gRPC` 也是基於以下理念: 定義一個 service, 指定其為能夠被遠端調用的方法(包含參數和返回型別), 在 server 實現 intereface, 並運行一個 gRPC server 來處理 client 調用, 在 client 擁有一個`存根`就像 server 一樣的方法
 
 `gRPC` 默認使用 `protocol buffers`, 其為 Google 開源的一套成熟的結構化資料序列化標準
@@ -150,13 +163,27 @@ func main() {
 
 > Protocol buffers are a language-neutral, platform-neutral extensible mechanism for serializing structured data.
 
-`protoc` 主要用於 compile `protobuf(.proto)` 檔案和 runtime, 其為 C++ 編寫, release 下載地址如下: 
+`protoc` 主要用於 compile `protobuf(.proto)` 檔案和 runtime, 其為 C++ 編寫, 以超高的壓縮率著稱, release 下載地址如下: 
 
 [https://github.com/protocolbuffers/protobuf/releases
 ](https://github.com/protocolbuffers/protobuf/releases
 )
 
 需注意一點, `Protocol buffers` 可以獨立使用, 不一定要與 gRPC 綁定使用, 但若使用 gRPC 則一定要使用 `Protocol buffers`
+
+使用 protobuf 作為序列化傳輸方案有以下幾個優點:
+- 節省網路傳輸量, 傳輸速度更快且檔案大小更小
+- 降低 CPU effort, parsing JSON 本身為 CPU intensive, 而 protobuf 本身為 binary format, 更接近底層資料表徵, 因此能有效降低 CPU effort
+- 能夠根據不同程式語言 compile 出不同的檔案
+- 可以邊寫註解, 型別顯式明確
+
+透過 protobuf 定義好傳輸的資料欄位(message) 和呼叫的方法(service) 後, gRPC 即可在不同程式語言上運行
+
+對於 JSON 等文本形式的序列化協定來說, protubuf 能達到幾十倍空間及性能的提升, 比如傳輸整數 123, 文本類協定需要 3 個 bytes(ascii 31 32 33) 來傳輸, 而 binary 類只需要一個 byte (01111011) 即可表達
+
+同時 protobuf 會維護 `.proto` 檔案, 如此一來在 parsing 檔案生成 stub 程式時可以對 function name 進行編號, 傳輸時只需傳輸編號而不用傳 function name, 如此一來可以省下大量 bytes 傳輸量, 其他更多精巧的壓縮方式如 `TLV`, 可以參考 [proto encoding](https://link.zhihu.com/?target=https%3A//developers.google.com/protocol-buffers/docs/encoding)
+
+
 
 ### Protobuf Setup
 
