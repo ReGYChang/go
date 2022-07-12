@@ -156,6 +156,8 @@ func main() {
 ](https://github.com/protocolbuffers/protobuf/releases
 )
 
+需注意一點, `Protocol buffers` 可以獨立使用, 不一定要與 gRPC 綁定使用, 但若使用 gRPC 則一定要使用 `Protocol buffers`
+
 ### Protobuf Setup
 
 Uncompress:
@@ -200,26 +202,22 @@ go get google.golang.org/protobuf/cmd/protoc-gen-go
 create `.proto` file: hello_world.proto
 
 ```protobuf
-// 宣告 proto 版本, 只有 proto3 才支持 gRPC
-syntax = "proto3";
-// 將編譯後檔案輸出於 github.com/regy/grpc-go-example/helloworld/helloworld 目錄
-option go_package = "github.com/regy/grpc-go-example/helloworld/helloworld";
-// 指定當前 proto 檔案屬於 helloworld package
-package helloworld;
+syntax = "proto3";  // 定義要使用的 protocol buffer 版本
 
-// 定義一個 greeting service
-service Greeter {
-  // service 包含一個 SayHello 方法, HelloRequest, HelloReply 分别為此方法 input & output
-  rpc SayHello (HelloRequest) returns (HelloReply) {}
+package calculator;  // for name space
+option go_package = "proto/calculator";  // generated code 的 full Go import path
+
+message CalculatorRequest {
+  int64 a = 1;
+  int64 b = 2;
 }
 
-// 具體參數定義
-message HelloRequest {
-  string name = 1;
+message CalculatorResponse {
+  int64 result = 1;
 }
 
-message HelloReply {
-  string message = 1;
+service CalculatorService {
+  rpc Sum(CalculatorRequest) returns (CalculatorResponse) {};
 }
 ```
 

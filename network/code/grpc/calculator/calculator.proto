@@ -1,0 +1,17 @@
+syntax = "proto3";  // 定義要使用的 protocol buffer 版本
+
+package calculator;  // for name space
+option go_package = "proto/calculator";  // generated code 的 full Go import path
+
+message CalculatorRequest {
+  int64 a = 1;
+  int64 b = 2;
+}
+
+message CalculatorResponse {
+  int64 result = 1;
+}
+
+service CalculatorService {
+  rpc Sum(CalculatorRequest) returns (CalculatorResponse) {};
+}
