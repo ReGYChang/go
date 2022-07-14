@@ -24,6 +24,11 @@ RPC 協議基於傳輸層的 TCP 或 UDP, 或是由應用層的 HTTP 構建, 允
 
 client 收到 server repsonse 後可以執行相對應的業務邏輯, 也可以繼續進行其他的 RPC 調用
 
+從抽象角度來看, RPC 具備以下三點特性:
+- 需要約定調用的語法
+- 需要約定內容編碼方式
+- 需要網絡傳輸
+
 ## RPC in Go
 
 Go 標準庫提供 `net/rpc` package, 其實現了 RPC 協議的相關細節

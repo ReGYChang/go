@@ -59,6 +59,8 @@
       - ElasticSearch
 # Message Queue
   - [Kafka](mq/kafka.md)
+# CDC
+  - [Debezium](cdc/debezium.md)
 # Caching
   - GCache
   - Distributed Cache
