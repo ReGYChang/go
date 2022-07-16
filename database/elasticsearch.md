@@ -32,3 +32,25 @@ Elasticsearch 是基於 `Restful API`, 使用 `Java` 開發的 search engine, �
 - distributed real-time documents storage, 每個 field 都可以被索引及搜尋
 - distributed real-time analytic search engine
 - 能支撐上百個節點擴充, 並支持 PB 級結構化或非結構化資料儲存
+
+# Elasticsearch Basic Concept
+
+- Near Realtime(NRT): 接近 real-time, 資料在 summit index 後馬上就可以搜尋到
+- Cluster: 一個 cluster 有一個 unique identifier, default 為 `elasticsearch`, 具有相同 cluster name 的 nodes 才會組成一個 cluster
+- Node: 儲存 cluster data, 參與 cluster 索引和搜尋功能, node name default 為啟動時以一個隨機的 UUID 前七個字符, 通過 cluster name 在網絡中發現 member 並組成 cluster, single node 也可以為 cluster
+- Index: 一個 index 為一個 document 集合, 每個 index 有 unique name, 一個 cluster 中可以有任意多個 index
+- Document: 被索引的一筆資料, 索引的基本資料單元, 以 `JSON` 格式表示
+- Shard: 在創建一個 index 時可以指定分成多少個 shard 來儲存, 每個 shard 本身也是一個功能完善且獨立的 `"index"`, 可以被放置在 cluster 的任意 node 上
+
+| RDBMS               | Elasticserach          |
+| ------------------- | ---------------------- |
+| database            | index                  |
+| table               | type(6.0.0 deprecated) |
+| row                 | document               |
+| column              | field                  |
+| schema              | mapping                |
+| index               | reverse index          |
+| SQL                 | DSL                    |
+| SELECT * FROM table | GET http://...         |
+| UPDATE table SET    | PUT http://...         |
+| DELETE              | DELETE http://...      |
