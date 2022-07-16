@@ -56,7 +56,7 @@
       - [MongoDB](database/mongodb.md)
       - [Redis](database/redis.md)
   - Search Engines
-      - ElasticSearch
+      - [ElasticSearch](database/elasticsearch.md)
 # Message Queue
   - [Kafka](mq/kafka.md)
 # CDC
