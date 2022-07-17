@@ -196,3 +196,194 @@ curl -X POST "localhost:9200/customer/_doc/1?pretty" -H 'Content-Type: applicati
   }
 }
 ```
+
+如果需要對建立 index 的過程做更多的控制, 如想要確保這個 index 有數量適中的主分片, 且在新增任何資料之前分析器和 mapping 都已經被建立好, 就需要 import 兩點:
+- 禁止自動創建 index
+- 手動設定並創建 index
+
+可以通過在 `config/elasticsearch.yaml` 的每個節點下添加下面的配置:
+
+```yaml
+action.auto_create_index: false
+```
+
+## Index Format
+
+在 request body 中添加設置或是型別 mapping, 如下所示:
+
+```json
+PUT /my_index
+{
+    "settings": { ... any settings ... },
+    "mappings": {
+        "properties": { ... any properties ... }
+    }
+}
+```
+
+- settings: 設置 shards, replications 等配置資訊
+- mappings: field mapping, type 等
+  - properties: object fields or nested fields
+
+## Create Index
+
+首先創建一個 `user index test-index-users`, 其中包含三個屬性: `name`, `age`, `remarks`, 儲存在一個 shard 及 一個 replication 上
+
+```json
+PUT /test-index-users
+{
+  "settings": {
+		"number_of_shards": 1,
+		"number_of_replicas": 1
+	},
+  "mappings": {
+    "properties": {
+      "name": {
+        "type": "text",
+        "fields": {
+          "keyword": {
+            "type": "keyword",
+            "ignore_above": 256
+          }
+        }
+      },
+      "age": {
+        "type": "long"
+      },
+      "remarks": {
+        "type": "text"
+      }
+    }
+  }
+}
+```
+
+output:
+
+```json
+{
+    "acknowledged" : true,
+    "shards_acknowledged" : true,
+    "index" : "test-index-users"
+}
+```
+
+新增資料測試:
+
+```json
+POST /test-index-users/_doc
+{
+    "name" : "pdai test name",
+    "age" : 18,
+    "remarks" : "hello world"
+}
+```
+
+查詢資料測試:
+
+```json
+GET /test-index-users/_search
+{
+    "query" : {"match_all" : {}}
+}
+```
+
+測試不匹配的資料型別(age):
+
+```json
+POST /test-index-users/_doc
+{
+  "name": "test user",
+  "age": "error_age",
+  "remarks": "hello eeee"
+}
+```
+
+會報 `mapper parsing exception` 的錯誤
+
+## Update Index
+
+查看剛才創建的 index:
+
+```shell
+curl 'localhost:9200/_cat/indices?v' | grep users
+```
+
+output:
+
+```
+yellow open test-index-users                          LSaIB57XSC6uVtGQHoPYxQ 1 1     1    0   4.4kb   4.4kb
+```
+
+這邊需注意剛創建的 index status 為 `yellow`, 因為測試環境為單節點環境, 無法創建 replication, 但在上述 `number_of_replicas` 中設置了 replication 數量為 1
+
+這時可以按需要修改 index 配置, 將 replication 數量修改為 0:
+
+```
+PUT /test-index-users/_settings
+{
+  "settings": {
+    "number_of_replicas": 0
+  }
+}
+```
+
+再次查看狀態:
+
+```
+green open test-index-users                          LSaIB57XSC6uVtGQHoPYxQ 1 1     1    0   4.4kb   4.4kb
+```
+
+## Open/Close Index
+
+一旦 index 被關閉, 則此 index 只能顯示 metadata, 無法進行任何讀寫操作:
+
+```json
+POST /test-index-users/_close
+```
+
+關閉 index 後再插入資料:
+
+```json
+POST /test-index-users/_doc
+{
+    "name" : "test user2",
+    "age" : 18,
+    "remarks" : "hello user2"
+}
+```
+
+會報 `index_closed_exception` 錯誤
+
+再打開 index:
+
+```json
+POST /test-index-users/_open
+```
+
+output:
+
+```json
+{
+    "acknowledged" : true,
+    "shards_acknowledged" : true
+}
+
+此時又可以重新寫入資料:
+
+```json
+POST /test-index-users/_doc
+{
+    "name" : "test user2",
+    "age" : 18,
+    "remarks" : "hello user2"
+}
+```
+
+## Delete Index
+
+將前面創建的 `test-index-users` 刪除:
+
+```json
+DELETE /test-index-users
+```
