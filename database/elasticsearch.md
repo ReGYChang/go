@@ -90,3 +90,109 @@ Elasticsearch 是基於 `Restful API`, 使用 `Java` 開發的 search engine, �
 `Kibana` 實現資料可視化, 其作用為將 Elasticsearch 中的資料以圖表的形式呈現, 且具有可擴展的使用者介面, 可以配置並管理 Elasticsearch
 
 Kibana 最早是基於 Logstash 創建的工具, 後被 Elastic 公司於 2013 年收購
+
+# Search and Aggregation
+
+可以通過 RESTful API 的方式對 Elasticsearch 進行操作
+
+## Add data to Elasticserach
+
+新增一筆資料到 Elasticsearch 中:
+
+```shell
+curl -X POST "localhost:9200/customer/_doc/1?pretty" -H 'Content-Type: application/json' -d'
+{
+  "name": "John Doe"
+}
+'
+```
+
+查詢剛才插入的 document:
+
+```shell
+curl -X GET "localhost:9200/customer/_doc/1?pretty"
+```
+
+output:
+
+```json
+{
+    "_index" : "customer",
+    "_type" : "_doc",
+    "_id" : "1",
+    "_version" : 1,
+    "_seq_no" : 0,
+    "_primary_term" : 1,
+    "found" : true,
+    "_source" : {
+        "name" : "John Doe"
+    }
+}
+```
+
+## Add data in bulk
+
+> ES 提供了批量操作, 使用批量處理 document 相對快很多, 節省了網絡往返的時間
+
+```shell
+curl -X PUT "localhost:9200/bank/_bulk?pretty" -H 'Content-Type: application/json' -d'
+{ "create":{ } }
+{ "account_number":1,"balance":39225,"firstname":"Amber","lastname":"Duke","age":32,"gender":"M","address":"880 Holmes Lane","employer":"Pyrami","email":"amberduke@pyrami.com","city":"Brogan","state":"IL" }
+{ "create":{ } }
+{ "account_number":6,"balance":5686,"firstname":"Hattie","lastname":"Bond","age":36,"gender":"M","address":"671 Bristol Street","employer":"Netagy","email":"hattiebond@netagy.com","city":"Dante","state":"TN" }
+{ "create":{ } }
+{ "account_number":13,"balance":32838,"firstname":"Nanette","lastname":"Bates","age":28,"gender":"F","address":"789 Madison Street","employer":"Quility","email":"nanettebates@quility.com","city":"Nogal","state":"VA" }
+{ "create":{ } }
+{ "account_number":18,"balance":4180,"firstname":"Dale","lastname":"Adams","age":33,"gender":"M","address":"467 Hutchinson Court","employer":"Boink","email":"daleadams@boink.com","city":"Orick","state":"MD" }
+{ "create":{ } }
+{ "account_number":20,"balance":16418,"firstname":"Elinor","lastname":"Ratliff","age":36,"gender":"M","address":"282 Kings Place","employer":"Scentric","email":"elinorratliff@scentric.com","city":"Ribera","state":"WA" }
+{ "create":{ } }
+{ "account_number":25,"balance":40540,"firstname":"Virginia","lastname":"Ayala","age":39,"gender":"F","address":"171 Putnam Avenue","employer":"Filodyne","email":"virginiaayala@filodyne.com","city":"Nicholson","state":"PA" }
+{ "create":{ } }
+{ "account_number":32,"balance":48086,"firstname":"Dillard","lastname":"Mcpherson","age":34,"gender":"F","address":"702 Quentin Street","employer":"Quailcom","email":"dillardmcpherson@quailcom.com","city":"Veguita","state":"IN" }
+{ "create":{ } }
+{ "account_number":37,"balance":18612,"firstname":"Mcgee","lastname":"Mooney","age":39,"gender":"M","address":"826 Fillmore Place","employer":"Reversus","email":"mcgeemooney@reversus.com","city":"Tooleville","state":"OK" }
+{ "create":{ } }
+{ "account_number":44,"balance":34487,"firstname":"Aurelia","lastname":"Harding","age":37,"gender":"M","address":"502 Baycliff Terrace","employer":"Orbalix","email":"aureliaharding@orbalix.com","city":"Yardville","state":"DE" }
+{ "create":{ } }
+{ "account_number":49,"balance":29104,"firstname":"Fulton","lastname":"Holt","age":23,"gender":"F","address":"451 Humboldt Street","employer":"Anocha","email":"fultonholt@anocha.com","city":"Sunriver","state":"RI" }
+'
+```
+
+# Index Modules
+
+> Index Modules are modules created per index and control all aspects related to an index.
+
+## Index Management
+
+在之前新增 document 時, 使用下面的方式會動態創建一個 customer 的 index:
+
+```shell
+curl -X POST "localhost:9200/customer/_doc/1?pretty" -H 'Content-Type: application/json' -d'
+{
+  "name": "John Doe"
+}
+'
+```
+
+這個 index 實際上已經自動創建了一個 mapping:
+
+```json
+{
+  "mappings": {
+    "_doc": {
+      "properties": {
+        "name": {
+          "type": "text",
+          "fields": {
+            "keyword": {
+              "type": "keyword",
+              "ignore_above": 256
+            }
+          }
+        }
+      }
+    }
+  }
+}
+```
