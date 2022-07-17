@@ -54,3 +54,39 @@ Elasticsearch 是基於 `Restful API`, 使用 `Java` 開發的 search engine, �
 | SELECT * FROM table | GET http://...         |
 | UPDATE table SET    | PUT http://...         |
 | DELETE              | DELETE http://...      |
+
+# Elastic Stack
+
+> Beats + Logstash + Elasticsearch + Kibana
+
+![elastic_search](img/elastic_stack.png)
+
+## Beats
+
+`Beats` 是一個輕量型採集器平台, 這些採集器可以從 edge mechine 向 `Logstash` 或 `Elasticsearch` 發送資料, 期由 Go 進行開發, 運行效率較高, 不同的 beats 套件針對不同的 data source
+
+## Logstash
+
+`Logstash` 是動態資料收集管道, 擁有可擴充的 plugin 生態, 支持從不同來源收集資料並轉換, 最後將資料發送到不同的資料庫中, 能與 Elasticsearch 產生強大的協同作用, 在 2013 年被 Elastic 公司收購
+
+其具有以下特性:
+- 實時解析與轉化資料
+- 可擴展性
+- 可用性, 會通過持久話隊列來保證至少將運行中的事件送達一次
+- 安全性, 可對資料進行傳輸加密
+- 可監控
+
+## Elasticsearch
+
+`Elasticsearch` 可對資料進行搜尋, 分析和儲存, 其是基於 `JSON` 的分散式搜尋和分析引擎, 專門為了實現水平擴展性, 高可用性及管理便攜性而設計
+
+其實現原理主要分為以下幾個步驟:
+- 將資料提交到 Elasticsearch 中
+- 通過分詞器將對應語句分詞
+- 將分詞結果及權重一並存入, 在搜尋資料時根據權重將結果排名並返回
+
+## Kibana
+
+`Kibana` 實現資料可視化, 其作用為將 Elasticsearch 中的資料以圖表的形式呈現, 且具有可擴展的使用者介面, 可以配置並管理 Elasticsearch
+
+Kibana 最早是基於 Logstash 創建的工具, 後被 Elastic 公司於 2013 年收購
