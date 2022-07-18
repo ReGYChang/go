@@ -15,6 +15,10 @@
   - [Open/Close Index](#openclose-index)
 - [Document Operations](#document-operations)
   - [Create Document](#create-document)
+  - [Search Document](#search-document)
+  - [Update Document](#update-document)
+  - [Delete Document](#delete-document)
+  - [Bulk Operations](#bulk-operations)
 
 # What is Elasticsearch?
 
@@ -433,4 +437,256 @@ PUT test_index/_doc/1?op_type=create
   "name": "Regy3"
 }
 ```
->❗️NOTE: op_type=create 强制执行时，若id已存在，ES会报“version_conflict_engine_exception”。op_type 属性在实践中同步数据时是有用的，后面讲解数据库与ES的数据同步问题时，test再为大家详细讲解。
+>❗️NOTE: `op_type=create` 強制執行時若 id 已存在, ES 會報`version_conflict_engine_exception`, `op_type` 主要應用於同步資料場景
+
+此時可以查詢資料:
+
+```json
+GET /test_index/_doc/_search
+{
+  "took": 1,
+  "timed_out": false,
+  "_shards": {
+    "total": 1,
+    "successful": 1,
+    "skipped": 0,
+    "failed": 0
+  },
+  "hits": {
+    "total": 2,
+    "max_score": 1,
+    "hits": [
+      {
+        "_index": "test_index",
+        "_type": "_doc",
+        "_id": "1",
+        "_score": 1,
+        "_source": {
+          "name": "Regy"
+        }
+      },
+      {
+        "_index": "test_index",
+        "_type": "_doc",
+        "_id": "P7-FCHIBJxE1TMY0WNGN",
+        "_score": 1,
+        "_source": {
+          "name": "Regy2"
+        }
+      }
+    ]
+  }
+}
+```
+
+## Search Document
+
+```json
+# 根據 id 查詢單筆資料
+GET /test_index/_doc/1
+
+# output--->
+{
+  "_index": "test_index",
+  "_type": "_doc",
+  "_id": "1",
+  "_version": 5,
+  "found": true,
+  "_source": {
+    "name": "Regy-update",
+    "age": 18
+  }
+}
+
+# 獲取 index 中所有資料
+GET /test_index/_doc/_search
+
+# output--->
+{
+  "took": 1,
+  "timed_out": false,
+  "_shards": {
+    "total": 1,
+    "successful": 1,
+    "skipped": 0,
+    "failed": 0
+  },
+  "hits": {
+    "total": 3,
+    "max_score": 1,
+    "hits": [
+      {
+        "_index": "test_index",
+        "_type": "_doc",
+        "_id": "P7-FCHIBJxE1TMY0WNGN",
+        "_score": 1,
+        "_source": {
+          "name": "Regy2"
+        }
+      },
+      {
+        "_index": "test_index",
+        "_type": "_doc",
+        "_id": "_update",
+        "_score": 1,
+        "_source": {
+          "name": "Regy3"
+        }
+      },
+      {
+        "_index": "test_index",
+        "_type": "_doc",
+        "_id": "1",
+        "_score": 1,
+        "_source": {
+          "name": "Regy-update",
+          "age": 18
+        }
+      }
+    ]
+  }
+}
+
+# 條件查詢
+GET /test_index/_doc/_search
+{
+  "query": {
+    "match": {
+      "name": "2"
+    }
+  }
+}
+
+# output--->
+{
+  "took": 1,
+  "timed_out": false,
+  "_shards": {
+    "total": 1,
+    "successful": 1,
+    "skipped": 0,
+    "failed": 0
+  },
+  "hits": {
+    "total": 1,
+    "max_score": 0.9808292,
+    "hits": [
+      {
+        "_index": "test_index",
+        "_type": "_doc",
+        "_id": "P7-FCHIBJxE1TMY0WNGN",
+        "_score": 0.9808292,
+        "_source": {
+          "name": "Regy2"
+        }
+      }
+    ]
+  }
+}
+```
+
+## Update Document
+
+```json
+# 根據 id 修改單筆資料
+PUT /test_index/_doc/1?pretty
+{
+  "name": "Regy-update-after"
+}
+# 根據查詢條件 id=10, 修改 name=after name
+POST test_index/_update_by_query
+{
+  "script": {
+    "source": "ctx._source.name = params.name",
+    "lang": "painless",
+    "params":{
+      "name":"after name"
+    }
+  },
+  "query": {
+    "term": {
+      "id": "10"
+    }
+  }
+}
+```
+
+>❗️NOTE: 修改語法和新增語法相同, 可以理解為根據 ID, 資料存在則更新; 不存在則新增
+
+## Delete Document
+
+```json
+# 根據 id 刪除單筆資料
+DELETE /test_index/_doc/1
+
+# delete by query
+POST test_index/_delete_by_query
+{
+  "query": {
+    "match": {
+     "name": "2"
+    }
+  }
+}
+```
+
+## Bulk Operations
+
+```json
+POST _bulk
+{ "index" : { "_index" : "test_test1", "_type" : "_doc", "_id" : "1" } }
+{ "this_is_field1" : "this_is_index_value" }
+{ "delete" : { "_index" : "test_test1", "_type" : "_doc", "_id" : "2" } }
+{ "create" : { "_index" : "test_test1", "_type" : "_doc", "_id" : "3" } }
+{ "this_is_field3" : "this_is_create_value" }
+{ "update" : {"_id" : "1", "_type" : "_doc", "_index" : "test_test1"} }
+{ "doc" : {"this_is_field2" : "this_is_update_value"} }
+
+# 查詢所有資料
+GET /test_test1/_doc/_search
+
+# output--->
+{
+  "took": 33,
+  "timed_out": false,
+  "_shards": {
+    "total": 5,
+    "successful": 5,
+    "skipped": 0,
+    "failed": 0
+  },
+  "hits": {
+    "total": 2,
+    "max_score": 1,
+    "hits": [
+      {
+        "_index": "test_test1",
+        "_type": "_doc",
+        "_id": "1",
+        "_score": 1,
+        "_source": {
+          "this_is_field1": "this_is_index_value",
+          "this_is_field2": "this_is_update_value"
+        }
+      },
+      {
+        "_index": "test_test1",
+        "_type": "_doc",
+        "_id": "3",
+        "_score": 1,
+        "_source": {
+          "this_is_field3": "this_is_create_value"
+        }
+      }
+    ]
+  }
+}
+```
+
+>💡 POST _bulk 做了哪些操作?
+- 若 index `test_test1` 不存在則創建, 同時若 id=1 document 存在則更新
+- 刪除 id=2 document
+- 新增 id=3 document; 若 document 存在則報 exception
+- 更新 id=1 document
+
+> 實際環境中 bulk operation 使用較多, 其可大幅縮減 IO 以提升效率
