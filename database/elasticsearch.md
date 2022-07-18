@@ -1,4 +1,20 @@
-
+- [What is Elasticsearch?](#what-is-elasticsearch)
+- [Elasticsearch Basic Concept](#elasticsearch-basic-concept)
+- [Elastic Stack](#elastic-stack)
+  - [Beats](#beats)
+  - [Logstash](#logstash)
+  - [Elasticsearch](#elasticsearch)
+  - [Kibana](#kibana)
+- [Index Modules](#index-modules)
+  - [Index Management](#index-management)
+  - [Index Format](#index-format)
+  - [Create Index](#create-index)
+  - [Search Index](#search-index)
+  - [Update Index](#update-index)
+  - [Delete Index](#delete-index)
+  - [Open/Close Index](#openclose-index)
+- [Document Operations](#document-operations)
+  - [Create Document](#create-document)
 
 # What is Elasticsearch?
 
@@ -91,74 +107,6 @@ Elasticsearch 是基於 `Restful API`, 使用 `Java` 開發的 search engine, �
 
 Kibana 最早是基於 Logstash 創建的工具, 後被 Elastic 公司於 2013 年收購
 
-# Search and Aggregation
-
-可以通過 RESTful API 的方式對 Elasticsearch 進行操作
-
-## Add data to Elasticserach
-
-新增一筆資料到 Elasticsearch 中:
-
-```shell
-curl -X POST "localhost:9200/customer/_doc/1?pretty" -H 'Content-Type: application/json' -d'
-{
-  "name": "John Doe"
-}
-'
-```
-
-查詢剛才插入的 document:
-
-```shell
-curl -X GET "localhost:9200/customer/_doc/1?pretty"
-```
-
-output:
-
-```json
-{
-    "_index" : "customer",
-    "_type" : "_doc",
-    "_id" : "1",
-    "_version" : 1,
-    "_seq_no" : 0,
-    "_primary_term" : 1,
-    "found" : true,
-    "_source" : {
-        "name" : "John Doe"
-    }
-}
-```
-
-## Add data in bulk
-
-> ES 提供了批量操作, 使用批量處理 document 相對快很多, 節省了網絡往返的時間
-
-```shell
-curl -X PUT "localhost:9200/bank/_bulk?pretty" -H 'Content-Type: application/json' -d'
-{ "create":{ } }
-{ "account_number":1,"balance":39225,"firstname":"Amber","lastname":"Duke","age":32,"gender":"M","address":"880 Holmes Lane","employer":"Pyrami","email":"amberduke@pyrami.com","city":"Brogan","state":"IL" }
-{ "create":{ } }
-{ "account_number":6,"balance":5686,"firstname":"Hattie","lastname":"Bond","age":36,"gender":"M","address":"671 Bristol Street","employer":"Netagy","email":"hattiebond@netagy.com","city":"Dante","state":"TN" }
-{ "create":{ } }
-{ "account_number":13,"balance":32838,"firstname":"Nanette","lastname":"Bates","age":28,"gender":"F","address":"789 Madison Street","employer":"Quility","email":"nanettebates@quility.com","city":"Nogal","state":"VA" }
-{ "create":{ } }
-{ "account_number":18,"balance":4180,"firstname":"Dale","lastname":"Adams","age":33,"gender":"M","address":"467 Hutchinson Court","employer":"Boink","email":"daleadams@boink.com","city":"Orick","state":"MD" }
-{ "create":{ } }
-{ "account_number":20,"balance":16418,"firstname":"Elinor","lastname":"Ratliff","age":36,"gender":"M","address":"282 Kings Place","employer":"Scentric","email":"elinorratliff@scentric.com","city":"Ribera","state":"WA" }
-{ "create":{ } }
-{ "account_number":25,"balance":40540,"firstname":"Virginia","lastname":"Ayala","age":39,"gender":"F","address":"171 Putnam Avenue","employer":"Filodyne","email":"virginiaayala@filodyne.com","city":"Nicholson","state":"PA" }
-{ "create":{ } }
-{ "account_number":32,"balance":48086,"firstname":"Dillard","lastname":"Mcpherson","age":34,"gender":"F","address":"702 Quentin Street","employer":"Quailcom","email":"dillardmcpherson@quailcom.com","city":"Veguita","state":"IN" }
-{ "create":{ } }
-{ "account_number":37,"balance":18612,"firstname":"Mcgee","lastname":"Mooney","age":39,"gender":"M","address":"826 Fillmore Place","employer":"Reversus","email":"mcgeemooney@reversus.com","city":"Tooleville","state":"OK" }
-{ "create":{ } }
-{ "account_number":44,"balance":34487,"firstname":"Aurelia","lastname":"Harding","age":37,"gender":"M","address":"502 Baycliff Terrace","employer":"Orbalix","email":"aureliaharding@orbalix.com","city":"Yardville","state":"DE" }
-{ "create":{ } }
-{ "account_number":49,"balance":29104,"firstname":"Fulton","lastname":"Holt","age":23,"gender":"F","address":"451 Humboldt Street","employer":"Anocha","email":"fultonholt@anocha.com","city":"Sunriver","state":"RI" }
-'
-```
-
 # Index Modules
 
 > Index Modules are modules created per index and control all aspects related to an index.
@@ -227,111 +175,191 @@ PUT /my_index
 
 ## Create Index
 
-首先創建一個 `user index test-index-users`, 其中包含三個屬性: `name`, `age`, `remarks`, 儲存在一個 shard 及 一個 replication 上
-
 ```json
-PUT /test-index-users
+# create index test_index
+PUT /test_index?pretty
 {
+# index settings
   "settings": {
-		"number_of_shards": 1,
-		"number_of_replicas": 1
-	},
+    "index": {
+      "number_of_shards": 1, # shard 數量為 1, default 5
+      "number_of_replicas": 1 # replication 數量 1, default 1
+    }
+  },
+# index mapping
   "mappings": {
-    "properties": {
-      "name": {
-        "type": "text",
-        "fields": {
-          "keyword": {
-            "type": "keyword",
-            "ignore_above": 256
-          }
+    "_doc": { # 型別, 建議設置為 _doc
+      "dynamic": false, # 動態映射配置
+# field properties
+      "properties": {
+        "id": {
+          "type": "integer"  # 表示 field id 型別為 integer
+        },
+        "name": {
+          "type": "text",
+          "analyzer": "ik_max_word", # 儲存時使用的分詞器
+          "search_analyzer": "ik_smart"  # 查詢時使用的分詞器
+        },
+        "createAt": {
+          "type": "date"
         }
-      },
-      "age": {
-        "type": "long"
-      },
-      "remarks": {
-        "type": "text"
       }
     }
   }
 }
 ```
 
+>❗️NOTE: `dynamic` 為動態映射配置, 有三種狀態: true, 動態新增新的 field; false, 忽略新的 field, 不會新增 field mapping, 但會存在於 `_source` 中; strict, 若遇到新 field 會拋出 exception
+
+output:
+
+```json
+{
+  "acknowledged": true, # 是否在 cluster 中成功創建 index
+  "shards_acknowledged": true,
+  "index": "test_index"
+}
+```
+
+## Search Index
+
+```json
+# 查看 index
+GET /test_index
+
+# 可以同時查看多個 index
+GET /test_index,other_index
+
+# 查看所有 index
+GET /_cat/indices?v
+```
+
 output:
 
 ```json
 {
-    "acknowledged" : true,
-    "shards_acknowledged" : true,
-    "index" : "test-index-users"
-}
-```
-
-新增資料測試:
-
-```json
-POST /test-index-users/_doc
-{
-    "name" : "pdai test name",
-    "age" : 18,
-    "remarks" : "hello world"
-}
-```
-
-查詢資料測試:
-
-```json
-GET /test-index-users/_search
-{
-    "query" : {"match_all" : {}}
-}
-```
-
-測試不匹配的資料型別(age):
-
-```json
-POST /test-index-users/_doc
-{
-  "name": "test user",
-  "age": "error_age",
-  "remarks": "hello eeee"
-}
-```
-
-會報 `mapper parsing exception` 的錯誤
-
-## Update Index
-
-查看剛才創建的 index:
-
-```shell
-curl 'localhost:9200/_cat/indices?v' | grep users
-```
-
-output:
-
-```
-yellow open test-index-users                          LSaIB57XSC6uVtGQHoPYxQ 1 1     1    0   4.4kb   4.4kb
-```
-
-這邊需注意剛創建的 index status 為 `yellow`, 因為測試環境為單節點環境, 無法創建 replication, 但在上述 `number_of_replicas` 中設置了 replication 數量為 1
-
-這時可以按需要修改 index 配置, 將 replication 數量修改為 0:
-
-```
-PUT /test-index-users/_settings
-{
-  "settings": {
-    "number_of_replicas": 0
+  "test_index": {
+    "aliases": {},
+    "mappings": {
+      "_doc": {
+        "dynamic": "false",
+        "properties": {
+          "createAt": {
+            "type": "date"
+          },
+          "id": {
+            "type": "integer"
+          },
+          "name": {
+            "type": "text",
+            "analyzer": "ik_max_word",
+            "search_analyzer": "ik_smart"
+          }
+        }
+      }
+    },
+    "settings": {
+      "index": {
+        "creation_date": "1589271136921",
+        "number_of_shards": "1",
+        "number_of_replicas": "1",
+        "uuid": "xueDIxeUQnGBQTms65wA6Q",
+        "version": {
+          "created": "6050499"
+        },
+        "provided_name": "test_index"
+      }
+    }
   }
 }
 ```
 
-再次查看狀態:
+## Update Index
 
+> ES 提供了一系列針對 index 修改的語法, 包括 replication 數量, 新增 field, refresh_interval, index parser, aliases 等配置的修改
+
+```json
+# 修改 replication
+PUT /test_index/_settings
+{
+    "index" : {
+        "number_of_replicas" : 2
+    }
+}
+
+# 修改 shard 刷新時間, default 為 1s
+PUT /test_index/_settings
+{
+    "index" : {
+        "refresh_interval" : "2s"
+    }
+}
+
+# 新增 field age
+PUT /teset_index/_mapping/_doc
+{
+  "properties": {
+    "age": {
+      "type": "integer"
+    }
+  }
+}
 ```
-green open test-index-users                          LSaIB57XSC6uVtGQHoPYxQ 1 1     1    0   4.4kb   4.4kb
+
+修改完成後再次查看 index config:
+
+```json
+GET /test_index
+{
+  "test_index": {
+    "aliases": {},
+    "mappings": {
+      "_doc": {
+        "dynamic": "false",
+        "properties": {
+          "age": { #
+            "type": "integer"
+          },
+          "createAt": {
+            "type": "date"
+          },
+          "id": {
+            "type": "integer"
+          },
+          "name": {
+            "type": "text",
+            "analyzer": "ik_max_word",
+            "search_analyzer": "ik_smart"
+          }
+        }
+      }
+    },
+    "settings": {
+      "index": {
+        "refresh_interval": "2s", #
+        "number_of_shards": "1", #
+        "provided_name": "test_index",
+        "creation_date": "1589271136921",
+        "number_of_replicas": "2",
+        "uuid": "xueDIxeUQnGBQTms65wA6Q",
+        "version": {
+          "created": "6050499"
+        }
+      }
+    }
+  }
+}
+```
+
+## Delete Index
+
+```json
+# 刪除 index
+DELETE /test_index
+
+# 驗證 index 是否存在
+HEAD test_index
+return: 404 - Not Found
 ```
 
 ## Open/Close Index
@@ -380,10 +408,29 @@ POST /test-index-users/_doc
 }
 ```
 
-## Delete Index
+# Document Operations
 
-將前面創建的 `test-index-users` 刪除:
+可以通過 RESTful API 的方式對 Elasticsearch document 進行操作
+
+## Create Document
 
 ```json
-DELETE /test-index-users
+# 新增單筆資料並指定 document id 為 1
+PUT /test_index/_doc/1?pretty
+{
+  "name": "Regy"
+}
+
+# 新增單筆資料並自動生成 document id
+POST /test_index/_doc?pretty
+{
+  "name": "Regy2"
+}
+
+# 使用 op_type 属性，强制执行某种操作
+PUT test_index/_doc/1?op_type=create
+{
+  "name": "Regy3"
+}
 ```
+>❗️NOTE: op_type=create 强制执行时，若id已存在，ES会报“version_conflict_engine_exception”。op_type 属性在实践中同步数据时是有用的，后面讲解数据库与ES的数据同步问题时，test再为大家详细讲解。
