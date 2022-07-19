@@ -15,6 +15,15 @@
   - [Printing](#printing)
     - [Sample](#sample)
     - [Placeholder](#placeholder)
+- [Encoding/Decoding](#encodingdecoding)
+  - [encoding/json](#encodingjson)
+  - [JSON Encoding](#json-encoding)
+    - [Data Type Mapping](#data-type-mapping)
+  - [JSON Decoding](#json-decoding)
+    - [Data Type Mapping](#data-type-mapping-1)
+  - [Decode Unknown JSON data](#decode-unknown-json-data)
+  - [Visit Decoding JSON data](#visit-decoding-json-data)
+  - [Decode JSON From Stream](#decode-json-from-stream)
 
 # I/O
 
@@ -299,7 +308,7 @@ type Seeker interface {
 
 > 官方文件關於此 interface methods 說明:
 
-Seek 設置下一次 Read 或 Write 的偏移量為 offset, 它的解釋取決於 whence： 
+Seek 設置下一次 Read 或 Write 的偏移量為 offset, 它的解釋取決於 whence 
 - 0 表示相對於文件的起始處
 - 1 表示相對於當前的偏移
 - 2 表示相對於其結尾處, Seek 返回新的偏移量和一個錯誤(如果有的話)
@@ -505,24 +514,347 @@ func main() {
 
 ### Placeholder
 
-|format|	meaning|
-|--|--|
-|%%|	A% literal|
-|%b|	A binary integer value (Radix 2), or a floating-point number with exponent 2 expressed in scientific counting|
-|%c|	Character type. You can input numbers according toASCII codeThe corresponding character is converted to the corresponding character|
-|%d|	A decimal value (base 10)|
-|%e|	A floating-point number or complex number represented by scientific notation E|
-|%E|	A floating-point number or complex number represented by scientific notation E|
-|%f|	A floating point number or complex number represented by standard counting|
-|%g|	Floating point number or complex number represented by% e or% F, either of which is output in the most compact way|
-|%G|	Floating point number or complex number represented by% e or% F, either of which is output in the most compact way|
-|%o|	An octal numeric value (base 8)|
-|%p|	The address of a value in hexadecimal (base 16), prefixed with0x, the letters are lowercasea - fexpress.|
-|%q|	Use go syntax and escape when necessary, string or byte slice [] byte enclosed in double quotation marks, or number enclosed in single quotation marks|
-|%s|	String. Outputs the characters in the string up to the empty characters in the string (string in characters)\0End, this\0(i.e. null character)|
-|%t|	withtrueperhapsfalseBoolean value of output|
-|%T|	The type of value output using go syntax|
-|%U|	An integer code point represented in Unicode notation. The default value is 4 numeric characters|
-|%v|	The built-in or user-defined value output in the default format, or the user-defined value output in the string () mode of its type, if this method exists|
-|%x|	Integer value in hexadecimal (base is hexadecimal), numbera-fUse lowercase representation|
-|%X|	Integer value in hexadecimal (base is hexadecimal), numberA-FUse uppercase|
+| format | meaning                                                                                                                                                    |
+| ------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| %%     | A% literal                                                                                                                                                 |
+| %b     | A binary integer value (Radix 2), or a floating-point number with exponent 2 expressed in scientific counting                                              |
+| %c     | Character type. You can input numbers according toASCII codeThe corresponding character is converted to the corresponding character                        |
+| %d     | A decimal value (base 10)                                                                                                                                  |
+| %e     | A floating-point number or complex number represented by scientific notation E                                                                             |
+| %E     | A floating-point number or complex number represented by scientific notation E                                                                             |
+| %f     | A floating point number or complex number represented by standard counting                                                                                 |
+| %g     | Floating point number or complex number represented by% e or% F, either of which is output in the most compact way                                         |
+| %G     | Floating point number or complex number represented by% e or% F, either of which is output in the most compact way                                         |
+| %o     | An octal numeric value (base 8)                                                                                                                            |
+| %p     | The address of a value in hexadecimal (base 16), prefixed with0x, the letters are lowercasea - fexpress.                                                   |
+| %q     | Use go syntax and escape when necessary, string or byte slice [] byte enclosed in double quotation marks, or number enclosed in single quotation marks     |
+| %s     | String. Outputs the characters in the string up to the empty characters in the string (string in characters)\0End, this\0(i.e. null character)             |
+| %t     | withtrueperhapsfalseBoolean value of output                                                                                                                |
+| %T     | The type of value output using go syntax                                                                                                                   |
+| %U     | An integer code point represented in Unicode notation. The default value is 4 numeric characters                                                           |
+| %v     | The built-in or user-defined value output in the default format, or the user-defined value output in the string () mode of its type, if this method exists |
+| %x     | Integer value in hexadecimal (base is hexadecimal), numbera-fUse lowercase representation                                                                  |
+| %X     | Integer value in hexadecimal (base is hexadecimal), numberA-FUse uppercase                                                                                 |
+
+# Encoding/Decoding
+
+## encoding/json
+
+Go 語言 build-in package `encoding/json` 提供了一系列方法進行 json 編解碼, 下列逐一介紹這些方法
+
+## JSON Encoding
+
+可以通過 `encoding/json` package 的 `Marshal()` 函數將資料編碼為 JSON 文本, 此函數簽名如下:
+
+```go
+func Marshal(v interface{}) ([]byte, error)
+```
+
+傳入參數 `v` 為 interface, 意味著可以傳入任意型別的資料, 若編碼成功則返回對應的 JSON 格式文本, 失敗則透過 `error` 參數標示錯誤訊息
+
+假設有一個 `User` 型別的 struct:
+
+```go
+type User struct { 
+    Name string
+    Website string
+    Age  uint
+    Male bool
+    Skills []string
+}
+```
+
+並通過以下形式對其初始化:
+
+```go
+user := User{
+    "regy",
+	"https://regy.dev",
+	18,
+	true,
+	[]string{"Golang", "PHP", "C", "Java", "Python"},
+}
+```
+
+隨後可以使用 `json.Marshal()` 函數將上述 `user` instance 編碼成 JSON 文本:
+
+```go
+u, err := json.Marshal(user)
+```
+
+完整程式碼如下:
+
+```go
+# src/note/json/basic.go
+package main
+
+import (
+	"encoding/json"
+	"fmt"
+)
+
+type User struct {
+	Name string
+	Website string
+	Age  uint
+	Male bool
+	Skills []string
+}
+
+func main()  {
+	user := User{
+		"regy",
+		"https://regy.dev",
+		18,
+		true,
+		[]string{"Golang", "PHP", "C", "Java", "Python"},
+	}
+
+	u, err := json.Marshal(user)
+	if err != nil {
+		fmt.Printf("JSON encoding failed: %v\n", err)
+		return
+	}
+
+	fmt.Printf("JSON data: %s\n", u)
+}
+```
+
+若編碼成功則 `err` 為 `nil`, output:
+
+```go
+JSON data: {"Name":"regy","Website":"https://regy.dev","Age":18,"Male":true,"Skills":["Golang","PHP","C","Java","Python"]}
+```
+
+底層實現邏輯為當調用 `json.Marshal(user)` 時會遍歷 `user` struct, 若發現 `user` 資料結構實現了 `json.Marshaler` interface 且包含有效的值, `Marshal()` 則會調用 `MarshalJSON()` 方法透過此資料結構生成 JSON 格式文本
+
+### Data Type Mapping
+
+除了 `channel`, `complex` 和函數幾種型別以外, Go 中大部分的資料型別都可以編碼為有效的 JSON 文本, 若編碼前的資料結構中出現 pointer, 則將編碼 pointer 所指向的值; 若指向零值, 則 `null` 將作為編碼後的結果
+
+Go 中 JSON 編碼前後的資料型別映射如下:
+- `bool` 編碼後依舊為 `bool`
+- `float` 和 `int` 編碼後為 JSON 常規數字
+- `string` 將以 `UTF-8` 編碼輸出為 `Unicode` 字符串, 特殊字符將為被轉義為 `\u003c`
+- `array` 和 `slice` 會編碼為 JSON 中的 array, 但 `[]byte` 型別的值會被編碼為 `Base64` 編碼後的字符串, `slice` 型別的零值會被編碼為 `null`
+- `struct` 會被編碼為 JSON Object, 且只有 struct 中大寫字母開頭的 field 才會被編碼輸出為 JSON Object string key
+- 編碼一個 `map` 型別資料結構時, 其型別必須為 `map[string]T`(T 為 `encoding/json 支持的任意資料型別`)
+
+## JSON Decoding
+
+與 `json.Marshal()` 相對, 可以使用 `json.Unmarshal()` 函數將 JSON 解碼為 Go 中對應的資料結構
+
+`json.Unmarshal()` 函數簽名如下:
+
+```go
+func Unmarshal(data []byte, v interface{}) error
+```
+
+解碼 JSON 資料前首先需要在 Go 中宣告一個目標型別的實體物件用於解碼後的值:
+
+```go
+var user User
+```
+
+再調用 `json.Unmarshal()` 函數將 `[]byte` 型別的 JSON 資料作為第一個參數傳入, 將 `user` 實體變數指針作為第二個參數傳入:
+
+```go
+err := json.Unmarshal(u, &user)
+```
+
+若 `u` 為有效 JSON 資料並能與 `user` struct 對應, 則 JSON 解碼後的值會一一存放到 `user` struct 對應 field 中
+
+JSON decoding sample code:
+
+```go
+...
+
+func main()  {
+	...
+
+	u, err := json.Marshal(user)
+	...
+
+	var user2 User
+	err = json.Unmarshal(u, &user2)
+	if err != nil {
+		fmt.Printf("JSON decoding failed: %v\n", err)
+	}
+		return
+
+	fmt.Printf("JSON decoding result: %#v\n", user2)
+}
+```
+
+解碼成功後的 `user2` 資料如下:
+
+```go
+JSON decoding result: main.User{Name:"regy", Website:"https://regy.dev", Age:0x12, Male:true, Skills:[]string{"Golang", "PHP", "C", "Java", "Python"}}
+```
+
+### Data Type Mapping
+
+實際上, json.Unmarshal() 函數會根據一個約定的順序查找目標結構中的字段, 如果找到一個即發生匹配
+
+假設某個 JSON 對像有一個名為 `Foo` 的索引 (不區分大小寫), 要將 `Foo` 所對應的值填充到目標結構體的目標字段上, `json.Unmarshal()` 將會遵循如下順序進行查找匹配:
+
+- 一個包含 Foo 標籤的字段 (不區分大小寫)
+- 一個名為 Foo 或者除了首字母其他字母不區分大小寫的名為 Foo 的字段 (這些字段在類型聲明中必須都是以大寫字母開頭、可被外部訪問的公開字段)
+
+後面兩個比較好理解, 第一個我們在微服務架構教程中通過 protoc 生成的原型文件裡面經常可以看到:
+
+```go
+type User struct {
+    Id  string `protobuf:"bytes,1,opt,name=id,proto3" json:"id"`
+    Name string `protobuf:"bytes,2,opt,name=name,proto3" json:"name"`
+    Email string `protobuf:"bytes,3,opt,name=email,proto3" json:"email"`
+    Password string `protobuf:"bytes,4,opt,name=password,proto3" json:"password"`
+}
+```
+
+這裡的 Name 被打上 `json:"name"` 標籤
+
+當 JSON 資料結構和 Go 語言裡邊的目標型別的結構對不上時, 會發生什麼呢?
+
+```go
+u2 := []byte(`{"name": "regy", "website": "https://regy.dev", "alias": "GOGOGO"}`)
+var user3 User
+err = json.Unmarshal(u2, &user3)
+if err != nil {
+fmt.Printf("JSON decoding failed: %v\n", err)
+	return
+}
+fmt.Printf("JSON decoding result: %#v\n", user3)
+```
+
+output:
+
+```go
+JSON decoding result: main.User{Name:"regy", Website:"https://regy.dev", Age:0x0, Male:false, Skills:[]string(nil)}
+```
+
+可以看到, 如果 JSON 中的字段在 Go 語言對應目標型別中不存在, `json.Unmarshal()` 函數在解碼過程中會丟棄該字段
+
+上述程式碼中由於 `Alias` 字段並沒有在 `User` 型別中定義, 所以會被忽略, 只有 `Name` 和 `Website` 這兩個字段的值才會被填充到 `user3` 中
+
+這個特性讓我們可以從同一段 JSON 數據中篩選指定的值填充到多個不同的 Go 語言型別中
+
+對於 JSON 中沒有而 `User` 中定義的字段, 會以對應數據類型的默認值填充, 比如上述 `Age`, `Male`, `Skills` 字段均是如此
+
+以上是在 JSON 結構已知情況下的解碼, 如果 JSON 結構是動態的或未知的, 又該怎麼處理呢?
+
+## Decode Unknown JSON data
+
+在 Go 中可以通過 `interface{}` 來表示任意資料型別, 同樣適用於未知結構的 JSON 資料解碼: 只需將這段 JSON 解碼輸出到一個 `interface{}` 型別的值即可
+
+在實際解碼過程中, JSON 結構中的資料元素將做以下型別轉換:
+
+- `boolean` 將會轉換為 Go 語言的 `bool` 型別
+- `數值`會被轉換為 Go 語言的 `float64` 型別
+- `字符串`轉換後還是 `string` 型別
+- `JSON Array` 會轉換為 `[]interface{}` 型別
+- `JSON Object` 會轉換為 `map[string]interface{}` 型別
+- `null` 值會轉換為 `nil`
+
+在 Go `encoding/json` 中允許使用 `map[string]interface{}` 和 `[]interface{}` 型別值來分別存放未知結構的 `JSON Object` 或 `Array`
+
+這次將解碼結果映射到 `interface{}` 物件:
+
+```go
+u3 := []byte(`{"name": "regy", "website": "https://regy.dev", "age": 18, "male": true, "skills": ["Golang", "PHP"]}`)
+var user4 interface{}
+err = json.Unmarshal(u3, &user4)
+if err != nil {
+    fmt.Printf("JSON decoding failed: %v\n", err)
+    return
+}
+fmt.Printf("JSON decoding result: %#v\n", user4)
+```
+
+上述程式碼中 `user4` 被定義為一個 `interface{}`, `json.Unmarshal()` 函數將一個 JSON Object 物件 `u3` 解碼輸出到 `user4` 中, 最終 `user4` 將會是一個 key-value pair 的 `map[string]interface{}` 結構:
+
+```go
+map[string]interface {}{"age":18, "male":true, "name":"regy", "skills":[]interface {}{"Golang", "PHP"}, "website":"https://regy.dev"}
+```
+
+`u3` 為一個 JSON Object, 內部屬性也會遵循上述型別轉換規則一一轉換
+
+## Visit Decoding JSON data
+
+取得解碼後的資料結構前須先判斷目標結構是否為預期的資料型別, 可通過 `for loop` 一一獲取解碼後的目標資料:
+
+```go
+user5, ok := user4.(map[string]interface{})
+if ok {
+    for k, v := range user5 {
+        switch v2 := v.(type) {
+        case string:
+            fmt.Println(k, "is string", v2)
+        case int:
+            fmt.Println(k, "is int", v2)
+        case bool:
+            fmt.Println(k, "is bool", v2)
+        case []interface{}:
+            fmt.Println(k, "is an array:")
+            for i, iv := range v2 {
+                fmt.Println(i, iv)
+            }
+        default:
+            fmt.Println(k, "is another type not handle yet")
+        }
+    }
+}
+```
+
+## Decode JSON From Stream
+
+此外 `encoding/json` 還提供了 `Decoder` 和 `Encoder` 兩個型別, 用於支持 JSON 資料的 stream read/write, 並提供 `NewDecoder()` 和 `NewEncoder()` 兩個函數用於實現:
+
+```go
+func NewDecoder(r io.Reader) *Decoder 
+func NewEncoder(w io.Writer) *Encoder
+```
+
+以下演示從 `Stdin` input stream 中讀取 JSON 資料並將其解碼, 最後再寫入 `Stdout`:
+
+```go
+# src/note/json/stream.go
+package main
+
+import (
+    "encoding/json"
+    "log"
+    "os"
+)
+
+func main() {
+    dec := json.NewDecoder(os.Stdin)
+    enc := json.NewEncoder(os.Stdout)
+    for {
+        var v map[string]interface{}
+        if err := dec.Decode(&v); err != nil {
+            log.Println(err)
+            return
+        }
+        if err := enc.Encode(&v); err != nil {
+            log.Println(err)
+        }
+    }
+}
+```
+
+須先輸入 JSON 結構資料供 `Stdin` input stream 讀取, 再通過 `json.NewDecoder` 返回的 decoder 對其進行解碼, 最後通過 `json.NewEncoder` 返回的編碼器將資料編碼後寫入 `Stdout` output stream 打印
+
+使用 `Decoder` 和 `Encoder` 對 data stream 進行處理應用更廣泛, 比如讀寫 `HTTP`, `WebSocket` 或檔案等, Go 標準庫 `net/rpc/jsonrpc` 就是應用了 `Decoder` 和 `Encoder` 的實際例子:
+
+```go
+// NewServerCodec returns a new rpc.ServerCodec using JSON-RPC on conn.
+func NewServerCodec(conn io.ReadWriteCloser) rpc.ServerCodec {
+    return &serverCodec{
+        dec:     json.NewDecoder(conn),
+        enc:     json.NewEncoder(conn),
+        c:       conn,
+        pending: make(map[uint64]*json.RawMessage),
+    }
+}
+```
