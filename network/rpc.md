@@ -10,6 +10,13 @@
     - [Server Streaming](#server-streaming)
     - [Client Streaming](#client-streaming)
     - [Bi-Directional Streaming](#bi-directional-streaming)
+  - [gRPC Server Source Code Review](#grpc-server-source-code-review)
+    - [Initialization](#initialization)
+    - [Register](#register)
+      - [Service API interface](#service-api-interface)
+      - [Service API IDL](#service-api-idl)
+      - [Register Service](#register-service)
+      - [Summary](#summary)
 - [Protobuf](#protobuf)
   - [Protobuf Setup](#protobuf-setup)
   - [Protobuf Example](#protobuf-example)
@@ -352,7 +359,141 @@ func printRoute(client pb.StreamServiceClient, r *pb.StreamRequest) error {
 }
 ```
 
+## gRPC Server Source Code Review
 
+Server
+
+```go
+func main() {
+  server := grpc.NewServer()
+  pb.RegisterSearchServiceServer(server, &SearchService{})
+
+  lis, err := net.Listen("tcp", ":"+PORT)
+  ...
+
+  server.Serve(lis)
+}
+```
+
+短短四行程式碼可以運行一個 gRPC server, 以下來拆解並一步步剖析 source code 是如何實現
+
+### Initialization
+
+```go
+// grpc.NewServer()
+func NewServer(opt ...ServerOption) *Server {
+ opts := defaultServerOptions
+ for _, o := range opt {
+  o(&opts)
+ }
+ s := &Server{
+  lis:    make(map[net.Listener]bool),
+  opts:   opts,
+  conns:  make(map[io.Closer]bool),
+  m:      make(map[string]*service),
+  quit:   make(chan struct{}),
+  done:   make(chan struct{}),
+  czData: new(channelzData),
+ }
+ s.cv = sync.NewCond(&s.mu)
+ ...
+
+ return s
+}
+```
+
+`NewServer` 函數主要是進行 `grpc.Server` 初始化的動作:
+- lis: 監聽地址 map
+- opts: service options, 包含 `Credentials`, `Interceptor` 及其他基礎配置
+- conns: client connection socket map
+- m: service infomation map
+- quit: quit signal
+- done: done signal
+- czData: 用於儲存 `ClientConn`, `addrConn 及 `Server` 的 `channelz` 相關資料
+- cv: graceful exit 會等待此 signal, 直到所有 RPC request 都處理完並斷開才會繼續處理
+
+### Register
+
+```go
+pb.RegisterSearchServiceServer(server, &SearchService{})
+```
+
+#### Service API interface
+
+```go
+// search.pb.go
+type SearchServiceServer interface {
+ Search(context.Context, *SearchRequest) (*SearchResponse, error)
+}
+
+func RegisterSearchServiceServer(s *grpc.Server, srv SearchServiceServer) {
+ s.RegisterService(&_SearchService_serviceDesc, srv)
+}
+```
+
+在生成出來的 `.pb.go` 檔案中, 會定義出 Service APIs interface 的具體實現約束
+
+在 gRPC Server 進行註冊時, 會傳入應用 Service 的功能 interface implementation, 此時生成的 `RegisterServer` 方法會保證兩者間的一致性
+
+#### Service API IDL
+
+`&_SearchService_serviceDesc` 有何作用? 程式碼如下:
+
+```go
+// search.pb.go
+var _SearchService_serviceDesc = grpc.ServiceDesc{
+ ServiceName: "proto.SearchService",
+ HandlerType: (*SearchServiceServer)(nil),
+ Methods: []grpc.MethodDesc{
+  {
+   MethodName: "Search",
+   Handler:    _SearchService_Search_Handler,
+  },
+ },
+ Streams:  []grpc.StreamDesc{},
+ Metadata: "search.proto",
+}
+```
+
+這段為 Service 的描述程式碼, 用來向 gRPC Server 內部表述自身具有什麼:
+- ServiceName: service name
+- HandlerType: service interface, 用於檢查使用者提供的 implementation 是否滿足 interface 要求
+- Methods: unary 方法集合, struct 內 `Handler` 方法對應最終的 RPC 處理方法, 在執行 RPC 方法時會使用
+- Metadata: 負責描述資料屬性, 這裡主要描述 `SearchServiceServer` service
+
+#### Register Service
+
+```go
+func (s *Server) register(sd *ServiceDesc, ss interface{}) {
+    ...
+ srv := &service{
+  server: ss,
+  md:     make(map[string]*MethodDesc),
+  sd:     make(map[string]*StreamDesc),
+  mdata:  sd.Metadata,
+ }
+ for i := range sd.Methods {
+  d := &sd.Methods[i]
+  srv.md[d.MethodName] = d
+ }
+ for i := range sd.Streams {
+  ...
+ }
+ s.m[sd.ServiceName] = srv
+}
+```
+
+最後一步會將先前的 service interface info, service description info 註冊到內部的 `service` 以便後續實際調用:
+- server: server interface info
+- md: unary service RPC 方法集合
+- sd: stream service
+- mdata: metadata
+
+#### Summary
+
+主要說明了 gRPC Server 啟動前的整理及註冊行為, 為後續運行預先準備:
+
+![grpc_register](img/grpc_register.png)
 
 # Protobuf
 
