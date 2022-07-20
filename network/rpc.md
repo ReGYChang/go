@@ -4,9 +4,15 @@
     - [Gob En/Deconding Rules](#gob-endeconding-rules)
     - [Gob En/Deconding in Go](#gob-endeconding-in-go)
 - [gRPC](#grpc)
-  - [Protobuf](#protobuf)
-    - [Protobuf Setup](#protobuf-setup)
-    - [Protobuf Demo](#protobuf-demo)
+  - [Communication Model](#communication-model)
+  - [Communication Type](#communication-type)
+    - [Unary RPC](#unary-rpc)
+    - [Server Streaming](#server-streaming)
+    - [Client Streaming](#client-streaming)
+    - [Bi-Directional Streaming](#bi-directional-streaming)
+- [Protobuf](#protobuf)
+  - [Protobuf Setup](#protobuf-setup)
+  - [Protobuf Example](#protobuf-example)
 
 # RPC
 
@@ -162,7 +168,193 @@ HTTP/2 則解決了這些問題, 並引入了新的機制:
 
 `gRPC` 默認使用 `protocol buffers`, 其為 Google 開源的一套成熟的結構化資料序列化標準
 
-## Protobuf
+## Communication Model
+
+![communication_model](img/communication_model.png)
+
+- gRPC Stub(Client) 調用 A 方法, 發起 RPC 調用
+- 對 request 資訊使用 `Protobuf` 進行物件序列化壓縮(IDL)
+- gRPC Server 收到 request 後解析 request body, 進行業務邏輯處理並返回
+- 對 response 使用 `Protobuf` 進行物件序列化壓縮(IDL)
+- gRPC Stub 收到 Server response, 解析 response body, callback A 方法並喚醒等待回應 (blocking) 的 client 調用並返回 response 結果
+
+## Communication Type
+
+### Unary RPC
+
+![grpc_type_unary](img/grpc_type_unary.png)
+
+Server
+
+```go
+type SearchService struct{}
+
+func (s *SearchService) Search(ctx context.Context, r *pb.SearchRequest) (*pb.SearchResponse, error) {
+    return &pb.SearchResponse{Response: r.GetRequest() + " Server"}, nil
+}
+
+const PORT = "9001"
+
+func main() {
+    server := grpc.NewServer()
+    pb.RegisterSearchServiceServer(server, &SearchService{})
+
+    lis, err := net.Listen("tcp", ":"+PORT)
+    ...
+
+    server.Serve(lis)
+}
+```
+
+- 創建 `gRPC Server` 物件, 其為 Server 端的抽象物件
+- 將 `SearchService`(其包含需被調用的 server side interface) 註冊到 `gRPC Server` 內部註冊中心, 接收到請求時可透過內部的 "service discovery" 機制找到對應 interface 並處理
+- 創建 `listener` 監聽 TCP connection
+- `gRPC Server` 開始 `lis.Accept` 直到 `Stop` 或 `GracefulStop`
+
+Client
+
+```go
+func main() {
+    conn, err := grpc.Dial(":"+PORT, grpc.WithInsecure())
+    ...
+    defer conn.Close()
+
+    client := pb.NewSearchServiceClient(conn)
+    resp, err := client.Search(context.Background(), &pb.SearchRequest{
+        Request: "gRPC",
+    })
+    ...
+}
+```
+
+- 創建與 Server 的 socket
+- 創建 `SearchService` 的 client object
+- 發送 RPC request, 等待同步回應, 得到 callback 後返回 response
+
+### Server Streaming
+
+![server_streaming](img/grpc_type_server_streaming.png)
+
+Server
+
+```go
+func (s *StreamService) List(r *pb.StreamRequest, stream pb.StreamService_ListServer) error {
+    for n := 0; n <= 6; n++ {
+        stream.Send(&pb.StreamResponse{
+            Pt: &pb.StreamPoint{
+                ...
+            },
+        })
+    }
+
+    return nil
+}
+```
+
+Client
+
+```go
+func printLists(client pb.StreamServiceClient, r *pb.StreamRequest) error {
+    stream, err := client.List(context.Background(), r)
+    ...
+
+    for {
+        resp, err := stream.Recv()
+        if err == io.EOF {
+            break
+        }
+        ...
+    }
+
+    return nil
+}
+```
+
+### Client Streaming
+
+![client_streaming](img/grpc_type_client_streaming.png)
+
+Server
+
+```go
+func (s *StreamService) Record(stream pb.StreamService_RecordServer) error {
+    for {
+        r, err := stream.Recv()
+        if err == io.EOF {
+            return stream.SendAndClose(&pb.StreamResponse{Pt: &pb.StreamPoint{...}})
+        }
+        ...
+
+    }
+
+    return nil
+}
+```
+
+Client
+
+```go
+func printRecord(client pb.StreamServiceClient, r *pb.StreamRequest) error {
+    stream, err := client.Record(context.Background())
+    ...
+
+    for n := 0; n < 6; n++ {
+        stream.Send(r)
+    }
+
+    resp, err := stream.CloseAndRecv()
+    ...
+
+    return nil
+}
+```
+
+### Bi-Directional Streaming
+
+![bi_directional_streaming](img/grpc_type_bi_directional_streaming.png)
+
+Server
+
+```go
+func (s *StreamService) Route(stream pb.StreamService_RouteServer) error {
+    for {
+        stream.Send(&pb.StreamResponse{...})
+        r, err := stream.Recv()
+        if err == io.EOF {
+            return nil
+        }
+        ...
+    }
+
+    return nil
+}
+```
+
+Client
+
+```go
+func printRoute(client pb.StreamServiceClient, r *pb.StreamRequest) error {
+    stream, err := client.Route(context.Background())
+    ...
+
+    for n := 0; n <= 6; n++ {
+        stream.Send(r)
+        resp, err := stream.Recv()
+        if err == io.EOF {
+            break
+        }
+        ...
+    }
+
+    stream.CloseSend()
+
+    return nil
+}
+```
+
+
+
+# Protobuf
 
 `Protocol buffers` 是一種與程式語言, 平台無耦合的資料交換格式, 用於序列化結構化資料, 較 XML, JSON 而言, `Protobuf` 序列化後的 data stream 更小, 傳輸速度更高, 且操作更簡單
 
@@ -190,7 +382,7 @@ HTTP/2 則解決了這些問題, 並引入了新的機制:
 
 
 
-### Protobuf Setup
+## Protobuf Setup
 
 Uncompress:
 
@@ -229,7 +421,7 @@ libprotoc 3.14.0
 go get google.golang.org/protobuf/cmd/protoc-gen-go
 ```
 
-### Protobuf Demo
+## Protobuf Example
 
 create `.proto` file: hello_world.proto
 
