@@ -17,6 +17,13 @@
       - [Service API IDL](#service-api-idl)
       - [Register Service](#register-service)
       - [Summary](#summary)
+    - [Listen](#listen)
+  - [gRPC Client](#grpc-client)
+    - [Create Socket Connection](#create-socket-connection)
+    - [Instantiated Service API](#instantiated-service-api)
+    - [Methods Call](#methods-call)
+    - [Connection](#connection)
+    - [Close Connection](#close-connection)
 - [Protobuf](#protobuf)
   - [Protobuf Setup](#protobuf-setup)
   - [Protobuf Example](#protobuf-example)
@@ -494,6 +501,215 @@ func (s *Server) register(sd *ServiceDesc, ss interface{}) {
 主要說明了 gRPC Server 啟動前的整理及註冊行為, 為後續運行預先準備:
 
 ![grpc_register](img/grpc_register.png)
+
+### Listen
+
+接下來就是 gRPC 初始化流程中最重要的部分: Listen / Request handle 的部分:
+
+```go
+func (s *Server) Serve(lis net.Listener) error {
+ ...
+ var tempDelay time.Duration
+ for {
+  rawConn, err := lis.Accept()
+  if err != nil {
+   if ne, ok := err.(interface {
+    Temporary() bool
+   }); ok && ne.Temporary() {
+    if tempDelay == 0 {
+     tempDelay = 5 * time.Millisecond
+    } else {
+     tempDelay *= 2
+    }
+    if max := 1 * time.Second; tempDelay > max {
+     tempDelay = max
+    }
+    ...
+    timer := time.NewTimer(tempDelay)
+    select {
+    case <-timer.C:
+    case <-s.quit:
+     timer.Stop()
+     return nil
+    }
+    continue
+   }
+   ...
+   return err
+  }
+  tempDelay = 0
+
+  s.serveWG.Add(1)
+  go func() {
+   s.handleRawConn(rawConn)
+   s.serveWG.Done()
+  }()
+ }
+}
+```
+
+`gRPC server` 會根據外部傳入的 Listener 不同而調用不同的 Listener mode, 這也是 `net.Listener` 的魅力所在, 靈活性及擴充性極高
+
+在 `gRPC server` 中最常用的是 `TCPConn`, 基於 `TCP Listener` 實現, 處理邏輯如下:
+
+![TCP_Conn](img/TCPConn.png)
+
+- loop 處理 connection, 通過 `lis.Accept` 取出 connection, 若 channel 中沒有需要處理的 connection 時 `block and wait`
+- 若 `lis.Accept` 失敗則觸發休眠機制, 若第一次失敗則休眠 5ms, 否則翻倍, 循環直至 1s, 休眠結束會嘗試讀取下一個 connection
+- 若 `lis.Accept` 成功則重置休眠時間計時器, 並啟動一個新的 goroutine 調用 `handleRawConn` 方法執行/處理新的 request
+- loop 過程中包含了 **"exit service"** 的場景, 主要分為 `shutdown` 及 `graceful shutdown` 兩種情況
+
+## gRPC Client
+
+```go
+func main() {
+  conn, err := grpc.Dial(":"+PORT, grpc.WithInsecure())
+  ...
+  defer conn.Close()
+
+  client := pb.NewSearchServiceClient(conn)
+  res, err := client.Search(context.Background(), &pb.SearchRequest{...})
+  ...
+}
+```
+
+### Create Socket Connection
+
+```go
+// grpc.Dial(":"+PORT, grpc.WithInsecure())
+func DialContext(ctx context.Context, target string, opts ...DialOption) (conn *ClientConn, err error) {
+ cc := &ClientConn{
+  target:            target,
+  csMgr:             &connectivityStateManager{},
+  conns:             make(map[*addrConn]struct{}),
+  dopts:             defaultDialOptions(),
+  blockingpicker:    newPickerWrapper(),
+  czData:            new(channelzData),
+  firstResolveEvent: grpcsync.NewEvent(),
+ }
+ ...
+ chainUnaryClientInterceptors(cc)
+ chainStreamClientInterceptors(cc)
+
+ ...
+}
+```
+
+`grpc.Dial` 方法實際上是對於 `grpc.DialContext` 的封裝, 區別在於 `ctx` 是直接傳入 `context.Background`
+
+其功能為創建並指定目標 client side connection, 並負責以下職責:
+- Initial ClientConn
+- Initial 基於 process LB 的 loading balance config
+- Initial channelz
+- Initial retry rules 和 client unary/stream interceptor
+- Initial protocol stack basic info
+- context timeout control
+- Initial & parse address info
+- Create connection between server
+
+### Instantiated Service API
+
+```go
+type SearchServiceClient interface {
+ Search(ctx context.Context, in *SearchRequest, opts ...grpc.CallOption) (*SearchResponse, error)
+}
+
+type searchServiceClient struct {
+ cc *grpc.ClientConn
+}
+
+func NewSearchServiceClient(cc *grpc.ClientConn) SearchServiceClient {
+ return &searchServiceClient{cc}
+}
+```
+
+### Methods Call
+
+```go
+// search.pb.go
+func (c *searchServiceClient) Search(ctx context.Context, in *SearchRequest, opts ...grpc.CallOption) (*SearchResponse, error) {
+ out := new(SearchResponse)
+ err := c.cc.Invoke(ctx, "/proto.SearchService/Search", in, out, opts...)
+ if err != nil {
+  return nil, err
+ }
+ return out, nil
+}
+```
+
+`proto` 產生的 RPC 方法像一層包裝, 把需要的東西放進去, 實際上還是調用 `grpc.invoke` 方法
+
+```go
+func invoke(ctx context.Context, method string, req, reply interface{}, cc *ClientConn, opts ...CallOption) error {
+ cs, err := newClientStream(ctx, unaryStreamDesc, cc, method, opts...)
+ if err != nil {
+  return err
+ }
+ if err := cs.SendMsg(req); err != nil {
+  return err
+ }
+ return cs.RecvMsg(reply)
+}
+```
+
+需關注三個地方的調用:
+- newClientStream: 獲取 transport layer `Transport` 並組合封裝到 `ClientStream` 中返回, 這部分會涉及 load balance, timeout control, encoding, stream 與 server 基本一致的行為
+- cs.SendMsg: 發送 RPC request, 但其並不負責 waiting response
+- cs.RecvMsg: Block & wait 收到的 RPC response
+
+### Connection
+
+```go
+// clientconn.go
+func (cc *ClientConn) getTransport(ctx context.Context, failfast bool, method string) (transport.ClientTransport, func(balancer.DoneInfo), error) {
+ t, done, err := cc.blockingpicker.pick(ctx, failfast, balancer.PickOptions{
+  FullMethodName: method,
+ })
+ if err != nil {
+  return nil, nil, toRPCErr(err)
+ }
+ return t, done, nil
+}
+```
+
+在 `newClientStream` 方法中, 通過 `getTransport` 方法獲取了 `Transport Layer` 中抽象出來的 `ClientTransport` 及 `ServerTransport`, 實際上就是獲取一個 connection 給後續的 RPC Call 傳輸使用
+
+### Close Connection
+
+```go
+// conn.Close()
+func (cc *ClientConn) Close() error {
+ defer cc.cancel()
+    ...
+ cc.csMgr.updateState(connectivity.Shutdown)
+    ...
+ cc.blockingpicker.close()
+ if rWrapper != nil {
+  rWrapper.close()
+ }
+ if bWrapper != nil {
+  bWrapper.close()
+ }
+
+ for ac := range conns {
+  ac.tearDown(ErrClientConnClosing)
+ }
+ if channelz.IsOn() {
+  ...
+  channelz.AddTraceEvent(cc.channelzID, ted)
+  channelz.RemoveEntry(cc.channelzID)
+ }
+ return nil
+}
+```
+
+此方法會取消 `ClientConn` context, 同時關閉所有底層傳輸:
+- Context Cancel
+- Clear & close client connection
+- Clear & close parser connection
+- Clear & close loading balance connection
+- 新增跟蹤引用
+- 移除當前 channel info
 
 # Protobuf
 
