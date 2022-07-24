@@ -25,8 +25,8 @@
 - [CRUD → aggregation](#crud--aggregation)
 - [Transaction-Multiple document](#transaction-multiple-document)
   - [w: writeConcern](#w-writeconcern)
-  - [readConcern: 決定節點上哪些數據可讀(isolation level)](#readconcern-決定節點上哪些數據可讀isolation-level)
-  - [readPreference: 決定讀請求節點](#readpreference-決定讀請求節點)
+  - [readConcern: control the consistency and isolation properties of the data read(isolation level)](#readconcern-control-the-consistency-and-isolation-properties-of-the-data-readisolation-level)
+  - [readPreference: how MongoDB clients route read operations to the members of a replica set](#readpreference-how-mongodb-clients-route-read-operations-to-the-members-of-a-replica-set)
   - [j: journal](#j-journal)
 - [Security](#security)
   - [Authentication](#authentication)
@@ -375,7 +375,7 @@ To see what the hashed value would be for a key, see convertShardKeyToHashed().
 - 1 ~ n
 - majority：more than half (≥ n / 2 + 1)
 
-## readConcern: 決定節點上哪些數據可讀(isolation level)
+## readConcern: control the consistency and isolation properties of the data read(isolation level)
 
 - available: 讀取所有可用數據
 - local: 讀取所有可用且屬於當前 shard 的數據
@@ -383,7 +383,7 @@ To see what the hashed value would be for a key, see convertShardKeyToHashed().
 - linearizable: 可線性化讀取文檔
 - snapshot: 讀取最近快照數據
 
-## readPreference: 決定讀請求節點
+## readPreference: how MongoDB clients route read operations to the members of a replica set
 
 - primary
 - paimaryPreferred
