@@ -88,7 +88,7 @@
   - Kubernetes
 # Good to Know Libraries
   - Cmd
-    - [urfave/cli](library/urfave_cli.md)
+    - [urfave/cli](libs/cmd/urfave_cli.md)
   - Logging
   - Encoding/Decoding
   - Input and output
