@@ -28,8 +28,12 @@
   - [Based on Pattern](#based-on-pattern)
 - [Event](#event)
 - [Transaction](#transaction)
+  - [Commands](#commands)
   - [Standard Transaction Execution](#standard-transaction-execution)
-  - [CAS Lock Implementation](#cas-lock-implementation)
+  - [Errors Inside a Transaction](#errors-inside-a-transaction)
+    - [Syntax Error](#syntax-error)
+    - [Runtime Error](#runtime-error)
+  - [Optimistic Locking Using CAS](#optimistic-locking-using-cas)
 - [High Availability](#high-availability)
 - [Scalability](#scalability)
 - [Application](#application)
@@ -878,9 +882,135 @@ Reading messages... (press Ctrl-C to quit)
 
 # Transaction
 
+> Redis transaction 本質為一組指令的集合, transaction 支持一次執行多個指令, 一個 transaction 中所有指令都會被序列化, 執行過程也會按照順序串行執行 Queue 中的指令, 不會被其他指令插入到執行序列中
+
+## Commands
+
+- MULTI: 開啟 transaction, redis 會將後續的指令逐個放入 Queue
+- EXEC: 執行 transaction 中所有的指令
+- DISCARD: 取消 transaction
+- WATCH: 標記一個或多個 key, 若 key(s) 在 transaction 執行前被修改則 transaction aborted
+- UNWATCH: 取消 WATCH 對所有 key(s) 標記
+
 ## Standard Transaction Execution
 
-## CAS Lock Implementation
+分別為 `k1`, `k2` 賦值, 並在 transaction 中修改 `k1`, `k2`:
+
+```go
+127.0.0.1:6379> SET k1 v1
+OK
+127.0.0.1:6379> SET k2 v2
+OK
+127.0.0.1:6379> MULTI
+OK
+127.0.0.1:6379> SET k1 11
+QUEUED
+127.0.0.1:6379> SET k2 22
+QUEUED
+127.0.0.1:6379> EXEC
+1) OK
+2) OK
+127.0.0.1:6379> GET k1
+"11"
+127.0.0.1:6379> GET k2
+"22"
+127.0.0.1:6379>
+```
+
+取消 transaction:
+
+```go
+127.0.0.1:6379> MULTI
+OK
+127.0.0.1:6379> SET k1 33
+QUEUED
+127.0.0.1:6379> SET k2 34
+QUEUED
+127.0.0.1:6379> DISCARD
+OK
+```
+
+## Errors Inside a Transaction
+
+### Syntax Error
+
+開啟 transaction 後修改 `k1` 為 11, `k2` 為 22, `k2` syntax error 最終導致 transaction commit failed, `k1`, `k2` 沒有任何修改:
+
+```go
+127.0.0.1:6379> SET k1 v1
+OK
+127.0.0.1:6379> SET k2 v2
+OK
+127.0.0.1:6379> MULTI
+OK
+127.0.0.1:6379> SET k1 11
+QUEUED
+127.0.0.1:6379> SETS k2 22
+(error) ERR unknown command `sets`, with args beginning with: `k2`, `22`, 
+127.0.0.1:6379> EXEC
+(error) EXECABORT Transaction discarded because of previous errors.
+127.0.0.1:6379> GET k1
+"v1"
+127.0.0.1:6379> GET k2
+"v2"
+127.0.0.1:6379>
+```
+
+### Runtime Error
+
+開啟 transaction 後修改 `k1` 值為 11, `k2` 值為 22, 但 runtime 檢查 `k2` 型別錯誤導致 transaction commit failed, 但 transaction 並沒有 rollback, 而是跳過錯誤指令繼續執行, 結果 `k1` 修改而 `k2` 沒有修改:
+
+```go
+127.0.0.1:6379> SET k1 v1
+OK
+127.0.0.1:6379> SET k1 v2
+OK
+127.0.0.1:6379> MULTI
+OK
+127.0.0.1:6379> SET k1 11
+QUEUED
+127.0.0.1:6379> LPUSH k2 22
+QUEUED
+127.0.0.1:6379> EXEC
+1) OK
+2) (error) WRONGTYPE Operation against a key holding the wrong kind of value
+127.0.0.1:6379> GET k1
+"11"
+127.0.0.1:6379> GET k2
+"v2"
+127.0.0.1:6379>
+```
+
+## Optimistic Locking Using CAS
+
+> `WATCH` 指令可以為 Redis transaction 提供 CAS 行為
+
+若被 `WATCH` 標記的 key 在 transaction `EXEC` 前被修改則整個 transaction 會被取消, `EXEC` 返回 `nil-reply` 表示 transaction 已經失敗
+
+假設需要原子性對某個值進行自增 1 的操作(不使用 `INCR`):
+
+```go
+val = GET mykey
+val = val + 1
+SET mykey $val
+```
+
+上述程式只有在 single client 中可以運行順利, 若遇到 multiple client 同時對一個 key 進行如上操作即會產生 `race condition`
+
+通過 `WATCH` 可以輕鬆避免 `race condition` 問題:
+
+```go
+WATCH mykey
+val = GET mykey
+val = val + 1
+MULTI
+SET mykey $val
+EXEC
+```
+
+`WATCH` 執行之後到 `EXEC` 執行前, 如果 `mykey` 值被修改則當前 client transaction 就會失敗, 程式就可以透過重試操作直到未發生碰撞為止
+
+大多數情況下發生碰撞的概率很低, 因此通常不需要進行重試, 此種形式的 lock 稱為 `Optimistic Lock`
 
 # High Availability
 # Scalability
