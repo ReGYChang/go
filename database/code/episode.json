@@ -1,0 +1,16 @@
+[
+    {
+        "_id": "5e3b381c1c9d4400004117e7",
+        "podcast": "5e3b37e51c9d4400004117e6",
+        "title": "Episode #1",
+        "description": "The first episode",
+        "duration": 25
+    },
+    {
+        "_id": "5e3b38511c9d4400004117e8",
+        "podcast": "5e3b37e51c9d4400004117e6",
+        "title": "Episode #2",
+        "description": "The second episode",
+        "duration": 30
+    }
+]
