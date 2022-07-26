@@ -24,6 +24,7 @@
   - [Decode Unknown JSON data](#decode-unknown-json-data)
   - [Visit Decoding JSON data](#visit-decoding-json-data)
   - [Decode JSON From Stream](#decode-json-from-stream)
+  - [omitempty](#omitempty)
 
 # I/O
 
@@ -856,5 +857,192 @@ func NewServerCodec(conn io.ReadWriteCloser) rpc.ServerCodec {
         c:       conn,
         pending: make(map[uint64]*json.RawMessage),
     }
+}
+```
+
+## omitempty
+
+在定義 json struct 時經常會使用到 `omitempty`, 使用上需要特別注意
+
+定義每個 field 對應的 json format, 如定義一個 `Dog` struct:
+
+```go
+type Dog struct {
+	Breed string
+	WeightKg int
+}
+```
+
+將其初始化並序列化為 JSON 格式:
+
+```go
+func main() {
+	d := Dog{
+		Breed:    "dalmation",
+		WeightKg: 45,
+	}
+	b, _ := json.Marshal(d)
+	fmt.Println(string(b))
+}
+```
+
+output:
+
+```go
+{"Breed":"dalmation","WeightKg":45}
+```
+
+若有其中一個 struct member 沒有初始化則結果可能與預期不符:
+
+```go
+func main() {
+	d := Dog{
+        Breed:    "pug",
+	}
+	b, _ := json.Marshal(d)
+	fmt.Println(string(b))
+}
+```
+
+output:
+
+```go
+{"Breed":"pug","WeightKg":0}
+```
+
+預期希望 `dog` 的 `weitght` 為未知, 而不是 0, 為了將未知的 field 忽略, 則使用 `omitempty` tag 來實現:
+
+```go
+type Dog struct {
+	Breed    string
+	// The first comma below is to separate the name tag from the omitempty tag 
+	WeightKg int `json:",omitempty"`
+}
+```
+
+output:
+
+```go
+{"Breed":"pug"}
+```
+
+現在 `WeightKg` 則被設置為默認零值, `int` 為 0, `string` 為 "", `pointer` 為 nil
+
+當使用 struct 互相嵌套時, 則 `omitempty` 則可能出現預期外結果:
+
+```go
+type dimension struct {
+	Height int
+	Width int
+	}
+
+type Dog struct {
+	Breed    string
+	WeightKg int
+	Size dimension `json:",omitempty"`
+}
+
+func main() {
+	d := Dog{
+		Breed: "pug",
+	}
+	b, _ := json.Marshal(d)
+	fmt.Println(string(b))
+}
+```
+
+output:
+
+```go
+{"Breed":"pug","WeightKg":0,"Size":{"Height":0,"Width":0}}
+```
+
+這裡雖然使用 `omitempty` tag 但 `dimension` 還是沒有被忽略, 因為不知道 struct `dimension` 空值為何, Go 只能判斷如 `int`, `string`, `pointer` 這種基本型別的空值
+
+為了使自定義 struct 未初始化時能被忽略, 可以使用 struct pointer:
+
+```go
+type Dog struct {
+	Breed    string
+	WeightKg int
+	// Now `Size` is a pointer to a `dimension` instance
+	Size *dimension `json:",omitempty"`
+}
+```
+
+output:
+
+```go
+{"Breed":"pug","WeightKg":0}
+```
+
+Go 有能力判斷 pointer type 空值為 nil, 所以直接賦值
+
+```go
+type Dog struct {
+	Age *int `json:",omitempty"`
+}
+
+func main() {
+	age := 0
+	d := Dog{
+		Age: &age,
+	}
+
+	b, _ := json.Marshal(d)
+	fmt.Println(string(b))
+}
+```
+
+output:
+
+```go
+{"Age":0}
+```
+
+因為 `Age` 為 pointer 型別, 而初始化時也傳入非 nil pointer, 所以不會被忽略而顯示 0
+
+```go
+type Restaurant struct {
+	NumberOfCustomers int `json:",omitempty"`
+}
+
+func main() {
+	d := Restaurant{
+		NumberOfCustomers: 0,
+	}
+	b, _ := json.Marshal(d)
+	fmt.Println(string(b))
+}
+```
+
+output:
+
+```go
+{}
+```
+
+這裡 `NumberOfCustomers` 被忽略顯時不是預期的結果, 因為 Go 將 0 當成零值, 跟沒賦值結果相同
+
+解決方法之一即是使用 `int pointer` 並傳入非 nil pointer:
+
+```go
+type Restaurant struct {
+	NumberOfCustomers *int `json:",omitempty"`
+}
+
+func main() {
+	d1 := Restaurant{}
+	b, _ := json.Marshal(d1)
+	fmt.Println(string(b))
+	//Prints: {}
+	
+	n := 0
+	d2 := Restaurant{
+		NumberOfCustomers: &n,
+	}
+	b, _ = json.Marshal(d2)
+	fmt.Println(string(b))
+	//Prints: {"NumberOfCustomers":0}
 }
 ```
