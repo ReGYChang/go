@@ -17,9 +17,6 @@
 - [I/O](go/io.md)
 - [error, panic, recover, test](go/error_panic_recover_test.md)
 - [goroutine, channel, buffer, select, mutex](go/go_channel_buffer_select_mutex.md)
-- semantic versioning
-- version, scripts, repository and other properties
-- concurrency patterns
 - [interview](go/interview.md)
 
 # SQL fundamentals
