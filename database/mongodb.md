@@ -73,7 +73,12 @@
     - [Replica Set](#replica-set-2)
 - [Exception Handling](#exception-handling)
   - [Rollback](#rollback)
-- [Document Design Patterns](#document-design-patterns)
+- [Aggregation Operations](#aggregation-operations)
+  - [Aggregation Pipeline Stages](#aggregation-pipeline-stages)
+    - [$lookup](#lookup)
+      - [Perform a Single Equality Join with $lookup](#perform-a-single-equality-join-with-lookup)
+      - [Use $lookup with an Array](#use-lookup-with-an-array)
+      - [Use $lookup with $mergeObjects](#use-lookup-with-mergeobjects)
 - [No Usage](#no-usage)
 - [Reference](#reference)
 - [Official Tips](#official-tips)
@@ -1215,7 +1220,222 @@ keytool -importkeystore -srckeystore mongod.p12 -srcstoretype PKCS12 -destkeysto
 - 完成後轉換為 RECOVERING 狀態並開始正常同步
 - 將這些動作所影響的文件版本寫入資料目錄內的 rollback 目錄 .bson 檔案中
 
-# Document Design Patterns
+# Aggregation Operations
+
+Aggregation operations process multiple documents and return computed results. You can use aggregation operations to:
+
+- Group values from multiple documents together.
+- Perform operations on the grouped data to return a single result.
+- Analyze data changes over time.
+
+## Aggregation Pipeline Stages
+
+### $lookup
+
+> Performs a left outer join to a collection in the same database to filter in documents from the "joined" collection for processing. To each input document, the $lookup stage adds a new array field whose elements are the matching documents from the "joined" collection. The $lookup stage passes these reshaped documents to the next stage.
+
+>💡Starting in MongoDB 5.1, $lookup works across sharded collections.
+
+#### Perform a Single Equality Join with $lookup
+
+Create a collection `orders` with these documents:
+
+```sh
+db.orders.insertMany( [
+   { "_id" : 1, "item" : "almonds", "price" : 12, "quantity" : 2 },
+   { "_id" : 2, "item" : "pecans", "price" : 20, "quantity" : 1 },
+   { "_id" : 3  }
+] )
+```
+
+Create another collection `inventory` with these documents:
+
+```js
+db.inventory.insertMany( [
+   { "_id" : 1, "sku" : "almonds", "description": "product 1", "instock" : 120 },
+   { "_id" : 2, "sku" : "bread", "description": "product 2", "instock" : 80 },
+   { "_id" : 3, "sku" : "cashews", "description": "product 3", "instock" : 60 },
+   { "_id" : 4, "sku" : "pecans", "description": "product 4", "instock" : 70 },
+   { "_id" : 5, "sku": null, "description": "Incomplete" },
+   { "_id" : 6 }
+] )
+```
+
+The following aggregation operation on the orders collection joins the documents from orders with the documents from the `inventory` collection using the fields item from the `orders` collection and the `sku` field from the `inventory` collection:
+
+```js
+db.orders.aggregate( [
+   {
+     $lookup:
+       {
+         from: "inventory",
+         localField: "item",
+         foreignField: "sku",
+         as: "inventory_docs"
+       }
+  }
+] )
+```
+
+The operation returns these documents:
+
+```js
+{
+   "_id" : 1,
+   "item" : "almonds",
+   "price" : 12,
+   "quantity" : 2,
+   "inventory_docs" : [
+      { "_id" : 1, "sku" : "almonds", "description" : "product 1", "instock" : 120 }
+   ]
+}
+{
+   "_id" : 2,
+   "item" : "pecans",
+   "price" : 20,
+   "quantity" : 1,
+   "inventory_docs" : [
+      { "_id" : 4, "sku" : "pecans", "description" : "product 4", "instock" : 70 }
+   ]
+}
+{
+   "_id" : 3,
+   "inventory_docs" : [
+      { "_id" : 5, "sku" : null, "description" : "Incomplete" },
+      { "_id" : 6 }
+   ]
+}
+```
+
+#### Use $lookup with an Array
+
+If the localField is an array, you can match the array elements against a scalar `foreignField` without an `$unwind` stage
+
+Firstly create an example collection `classes` with these documents:
+```js
+db.classes.insertMany( [
+   { _id: 1, title: "Reading is ...", enrollmentlist: [ "giraffe2", "pandabear", "artie" ], days: ["M", "W", "F"] },
+   { _id: 2, title: "But Writing ...", enrollmentlist: [ "giraffe1", "artie" ], days: ["T", "F"] }
+] )
+```
+
+Create another collection `members` with these documents:
+
+```js
+db.members.insertMany( [
+   { _id: 1, name: "artie", joined: new Date("2016-05-01"), status: "A" },
+   { _id: 2, name: "giraffe", joined: new Date("2017-05-01"), status: "D" },
+   { _id: 3, name: "giraffe1", joined: new Date("2017-10-01"), status: "A" },
+   { _id: 4, name: "panda", joined: new Date("2018-10-11"), status: "A" },
+   { _id: 5, name: "pandabear", joined: new Date("2018-12-01"), status: "A" },
+   { _id: 6, name: "giraffe2", joined: new Date("2018-12-01"), status: "D" }
+] )
+```
+
+The following aggregation operation joins documents in the `classes` collection with the `members` collection, matching on the `enrollmentlist` field to the `name` field:
+
+```js
+db.classes.aggregate( [
+   {
+      $lookup:
+         {
+            from: "members",
+            localField: "enrollmentlist",
+            foreignField: "name",
+            as: "enrollee_info"
+        }
+   }
+] )
+```
+
+The operation returns the following:
+
+```js
+{
+   "_id" : 1,
+   "title" : "Reading is ...",
+   "enrollmentlist" : [ "giraffe2", "pandabear", "artie" ],
+   "days" : [ "M", "W", "F" ],
+   "enrollee_info" : [
+      { "_id" : 1, "name" : "artie", "joined" : ISODate("2016-05-01T00:00:00Z"), "status" : "A" },
+      { "_id" : 5, "name" : "pandabear", "joined" : ISODate("2018-12-01T00:00:00Z"), "status" : "A" },
+      { "_id" : 6, "name" : "giraffe2", "joined" : ISODate("2018-12-01T00:00:00Z"), "status" : "D" }
+   ]
+}
+{
+   "_id" : 2,
+   "title" : "But Writing ...",
+   "enrollmentlist" : [ "giraffe1", "artie" ],
+   "days" : [ "T", "F" ],
+   "enrollee_info" : [
+      { "_id" : 1, "name" : "artie", "joined" : ISODate("2016-05-01T00:00:00Z"), "status" : "A" },
+      { "_id" : 3, "name" : "giraffe1", "joined" : ISODate("2017-10-01T00:00:00Z"), "status" : "A" }
+   ]
+}
+```
+
+#### Use $lookup with $mergeObjects
+
+The `$mergeObjects` operator combines multiple documents into a single document.
+
+Create a collection `orders` with these documents:
+
+```js
+db.orders.insertMany( [
+   { "_id" : 1, "item" : "almonds", "price" : 12, "quantity" : 2 },
+   { "_id" : 2, "item" : "pecans", "price" : 20, "quantity" : 1 }
+] )
+```
+
+Create another collection `items` with these documents:
+
+```js
+db.items.insertMany( [
+  { "_id" : 1, "item" : "almonds", description: "almond clusters", "instock" : 120 },
+  { "_id" : 2, "item" : "bread", description: "raisin and nut bread", "instock" : 80 },
+  { "_id" : 3, "item" : "pecans", description: "candied pecans", "instock" : 60 }
+] )
+```
+
+The following operation first uses the `$lookup` stage to join the two collections by the `item` fields and then uses `$mergeObjects` in the `$replaceRoot` to merge the joined documents from `items` and `orders`:
+
+```js
+db.orders.aggregate( [
+   {
+      $lookup: {
+         from: "items",
+         localField: "item",    // field in the orders collection
+         foreignField: "item",  // field in the items collection
+         as: "fromItems"
+      }
+   },
+   {
+      $replaceRoot: { newRoot: { $mergeObjects: [ { $arrayElemAt: [ "$fromItems", 0 ] }, "$$ROOT" ] } }
+   },
+   { $project: { fromItems: 0 } }
+] )
+```
+
+The operation returns these documents:
+
+```js
+{
+  _id: 1,
+  item: 'almonds',
+  description: 'almond clusters',
+  instock: 120,
+  price: 12,
+  quantity: 2
+},
+{
+  _id: 2,
+  item: 'pecans',
+  description: 'candied pecans',
+  instock: 60,
+  price: 20,
+  quantity: 1
+}
+```
 
 # No Usage
 
