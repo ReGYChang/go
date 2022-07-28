@@ -13,7 +13,7 @@
 - [array, slice, map](go/array_slice_map.md)
 - [packages](go/packages.md)
 - [struct, method](go/struct_methods.md)
-- [interface, reflection](go/interface_reflection.md)
+- [interface, reflection, generic](go/interface_reflection_generic.md)
 - [I/O](go/io.md)
 - [error, panic, recover, test](go/error_panic_recover_test.md)
 - [goroutine, channel, buffer, select, mutex](go/go_channel_buffer_select_mutex.md)
