@@ -6,6 +6,11 @@
   - [Beginning From Parameter & Argument](#beginning-from-parameter--argument)
   - [Generic in Go](#generic-in-go)
   - [Type Parameter, Type Argument, Type Constraint & Generic Type](#type-parameter-type-argument-type-constraint--generic-type)
+  - [Other Generic Types](#other-generic-types)
+  - [Nested Type Parameter](#nested-type-parameter)
+  - [Syntax Error](#syntax-error)
+  - [Special Generic Type](#special-generic-type)
+  - [Nested Generic Type](#nested-generic-type)
 
 # Interface
 
@@ -482,3 +487,142 @@ var a MyMap[string, float64] = map[string]float64{
 - `KEY int|string, VALUE float32|float64` 為 `type parameter list`
 - `Map[KEY,VALUE]` 為 `generic type`, 型別名稱為 `Map[KEY,VALUE]`
 - `var a MyMap[string, float64] = xx` 中的 `string` 和 `float64` 為 `type argument`, 用於替換 `KEY` 和 `VALUE` 並實體化出具體型別 `MyMap[string, float64]`
+
+![generic_type](img/generic_type.png)
+
+![generic_type2](img/generic_type2.png)
+
+## Other Generic Types
+
+所有型別定義都可以使用 `type parameter`:
+
+```go
+// generic type struct
+type MyStruct[T int | string] struct {  
+    Name string
+    Data T
+}
+
+// generic type interface
+type IPrintData[T int | float32 | string] interface {
+    Print(data T)
+}
+
+// generic type channel
+type MyChan[T int | string] chan T
+```
+
+## Nested Type Parameter
+
+`type parameter` 可以互相套用:
+
+```go
+type WowStruct[T int | float32, S []T] struct {
+    Data     S
+    MaxValue T
+    MinValue T
+}
+```
+
+任何 `generic type` 都必須傳入 `type argument` 實體化才能使用:
+
+```go
+var ws WowStruct[int, []int]
+```
+
+上述程式碼中為 `T` 傳入 `type argument int`, 又因 `S` 定義為 `[]T`, 所以 `S` 的 `type argument` 為 `[]int`, 實體化後 `WowStruct[T,S]` 定義如下:
+
+```go
+type WowStruct[int, []int] struct {
+    Data     []int
+    MaxValue int
+    MinValue int
+}
+```
+
+因為 `S` 定義為 `[]T`, 所以一旦 `T` 確認之後 `S` 的 `type argument` 就確定了:
+
+```go
+ws := WowStruct[int, []float32]{
+        Data:     []float32{1.0, 2.0, 3.0},
+        MaxValue: 3,
+        MinValue: 1,
+}
+```
+
+`T` 傳入 `type argument int`, 所以 `S` 的 `type argument` 為 `[]int` 而非 `[]float32`
+
+## Syntax Error
+
+定義 `generic type` 時基礎型別不能只有 `generic parameter`:
+
+```go
+type CommonType[T int|string|float32] T
+```
+
+`type constraint` 部分語法會被 compiler 誤認為表達式:
+
+```go
+//✗ Incorrect, T *int 會被 compiler 判斷為表達式: T 乘以 int, 而非 int pointer
+// compiler: 定義一個存放 slice 的 array, array length 為 T 乘以 int
+type NewType[T *int] []T
+
+//✗ Incorrect, 同上, * 被判斷為乘號, | 被判斷為 or operation
+type NewType2[T *int|*float64] []T 
+
+//✗ Incorrect
+type NewType2 [T (int)] []T 
+```
+
+> 為了避免上述歧異, 解決方法為給 `type constraint` 包上 `interface{}` 或加上逗號消除歧異:
+
+```go
+type NewType[T interface{*int}] []T
+type NewType2[T interface{*int|*float64}] []T 
+
+// 若 type constranit 中只有一個型別可以加上逗號消除歧異
+type NewType3[T *int,] []T
+
+//✗ Incorrect, 若 type constranit 存在多個型別則無法使用逗號消除歧異
+type NewType4[T *int|*float32,] []T 
+```
+
+統一推薦使用 `interface{}` 處理
+
+## Special Generic Type
+
+這裡討論一種較為特殊的 `generic type`:
+
+```go
+type Wow[T int | string] int
+
+var a Wow[int] = 123     // compile correct
+var b Wow[string] = 123  // compile correct
+var c Wow[string] = "hello" // compile error, 因為 hello 無法賦值給底層型別 int
+```
+
+這裡雖然使用了 `type parameter`, 但因為型別定義底層型別為 `int`, 所以無論傳入什麼型別的 `type argument` 實體化後的新型別底層型別都為 `int`
+
+## Nested Generic Type
+
+`generic type` 與普通型別相同, 可以互相嵌套定義出更複雜的新型別:
+
+```go
+// 首先定義一個 generic type Slice[T]
+type Slice[T int|string|float32|float64] []T
+
+// ✗ Incorrect, generic type Slice[T] type constranit 不包含 uint, uint8
+type UintSlice[T uint|uint8] Slice[T]  
+
+// ✓ Correct, 基於 generic type Slice[T] 定義新的 generic type FloatSlice[T], FloatSlice[T] 只接受 float32 和 float64 兩種型別
+type FloatSlice[T float32|float64] Slice[T] 
+
+// ✓ Correct, 基於 generic type Slice[T] 定義新的 generic type IntAndStringSlice[T]
+type IntAndStringSlice[T int|string] Slice[T]  
+// ✓ Correct, 基於 IntAndStringSlice[T] nested 定義出新的 generic type
+type IntSlice[T int] IntAndStringSlice[T] 
+
+// Nested generic type with map
+type WowMap[T int|string] map[string]Slice[T]
+type WowMap2[T Slice[int] | Slice[string]] map[string]T
+```
