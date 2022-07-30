@@ -6,11 +6,15 @@
   - [Beginning From Parameter & Argument](#beginning-from-parameter--argument)
   - [Generic in Go](#generic-in-go)
   - [Type Parameter, Type Argument, Type Constraint & Generic Type](#type-parameter-type-argument-type-constraint--generic-type)
-  - [Other Generic Types](#other-generic-types)
-  - [Nested Type Parameter](#nested-type-parameter)
-  - [Syntax Error](#syntax-error)
-  - [Special Generic Type](#special-generic-type)
-  - [Nested Generic Type](#nested-generic-type)
+    - [Other Generic Types](#other-generic-types)
+    - [Nested Type Parameter](#nested-type-parameter)
+    - [Syntax Error](#syntax-error)
+    - [Special Generic](#special-generic)
+    - [Nested Generic](#nested-generic)
+    - [Generic With Anonymous](#generic-with-anonymous)
+  - [Generic Receiver](#generic-receiver)
+    - [Queue Implementation Base On Generic Type](#queue-implementation-base-on-generic-type)
+    - [Dynamic Checkout Variable Type](#dynamic-checkout-variable-type)
 
 # Interface
 
@@ -492,7 +496,7 @@ var a MyMap[string, float64] = map[string]float64{
 
 ![generic_type2](img/generic_type2.png)
 
-## Other Generic Types
+### Other Generic Types
 
 所有型別定義都可以使用 `type parameter`:
 
@@ -512,7 +516,7 @@ type IPrintData[T int | float32 | string] interface {
 type MyChan[T int | string] chan T
 ```
 
-## Nested Type Parameter
+### Nested Type Parameter
 
 `type parameter` 可以互相套用:
 
@@ -552,7 +556,7 @@ ws := WowStruct[int, []float32]{
 
 `T` 傳入 `type argument int`, 所以 `S` 的 `type argument` 為 `[]int` 而非 `[]float32`
 
-## Syntax Error
+### Syntax Error
 
 定義 `generic type` 時基礎型別不能只有 `generic parameter`:
 
@@ -589,7 +593,7 @@ type NewType4[T *int|*float32,] []T
 
 統一推薦使用 `interface{}` 處理
 
-## Special Generic Type
+### Special Generic
 
 這裡討論一種較為特殊的 `generic type`:
 
@@ -603,7 +607,7 @@ var c Wow[string] = "hello" // compile error, 因為 hello 無法賦值給底層
 
 這裡雖然使用了 `type parameter`, 但因為型別定義底層型別為 `int`, 所以無論傳入什麼型別的 `type argument` 實體化後的新型別底層型別都為 `int`
 
-## Nested Generic Type
+### Nested Generic
 
 `generic type` 與普通型別相同, 可以互相嵌套定義出更複雜的新型別:
 
@@ -626,3 +630,216 @@ type IntSlice[T int] IntAndStringSlice[T]
 type WowMap[T int|string] map[string]Slice[T]
 type WowMap2[T Slice[int] | Slice[string]] map[string]T
 ```
+
+### Generic With Anonymous
+
+使用匿名 struct 時通常會先定義好匿名 struct 並直接初始化:
+
+```go
+testCase := struct {
+        caseName string
+        got      int
+        want     int
+    }{
+        caseName: "test OK",
+        got:      100,
+        want:     100,
+    }
+```
+
+但是匿名 struct 無法使用 generic type 做型別定義:
+
+```go
+testCase := struct[T int|string] {
+        caseName string
+        got      T
+        want     T
+    }[int]{
+        caseName: "test OK",
+        got:      100,
+        want:     100,
+    }
+```
+
+這一點對於為 genric type 做 unit test 的時候非常麻煩
+
+## Generic Receiver
+
+> Generic 一個最主要的應用場景就是與 receiver 結合使用
+
+定義普通型別之後可以為型別實現方法, 同樣也可以為 generic type 實現方法:
+
+```go
+type MySlice[T int | float32] []T
+
+func (s MySlice[T]) Sum() T {
+    var sum T
+    for _, value := range s {
+        sum += value
+    }
+    return sum
+}
+```
+
+這個例子為 generic type `MySlice[T]` 新增了一個計算成員總和的方法 `Sum()`:
+- 將 `MySlice[T]` 作為 receiver
+- 方法返回的參數使用 `type parameter T`
+- 方法定義中也可以使用 `type paramter T` (`var sum T`)
+
+使用 `MySlice[T]` 之前需要先用 `type argument` 進行實體化:
+
+```go
+var s MySlice[int] = []int{1, 2, 3, 4}
+fmt.Println(s.Sum()) // output: 10
+
+var s2 MySlice[float32] = []float32{1.0, 2.0, 3.0, 4.0}
+fmt.Println(s2.Sum()) // output: 10.0
+```
+
+上述例子用 `type argument int` 實體化了 generic type `MySlice[T]`, 所有 generic type 定義中的 `T` 都被替換為 `int`:
+
+```go
+type MySlice[int] []int // 實體化後的型別為 MyIntSlice[int]
+
+func (s MySlice[int]) Sum() int {
+    var sum int 
+    for _, value := range s {
+        sum += value
+    }
+    return sum
+}
+```
+
+通過 `generic type receiver`, generic type 實用性得到巨大的擴展, 在沒有 generic type 之前若想實現通用的資料結構如 `heap`, `stack`, `queue`, `linked list` 等, 選擇只有兩個:
+- 為每個型別寫一個實現
+- 使用 `interface` + `reflection`
+
+有了 generic 後就能非常簡單地創建通用的資料節後了
+
+### Queue Implementation Base On Generic Type
+
+`Queue` 為一種 `FIFO` 的資料結構, 與現實中排隊同理, 資料只能從尾部進入, 從頭部取出
+
+```go
+// type constraint 使用 `interface` 型別, 表示所有型別都能用來實體化 generic type Queue[T]
+type Queue[T interface{}] struct {
+    elements []T
+}
+
+// 將資料放入隊尾
+func (q *Queue[T]) Put(value T) {
+    q.elements = append(q.elements, value)
+}
+
+// 從對首取出資料並刪除
+func (q *Queue[T]) Pop() (T, bool) {
+    var value T
+    if len(q.elements) == 0 {
+        return value, true
+    }
+
+    value = q.elements[0]
+    q.elements = q.elements[1:]
+    return value, len(q.elements) == 0
+}
+
+// Queue 大小
+func (q Queue[T]) Size() int {
+    return len(q.elements)
+}
+```
+
+>❗️ 為方便說明, 此 Queue 實現方法為考慮 thread safe 等其他問題
+
+`Queue[T]` 為 generic type, 使用前須實體化:
+
+```go
+var q1 Queue[int]  // 可儲存 int 型別的 Queue
+q1.Put(1)
+q1.Put(2)
+q1.Put(3)
+q1.Pop() // 1
+q1.Pop() // 2
+q1.Pop() // 3
+
+var q2 Queue[string]  // 可儲存 string 型別的 Queue
+q2.Put("A")
+q2.Put("B")
+q2.Put("C")
+q2.Pop() // "A"
+q2.Pop() // "B"
+q2.Pop() // "C"
+
+var q3 Queue[struct{Name string}] 
+var q4 Queue[[]int] // 可儲存 []int slice 的 Queue
+var q5 Queue[chan int] // 可儲存 int channel 的 Queue
+var q6 Queue[io.Reader] // 可儲存 interface 的 Queue
+// ......
+```
+
+### Dynamic Checkout Variable Type
+
+使用 `interface` 時經常會用到 `type assertion` 或 `type switch` 來確認 interface 具體的型別, 並針對不同型別做出不同處裡:
+
+```go
+var i interface{} = 123
+i.(int) // type assertion
+
+// type switch
+switch i.(type) {
+    case int:
+        // do something
+    case string:
+        // do something
+    default:
+        // do something
+}
+```
+
+那對於 `value T` 這種通過 `type parameter` 定義的變數, 是否能判斷具體型別並針對不同型別做出不同處理呢? 答案是不行:
+
+```go
+func (q *Queue[T]) Put(value T) {
+    value.(int) // error, generic type variable 不能使用 type assertion
+
+    // error, 不允許使用 type switch 判斷 value 的具體型別
+    switch value.(type) {
+    case int:
+        // do something
+    case string:
+        // do something
+    default:
+        // do something
+    }
+    
+    // ...
+}
+```
+
+雖然 `type switch` 和 `type assertion` 不可用, 但可通過 `reflection` 來達到目的:
+
+```go
+func (receiver Queue[T]) Put(value T) {
+    // Printf() 可輸出 value type (reflection)
+    fmt.Printf("%T", value) 
+
+    // 通過 reflection 可以動態取得變數 value 型別並按情況處理
+    v := reflect.ValueOf(value)
+
+    switch v.Kind() {
+    case reflect.Int:
+        // do something
+    case reflect.String:
+        // do something
+    }
+
+    // ...
+}
+```
+
+這看似達到了目的, 但當寫出如上程式碼則反應了一個問題:
+
+> 為了避免使用 reflection 而選擇了 generic, 最後卻又在 generic 中使用 reflection
+
+當出現這種情況時應該重新思考需求是否真的需要使用 `generic`
+
