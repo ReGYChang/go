@@ -2,6 +2,8 @@
   - [Nil Interface](#nil-interface)
   - [Polymorphism with Open Closed Principle](#polymorphism-with-open-closed-principle)
   - [Composition Instead of Inheritance](#composition-instead-of-inheritance)
+- [Reflection](#reflection)
+  - [Why Reflection](#why-reflection)
 - [Generic](#generic)
   - [Beginning From Parameter & Argument](#beginning-from-parameter--argument)
   - [Generic in Go](#generic-in-go)
@@ -309,6 +311,30 @@ func main() {
 創建新 interface `EmployeeOperations` 並嵌套兩個 interface: `SalaryCalculator` & `LeaveCalculator`.
 
 如果一個類型定義了 `SalaryCalculator` 及 `LeaveCalculator` interface 中的 method, 就稱該類型實現了 `EmployeeOperations` interface
+
+# Reflection
+
+何為 `reflection` ? Wiki 定義如下:
+
+> In computer science, reflective programming or reflection is the ability of a process to examine, introspect, and modify its own structure and behavior.
+
+簡單來說, `reflection` 本質上為程式在 run time 探知物件的型別資訊和記憶體結構並修改自身的行為
+
+但不用 `reflection` 就無法在 run time 訪問, 檢測或修改程式自身的狀態或行為嗎?
+
+其實使用 `assembly language` 直接與機器底層交互也可以獲取對應的資訊, 但是使用 Go 等高階語言則無法做到, 只能通過 `reflection` 來達成
+
+不同程式語言的 reflection model 不盡相同, 有些語言甚至不支援 reflection
+
+`《The Go Programming Language》` 中是如此定義 `reflection`:
+
+> Go 語言提供了一種機制在 run time 時更新變數和檢查其值, 調用它們方法, 但在 compile time 並不知道這些變數的具體型別, 稱為 reflection
+
+## Why Reflection
+
+`interface` 為 Go 中實現抽象的強大工具, 當向 interface 賦予一個實體型別時, interface 會儲存實體的型別資訊, `reflection` 就是通過 interface 型別資訊實現, 其建立在型別的基礎上
+
+Go `reflect` package 中定義了各種型別, 並實現了 `reflection` 的各種函數, 通過它們可以在 run time 檢測型別資訊或改變型別的值
 
 # Generic
 
