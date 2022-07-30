@@ -4,6 +4,7 @@
   - [Composition Instead of Inheritance](#composition-instead-of-inheritance)
 - [Reflection](#reflection)
   - [Why Reflection](#why-reflection)
+  - [Types & interface](#types--interface)
 - [Generic](#generic)
   - [Beginning From Parameter & Argument](#beginning-from-parameter--argument)
   - [Generic in Go](#generic-in-go)
@@ -335,6 +336,58 @@ func main() {
 `interface` 為 Go 中實現抽象的強大工具, 當向 interface 賦予一個實體型別時, interface 會儲存實體的型別資訊, `reflection` 就是通過 interface 型別資訊實現, 其建立在型別的基礎上
 
 Go `reflect` package 中定義了各種型別, 並實現了 `reflection` 的各種函數, 通過它們可以在 run time 檢測型別資訊或改變型別的值
+
+## Types & interface
+
+Go 中每個變數都有一個靜態型別, 在 compile time 就確定了, 如 `int`, `float64`, `[]int` 等, 注意這個型別為聲明時的型別而非底層資料型別
+
+```go
+type MyInt int
+
+var i int
+var j MyInt
+```
+
+雖然 `i`, `j` 底層型別都是 `int`, 但其靜態型別並不相同, 除非進行型別轉換, 否則 `i`, `j` 不能同時出現在等號兩側
+
+`reflection` 主要與 `interface{}` 型別有關:
+
+```go
+type iface struct {
+	tab  *itab
+	data unsafe.Pointer
+}
+
+type itab struct {
+	inter  *interfacetype
+	_type  *_type
+	link   *itab
+	hash   uint32
+	bad    bool
+	inhash bool
+	unused [2]byte
+	fun    [1]uintptr
+}
+```
+
+![interface_structure](img/interface_structure.png)
+
+其中 `itab` 由具體型別 `_type` 及 `interfacetype` 組成, `_type` 表示具體型別, 而 `interfacetype` 則表示具體型別實現的 interface type
+
+實際上 `iface` 描述的為非空 interface, 其包含方法; 與其相對的是 `eface`, 描述的為空 interface, 不包含任何方法
+
+Go 中所有型別都實現了空 interface
+
+```go
+type eface struct {
+    _type *_type
+    data  unsafe.Pointer
+}
+```
+
+比起 `iface`, `eface` 就簡單多了, 只維護一個 `_type` field, 表示空 interface 所承載的具體實體型別, `data` 描述具體的值
+
+![eface](img/eface.png)
 
 # Generic
 
