@@ -9,6 +9,7 @@
     - [Use Errorf Function](#use-errorf-function)
     - [Use Struct Type and Field](#use-struct-type-and-field)
     - [Use Struct Methods](#use-struct-methods)
+  - [Error Handling](#error-handling)
 - [Panic](#panic)
   - [Panic Use Cases](#panic-use-cases)
   - [Defer and Panic](#defer-and-panic)
@@ -575,6 +576,64 @@ output:
 error: length -5.00 is less than zero  
 error: width -9.00 is less than zero
 ```
+
+## Error Handling
+
+上述介紹了 Go 中的 error 機制, 再來就是介紹錯誤處理的流程
+
+為了保持簡單, 最好在一個地方對一個錯誤採取一次處理
+
+先看下面一個**同時處理並返回錯誤的**例子:
+
+```go
+func someFunc() (Result, error) {
+ result, err := repository.Find(id)
+ if err != nil {
+   log.Errof(err)
+   return Result{}, err
+ }
+  return result, nil
+}
+```
+
+這段程式碼先記錄錯誤, 並將其返回給函式調用方, 如此一來便處理了兩次錯誤, 當其他團隊成員使用此函式, 便會再記錄一次錯誤, 如此一來在 system log 中會重複記載同個錯誤
+
+想像應用程式有三層, `repository`, `interactor` 跟 `web server`:
+
+```go
+// The repository uses an external dependency orm
+func getFromRepository(id int) (Result, error) {
+  result := Result{ID: id}
+  err := orm.entity(&result)
+  if err != nil {
+    return Result{}, err
+  }
+  return result, nil 
+}
+```
+
+根據之前提到的原則, 正確方式是將錯誤返回到頂部來處理, 在 `web server` 獲取到全部的 feedback
+
+不幸的是 Go 內置錯誤並沒有提供 stack trace, 此外錯誤是在 external dependency 上產生, 我們需要了解在我們程式碼中的哪一段導致了這個錯誤
+
+可以通過新增 stack trace 及 `repository` 的錯誤訊息來重構前面的函式:
+
+```go
+import "github.com/pkg/errors"
+
+// The repository uses an external depedency orm
+func getFromRepository(id int) (Result, error) {
+  result := Result{ID: id}
+  err := orm.entity(&result)
+  if err != nil {
+    return Result{}, errors.Wrapf(err, "error getting the result with id %d", id);
+  }
+  return result, nil 
+}
+// after the error wraping the result will be
+// err.Error() -> error getting the result with id 10: whatever it comes from the orm
+```
+
 
 # Panic
 
