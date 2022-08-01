@@ -12,6 +12,7 @@
   - [select](#select)
   - [slice](#slice)
   - [goroutine](#goroutine)
+  - [interface](#interface)
 - [Coding](#coding)
 
 
@@ -235,6 +236,39 @@ func AddFruit(name, color string) {
     ```
 
 2. Thread 有哪幾種 model? Goroutine 實現原理與優勢為何?
+
+## interface
+
+1. 下列函式輸出為何?
+    ```go
+    package main
+
+    import "fmt"
+
+    type coder interface {
+        code()
+        debug()
+    }
+
+    type Gopher struct {
+        language string
+    }
+
+    func (p Gopher) code() {
+        fmt.Printf("I am coding %s language\n", p.language)
+    }
+
+    func (p *Gopher) debug() {
+        fmt.Printf("I am debuging %s language\n", p.language)
+    }
+
+    func main() {
+        var c coder = &Gopher{"Go"}
+        // var c coder = Gopher{"Go"}
+        c.code()
+        c.debug()
+    }
+    ```
 
 # Coding
 
