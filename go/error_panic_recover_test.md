@@ -9,7 +9,7 @@
     - [Use Errorf Function](#use-errorf-function)
     - [Use Struct Type and Field](#use-struct-type-and-field)
     - [Use Struct Methods](#use-struct-methods)
-  - [Error Handling](#error-handling)
+  - [Error Handling Design](#error-handling-design)
 - [Panic](#panic)
   - [Panic Use Cases](#panic-use-cases)
   - [Defer and Panic](#defer-and-panic)
@@ -577,7 +577,7 @@ error: length -5.00 is less than zero
 error: width -9.00 is less than zero
 ```
 
-## Error Handling
+## Error Handling Design
 
 上述介紹了 Go 中的 error 機制, 再來就是介紹錯誤處理的流程
 
@@ -668,14 +668,14 @@ func handleError(w http.ResponseWriter, err error) {
 }
 ```
 
-如此一來僅在頂層處理錯誤, 但會發現總是收到 500 的 http status code, 另外總是紀錄如 `result not found` 的錯誤只會為 log 增加垃圾資訊
+如此一來僅在頂層處理錯誤, 但會發現總是只收到 500 的 http status code, 另外總是紀錄如 `result not found` 的錯誤只會為 log 增加垃圾資訊, 並無法清楚地追縱並排查錯誤
 
-這裡有三個解決方案:
+這裡有三個 error handling design 需要注意的重點:
 - 提供良好的 error stack trace
 - Log the error(e.g. web infrastructure layer)
 - 必要時提供 contextual error info(e.g. Email 輸入格式不對)
 
-首先創建一個錯誤型別:
+下面範例構建一個 error handling library, 首先創建一個錯誤型別:
 
 ```go
 package errors
@@ -725,7 +725,7 @@ func (type ErrorType) Wrapf(err error, msg string, args ...interface{}) error {
 }
 ```
 
-公開 `ErrorType` 及 錯誤型別, 如此一來可以創建新錯誤並封裝現有錯誤
+export `ErrorType` 及 錯誤型別, 如此一來可以創建新錯誤並封裝現有錯誤
 
 另外有兩件事情需要注意:
 - 若沒有 export `customError` 將如何檢查錯誤型別?
@@ -882,6 +882,8 @@ func handleError(w http.ResponseWriter, err error) {
 ```
 
 > 透過 export 型別和一些值來優雅地處理錯誤, 這個設計方案的特色是可以顯式表明錯誤類型
+
+github repository: https://github.com/henrmota/errors-handling-example
 
 # Panic
 
