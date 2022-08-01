@@ -616,7 +616,7 @@ func getFromRepository(id int) (Result, error) {
 
 不幸的是 Go 內置錯誤並沒有提供 stack trace, 此外錯誤是在 external dependency 上產生, 我們需要了解在我們程式碼中的哪一段導致了這個錯誤
 
-可以通過新增 stack trace 及 `repository` 的錯誤訊息來重構前面的函式:
+可以使用 `github.com/pkg/errors` package, 通過新增 stack trace 及 `repository` 的錯誤訊息來重構前面的函式:
 
 ```go
 import "github.com/pkg/errors"
@@ -634,6 +634,254 @@ func getFromRepository(id int) (Result, error) {
 // err.Error() -> error getting the result with id 10: whatever it comes from the orm
 ```
 
+`errors.Wrapf` 函式的作用為, 在不影響原始錯誤的前提下構建 stack trace 並封裝來自 orm 的錯誤
+
+再來看看其他層如 `interactor` 是如何處理錯誤:
+
+```go
+func getInteractor(idString string) (Result, error) {
+  id, err := strconv.Atoi(idString)
+  if err != nil {
+    return Result{}, errors.Wrapf(err, "interactor converting id to int")
+  }
+  return repository.getFromRepository(id) 
+}
+```
+
+再來是頂層的 `web server`:
+
+```go
+r := mux.NewRouter()
+r.HandleFunc("/result/{id}", ResultHandler)
+func ResultHandler(w http.ResponseWriter, r *http.Request) {
+  vars := mux.Vars(r)
+  result, err := interactor.getInteractor(vars["id"])
+  if err != nil { 
+    handleError(w, err) 
+  }
+  fmt.Fprintf(w, result)
+}
+func handleError(w http.ResponseWriter, err error) { 
+   w.WriteHeader(http.StatusIntervalServerError)
+   log.Errorf(err)
+   fmt.Fprintf(w, err.Error())
+}
+```
+
+如此一來僅在頂層處理錯誤, 但會發現總是收到 500 的 http status code, 另外總是紀錄如 `result not found` 的錯誤只會為 log 增加垃圾資訊
+
+這裡有三個解決方案:
+- 提供良好的 error stack trace
+- Log the error(e.g. web infrastructure layer)
+- 必要時提供 contextual error info(e.g. Email 輸入格式不對)
+
+首先創建一個錯誤型別:
+
+```go
+package errors
+
+const(
+  NoType = ErrorType(iota)
+  BadRequest
+  NotFound 
+  // add any type you want
+)
+
+type ErrorType uint
+
+type customError struct {
+  errorType ErrorType 
+  originalError error 
+  contextInfo map[string]string 
+}
+
+// Error returns the mssage of a customError
+func (error customError) Error() string {
+   return error.originalError.Error()
+}
+
+// New creates a new customError
+func (type ErrorType) New(msg string) error {
+   return customError{errorType: type, originalError: errors.New(msg)}
+}
+
+// Newf creates a new customError with formatted message
+func (type ErrorType) Newf(msg string, args ...interface{}) error {    
+   err := fmt.Errof(msg, args...)
+
+   return customError{errorType: type, originalError: err}
+}
+
+// Wrap creates a new wrapped error
+func (type ErrorType) Wrap(err error, msg string) error {
+   return type.Wrapf(err, msg)
+}
+
+// Wrap creates a new wrapped error with formatted message
+func (type ErrorType) Wrapf(err error, msg string, args ...interface{}) error { 
+   newErr := errors.Wrapf(err, msg, args..)   
+
+   return customError{errorType: errorType, originalError: newErr}
+}
+```
+
+公開 `ErrorType` 及 錯誤型別, 如此一來可以創建新錯誤並封裝現有錯誤
+
+另外有兩件事情需要注意:
+- 若沒有 export `customError` 將如何檢查錯誤型別?
+- 對於外部依賴中預先存在的錯誤應如何增加或獲取錯誤內容?
+
+可以採用 `github.com/pkg/errors` 並封裝這些 library 方法:
+
+```go
+// New creates a no type error
+func New(msg string) error {
+   return customError{errorType: NoType, originalError: errors.New(msg)}
+}
+
+// Newf creates a no type error with formatted message
+func Newf(msg string, args ...interface{}) error {
+   return customError{errorType: NoType, originalError: errors.New(fmt.Sprintf(msg, args...))}
+}
+
+// Wrap wrans an error with a string
+func Wrap(err error, msg string) error {
+   return Wrapf(err, msg)
+}
+
+// Cause gives the original error
+func Cause(err error) error {
+   return errors.Cause(err)
+}
+
+// Wrapf wraps an error with format string
+func Wrapf(err error, msg string, args ...interface{}) error {
+   wrappedError := errors.Wrapf(err, msg, args...)
+   if customErr, ok := err.(customError); ok {
+      return customError{
+         errorType: customErr.errorType,
+         originalError: wrappedError,
+         contextInfo: customErr.contextInfo,
+      }
+   }
+
+   return customError{errorType: NoType, originalError: wrappedError}
+}
+```
+
+接著構建自定義方法來處理一般錯誤的 context 及型別:
+
+```go
+// AddErrorContext adds a context to an error
+func AddErrorContext(err error, field, message string) error {
+   context := errorContext{Field: field, Message: message}
+   if customErr, ok := err.(customError); ok {
+      return customError{errorType: customErr.errorType, originalError: customErr.originalError, contextInfo: context}
+   }
+
+   return customError{errorType: NoType, originalError: err, contextInfo: context}
+}
+
+// GetErrorContext returns the error context
+func GetErrorContext(err error) map[string]string {
+   emptyContext := errorContext{}
+   if customErr, ok := err.(customError); ok || customErr.contextInfo != emptyContext  {
+
+      return map[string]string{"field": customErr.context.Field, "message": customErr.context.Message}
+   }
+
+   return nil
+}
+
+// GetType returns the error type
+func GetType(err error) ErrorType {
+   if customErr, ok := err.(customError); ok {
+      return customErr.errorType
+   }
+
+   return NoType
+}
+```
+
+構建完成後, 下面就可以應用這個新的 error library:
+
+```go
+import "github.com/our_user/our_project/errors"
+// The repository uses an external depedency orm
+
+func getFromRepository(id int) (Result, error) {
+  result := Result{ID: id}
+  err := orm.entity(&result)
+  if err != nil {    
+    msg := fmt.Sprintf("error getting the  result with id %d", id)
+    switch err {
+    case orm.NoResult:
+        err = errors.Wrapf(err, msg);
+    default: 
+        err = errors.NotFound(err, msg);  
+    }
+    return Result{}, err
+  }
+  return result, nil 
+}
+// after the error wraping the result will be
+// err.Error() -> error getting the result with id 10: whatever it comes from the orm
+```
+
+再來是 `interactor`:
+
+```go
+func getInteractor(idString string) (Result, error) {
+  id, err := strconv.Atoi(idString)
+  if err != nil {
+    err = errors.BadRequest.Wrapf(err, "interactor converting id to int")
+    err = errors.AddContext(err, "id", "wrong id format, should be an integer")
+
+    return Result{}, err
+  }
+  return repository.getFromRepository(id) 
+}
+```
+
+最後是 `web server`:
+
+```go
+r := mux.NewRouter()
+r.HandleFunc("/result/{id}", ResultHandler)
+func ResultHandler(w http.ResponseWriter, r *http.Request) {
+  vars := mux.Vars(r)
+  result, err := interactor.getInteractor(vars["id"])
+  if err != nil { 
+    handleError(w, err) 
+  }
+  fmt.Fprintf(w, result)
+}
+func handleError(w http.ResponseWriter, err error) { 
+   var status int
+   errorType := errors.GetType(err)
+   switch errorType {
+     case BadRequest: 
+      status = http.StatusBadRequest
+     case NotFound: 
+      status = http.StatusNotFound
+     default: 
+      status = http.StatusInternalServerError
+   }
+   w.WriteHeader(status) 
+
+   if errorType == errors.NoType {
+     log.Errorf(err)
+   }
+   fmt.Fprintf(w,"error %s", err.Error()) 
+
+   errorContext := errors.GetContext(err) 
+   if errorContext != nil {
+     fmt.Printf(w, "context %v", errorContext)
+   }
+}
+```
+
+> 透過 export 型別和一些值來優雅地處理錯誤, 這個設計方案的特色是可以顯式表明錯誤類型
 
 # Panic
 
