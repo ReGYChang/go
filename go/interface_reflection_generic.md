@@ -1,4 +1,5 @@
 - [Interface](#interface)
+  - [Relationship between Go and Duck Typing](#relationship-between-go-and-duck-typing)
   - [Nil Interface](#nil-interface)
   - [Polymorphism with Open Closed Principle](#polymorphism-with-open-closed-principle)
   - [Composition Instead of Inheritance](#composition-instead-of-inheritance)
@@ -109,6 +110,90 @@ func main() {
     }
 }
 ```
+
+## Relationship between Go and Duck Typing
+
+首先來看一下 wiki 對於 `Duck Typing` 的定義:
+
+> If it looks like a duck, swims like a duck, and quacks like a duck, then it probably is a duck.
+
+`Duck Typing` 為動態程式語言的一種物件推斷策略, 其更關注於物件的行為而非物件的型別
+
+Go 作為一個靜態語言, 可以通過 `interface` 完美實現 duck typing
+
+例如在動態語言 python 中, 定義一個函式如下:
+
+```python
+def hello_world(coder):
+    coder.say_hello()
+```
+
+調用此函式時可以傳入任意型別, 只要其實現 `say_hello()` 函式即可, 若沒有實現則為在 runtime 出現錯誤
+
+而在靜態語言如 Java, C++ 中必須顯示聲明實現某個 interface 才能使用在需要此 interface 的地方, 若在程式中調用 `hello_world` 函式卻傳入未實現 `say_hello()` 的型別, 則會發生 compile error, 這也是靜態語言較安全的原因
+
+靜態語言可以在 compile time 就發現型別不匹配的錯誤, 不需像動態語言一樣必須運行到那一行程式碼才會報錯
+
+但靜態語言要求開發者在編寫程式碼階段需為每個變數規定資料型別, 動態語言則沒有這些要求, 程式碼相對更短小簡潔, 開發效率更高
+
+Go 作為一個現代靜態語言, 引入了動態語言便利的同時又會進行靜態型別檢查, 其不要求型別顯示聲明實現某個 interface, 只要實現相關的方法即可, compiler 就能進行檢查判斷
+
+舉個例子, 先定義一個 interface, 並使用此 interface 作為參數的函式:
+
+```go
+type IGreeting interface {
+	sayHello()
+}
+
+func sayHello(i IGreeting) {
+	i.sayHello()
+}
+```
+
+接著定義兩個 struct:
+
+```go
+type Go struct {}
+func (g Go) sayHello() {
+	fmt.Println("Hi, I am GO!")
+}
+
+type PHP struct {}
+func (p PHP) sayHello() {
+	fmt.Println("Hi, I am PHP!")
+}
+```
+
+最後在 `main` 函式中調用 `sayHello()` 函式:
+
+```go
+func main() {
+	golang := Go{}
+	php := PHP{}
+
+	sayHello(golang)
+	sayHello(php)
+}
+```
+
+output:
+
+```go
+Hi, I am GO!
+Hi, I am PHP!
+```
+
+`golang`, `php` struct 並沒有顯式聲明實現 `IGreeting` 型別, 只是實現了 interface 中的 `sayHello()` 函式
+
+實際上 compiler 在調用 `sayHello()` 函式時會將 `golang` 和 `php` 物件隱式轉換為 `IGreeting` 型別, 這也是靜態語言的型別檢查功能
+
+順便提一下動態語言的特點:
+
+> 變數綁定的型別是不確定的, 在 runtime 才能確定; 函式和方法可以接收任何型別的參數, 且調用時不需檢查參數型別, 也不需要實現 interface
+
+簡單總結, `Duck Typing` 為一種動態語言的特色, 一個物件有效的語義不是由繼承自特定的型別或實現特定的 interface, 而是由其**當前方法和屬性的集合**來決定
+
+Go 作為一種靜態語言, 通過 interface 實現了 `Duck Typing`, 實際上為 Go compiler 在其中做了隱式的型別轉換
 
 ## Nil Interface
 
