@@ -26,7 +26,15 @@
     - [Close Connection](#close-connection)
 - [Protobuf](#protobuf)
   - [Protobuf Setup](#protobuf-setup)
-  - [Protobuf Example](#protobuf-example)
+  - [Protobuf Usage](#protobuf-usage)
+    - [Define Message Type](#define-message-type)
+    - [Reserved Field](#reserved-field)
+    - [Field Type](#field-type)
+    - [Enumerations](#enumerations)
+    - [Any](#any)
+    - [oneof](#oneof)
+    - [map](#map)
+    - [Code Style](#code-style)
 
 # RPC
 
@@ -759,7 +767,36 @@ RPC 調用中的 request 和 response 在調用時都有著不小的消耗:
 
 同時 protobuf 會維護 `.proto` 檔案, 如此一來在 parsing 檔案生成 stub 程式時可以對 function name 進行編號, 傳輸時只需傳輸編號而不用傳 function name, 如此一來可以省下大量 bytes 傳輸量, 其他更多精巧的壓縮方式如 `TLV`, 可以參考 [proto encoding](https://link.zhihu.com/?target=https%3A//developers.google.com/protocol-buffers/docs/encoding)
 
+下面為 `protobuf` 格式定義的範例:
 
+```go
+// test.proto
+service Test {
+    rpc HowRpcDefine (Request) returns (Response) ; // define RPC function
+}
+message Request {
+    //type | field name | number
+    int64    user_id  = 1;
+    string   name     = 2;
+}
+message Response {
+    repeated int64 ids = 1; // repeated as array
+    Value info = 2;         // nested object
+    map<int, Value> values = 3;    // output map mapping
+}
+message Value {
+    bool is_man = 1;
+    int age = 2;
+}
+```
+
+以上範例包含函式定義, input parameter & output parameter, 可以看出幾個特點:
+- 有明確型別, 支持型別多樣
+- 每個 field 都有名稱
+- 每個 field 都有一個 number, 一般按順序排列
+- 能表達 array, map 等型別
+- 通過嵌套 message 可以表達複雜物件
+- 函式, 參數定義在同一個 `.proto` 檔案, **依賴雙方須同時持有檔案**並依次進行編解碼
 
 ## Protobuf Setup
 
@@ -800,7 +837,9 @@ libprotoc 3.14.0
 go get google.golang.org/protobuf/cmd/protoc-gen-go
 ```
 
-## Protobuf Example
+## Protobuf Usage
+
+以下為一個完整的 `protobuf` 使用範例說明:
 
 create `.proto` file: hello_world.proto
 
@@ -847,3 +886,76 @@ compile 結束後會產生一個 `hello_world.pb.go` 檔案, 即 compile 完成
 - 將 `protobuf` 相關資料結構傳遞給對應程式語言的 compile plugin, 由 plugin 負責將接收到的 `protobuf` 原生資料結構渲染輸出為特定語言 template
 
 後續提到的 `gRPC Plugins`, `gRPC-Gateway` 也是 `protoc` compile plugin, 將 `.proto` 檔案 compile 成對應組件所需要的原始檔
+
+### Define Message Type
+
+使用 `protobuf` 首先需要先在 `.proto` 檔案中定義型別:
+
+```go
+// student.proto
+syntax = "proto3";
+package main;
+
+// this is a comment
+message Student {
+  string name = 1;
+  bool male = 2;
+  repeated int32 scores = 3;
+}
+```
+
+在當前目錄下執行:
+
+```go
+$ protoc --go_out=. *.proto
+$ ls
+student.pb.go  student.proto
+```
+
+即將當前目錄下所有 `.proto` 檔案轉成 `.go` 檔案, 其中定義了剛剛 `.proto` 中所定義的 struct 及相關 methods:
+
+```go
+// student.pb.go
+type Student struct {
+	Name string `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	Male bool `protobuf:"varint,2,opt,name=male,proto3" json:"male,omitempty"`
+	Scores []int32 `protobuf:"varint,3,rep,packed,name=scores,proto3" json:"scores,omitempty"`
+	...
+}
+```
+
+逐行解讀 `student.proto`:
+- protobuf 有兩個版本, 默認版本為 `proto2`, 若需要 `proto3` 則需要在非空非註釋第一行註明 `syntax = "proto3"`
+- `package` 即 package 聲明符, 為可選, 用來防止不同的 message type namespace conflict
+- message type 使用 `message` 關鍵字定義, `Student` 為型別名稱, `name`, `male`, `scores` 為該型別的 3 個 field, 分別為 `string`, `bool` 和 `[]int32`, field 可以為 scalar type, 也可以為組合型別
+- 每個 field 修飾符默認為 `singular`, 一般省略, `repeated` 表示 field 可重複, Go 中表示為 array
+- 每個字符 `=` 後的數字稱為標識符, 給個 field 須提供一個 unique 標識符, 用來在 message binary format 中識別每個 field, 取值範圍為 `[1, 2^29-1]`
+- `.proto` 檔案可以寫註解, 當行註解 `//`, 多行註解 `/*...*/`
+- 一個 `.proto` 檔案中可以寫多個 message type, 即對應多個 struct
+
+### Reserved Field
+
+### Field Type
+
+### Enumerations
+
+### Any
+
+### oneof
+
+### map
+
+### Code Style
+
+- Files
+  - 檔案名稱使用 `LOWER_CASE`, 如 `lower_snake_case.proto`
+  - 每行不超過 80 字符
+  - 使用 2 個空格縮進
+- Packages
+  - package name 應該與目錄結構對應
+- Messages & Fields
+  - message name 使用首字母大寫 `CamelCase`, 如 `message StudentRequest { ... }`
+  - field name 使用 `LOWER_CASE`, 如 `string status_code = 1`
+  - enum type name 使用 首字母大寫 `CamelCase`, 如 `enum FooBar`, 值使用 `UPPER_CASE`, 如 `FOO_DEFAULT = 1`
+- Services
+  - RPC service name & method name 均使用首字母大寫 `CamelCase`, 如 `service FooService{ rpc GetSomething() }`
