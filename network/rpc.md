@@ -713,6 +713,28 @@ func (cc *ClientConn) Close() error {
 
 # Protobuf
 
+RPC framework 主要圍繞在以下三大特點不斷優化:
+- 具有約定調用語法
+- 需要約定內容編碼方式
+- 需要網絡傳輸
+
+希望以更優的方式達到更低的成本及更快的速度, 其中 `encode/decode` 就是一個非常重要的點
+
+RPC 調用中的 request 和 response 在調用時都有著不小的消耗:
+- 內容序列化及反序列化, 若效率更高則對 CPU effort 更小
+- 內容在網絡中傳輸, protocol stack 成本, bandwidth 成本, GC 成本等
+
+舉例來說很多業務會將結果 cache 到 redis, 而有時結果集很大, 緩存資料存放時都需要經過序列化, 常規的序列化方式為 `json`, 但 `json` 序列化之後體積很大, 對於體積龐大的 key 只要經歷一輪 concurrent read, redis CPU 及 bandwidth 就會瞬間飆高, 因此需要更高效的序列化策略
+
+這方面 RPC framwork 有以下幾個目標:
+- 盡可能快速完成序列化/反序列化
+- 序列化後體積盡可能小
+- 跨語言
+- 簡單, 型別明確
+- 容易擴展, 可以簡單迭代並向後兼容
+
+對此, `gRPC` 的解決方案為棄用 json, xml 這種傳統序列化方案, 轉向使用 `Protocol Buffers` 作為替代解決方案
+
 `Protocol buffers` 是一種與程式語言, 平台無耦合的資料交換格式, 用於序列化結構化資料, 較 XML, JSON 而言, `Protobuf` 序列化後的 data stream 更小, 傳輸速度更高, 且操作更簡單
 
 > Protocol buffers are a language-neutral, platform-neutral extensible mechanism for serializing structured data.
