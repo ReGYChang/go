@@ -79,6 +79,19 @@
       - [Perform a Single Equality Join with $lookup](#perform-a-single-equality-join-with-lookup)
       - [Use $lookup with an Array](#use-lookup-with-an-array)
       - [Use $lookup with $mergeObjects](#use-lookup-with-mergeobjects)
+- [Data Model Design Pattern](#data-model-design-pattern)
+  - [Approximation](#approximation)
+  - [Attribute](#attribute)
+  - [Bucket](#bucket)
+  - [Computed](#computed)
+  - [Document Versioning](#document-versioning)
+  - [Extended Reference](#extended-reference)
+  - [Outlier](#outlier)
+  - [Pre-allocation](#pre-allocation)
+  - [Polymorphic](#polymorphic)
+  - [Schema Versioning](#schema-versioning)
+  - [Subset](#subset)
+  - [Tree](#tree)
 - [No Usage](#no-usage)
 - [Reference](#reference)
 - [Official Tips](#official-tips)
@@ -1436,6 +1449,136 @@ The operation returns these documents:
   quantity: 1
 }
 ```
+
+# Data Model Design Pattern
+
+## Approximation
+
+The [Approximation Pattern](https://www.mongodb.com/blog/post/building-with-patterns-the-approximation-pattern) is useful when expensive calculations are frequently done and when the precision of those calculations is not the highest priority.
+
+Pros
+- Fewer writes to the database.
+- Maintain statistically valid numbers.
+
+Cons
+- Exact numbers aren’t being represented.
+- Implementation must be done in the application.
+
+## Attribute
+
+The [Attribute Pattern](https://www.mongodb.com/blog/post/building-with-patterns-the-attribute-pattern) is useful for problems that are based around having big documents with many similar fields but there is a subset of fields that share common characteristics and we want to sort or query on that subset of fields. When the fields we need to sort on are only found in a small subset of documents. Or when both of those conditions are met within the documents.
+
+Pros
+- Fewer indexes are needed.
+- Queries become simpler to write and are generally faster.
+
+## Bucket
+
+The [Bucket Pattern](https://www.mongodb.com/blog/post/building-with-patterns-the-bucket-pattern) is a great solution for when needing to manage streaming data, such as time-series, real-time analytics, or Internet of Things (IoT) applications.
+
+Pros
+- Reduces the overall number of documents in a collection.
+- Improves index performance.
+- Can simplify data access by leveraging pre-aggregation.
+
+## Computed
+
+When there are very read intensive data access patterns and that data needs to be repeatedly computed by the application, the [Computed Pattern](https://www.mongodb.com/blog/post/building-with-patterns-the-computed-pattern) is a great option to explore.
+
+Pros
+- Reduction in CPU workload for frequent computations.
+- Queries become simpler to write and are generally faster.
+
+Cons
+- It may be difficult to identify the need for this pattern.
+- Applying or overusing the pattern should be avoided unless needed.
+
+## Document Versioning
+
+When you are faced with the need to maintain previous versions of documents in MongoDB, the [Document Versioning](https://www.mongodb.com/blog/post/building-with-patterns-the-document-versioning-pattern) pattern is a possible solution.
+
+Pros
+- Easy to implement, even on existing systems.
+- No performance impact on queries on the latest revision.
+
+Cons
+- Doubles the number of writes.
+- Queries need to target the correct collection.
+
+## Extended Reference
+
+You will find the [Extended Reference](https://www.mongodb.com/blog/post/building-with-patterns-the-extended-reference-pattern) pattern most useful when your application is experiencing lots of JOIN operations to bring together frequently accessed data.
+
+Pros
+- Improves performance when there are a lot of JOIN operations.
+- Faster reads and a reduction in the overall number of JOINs.
+
+Cons
+- Data duplication.
+
+## Outlier
+
+Do you find that there are a few queries or documents that don’t fit into the rest of your typical data patterns? Are these exceptions driving your application solution? If so, the [Outlier Pattern](https://www.mongodb.com/blog/post/building-with-patterns-the-outlier-pattern) is a wonderful solution to this situation.
+
+Pros
+- Prevents a few documents or queries from determining an application’s solution.
+- Queries are tailored for “typical” use cases, but outliers are still addressed.
+
+Cons
+- Often tailored for specific queries, therefore ad hoc queries may not perform well.
+- Much of this pattern is done with application code.
+
+## Pre-allocation
+
+When you know your document structure and your application simply needs to fill it with data, the [Pre-Allocation Pattern](https://www.mongodb.com/blog/post/building-with-patterns-the-preallocation-pattern) is the right choice.
+
+Pros
+- Design simplification when the document structure is known in advance.
+Cons
+- Simplicity versus performance.
+
+## Polymorphic
+
+Polymorphic
+The [Polymorphic Pattern](https://www.mongodb.com/blog/post/building-with-patterns-the-polymorphic-pattern) is the solution when there are a variety of documents that have more similarities than differences and the documents need to be kept in a single collection.
+
+Pros
+- Easy to implement.
+- Queries can run across a single collection.
+
+## Schema Versioning
+
+Just about every application can benefit from the [Schema Versioning Pattern](https://www.mongodb.com/blog/post/building-with-patterns-the-schema-versioning-pattern) as changes to the data schema frequently occur in an application’s lifetime. This pattern allows for previous and current versions of documents to exist side by side in a collection.
+
+Pros
+- No downtime needed.
+- Control of schema migration.
+- Reduced future technical debt.
+
+Cons
+- Might need two indexes for the same field during migration.
+
+## Subset
+
+The [Subset Pattern](https://www.mongodb.com/blog/post/building-with-patterns-the-subset-pattern) solves the problem of having the working set exceed the capacity of RAM due to large documents that have much of the data in the document not being used by the application.
+
+Pros
+- Reduction in the overall size of the working set.
+- Shorter disk access time for the most frequently used data.
+
+Cons
+- We must manage the subset.
+- Pulling in additional data requires additional trips to the database.
+
+## Tree
+
+When data is of a hierarchical structure and is frequently queried, the [Tree Pattern](https://www.mongodb.com/blog/post/building-with-patterns-the-tree-pattern) is the design pattern to implement.
+
+Pros
+- Increased performance by avoiding multiple JOIN operations.
+
+Cons
+- Updates to the graph need to be managed in the application.
 
 # No Usage
 
