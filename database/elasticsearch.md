@@ -19,6 +19,18 @@
   - [Update Document](#update-document)
   - [Delete Document](#delete-document)
   - [Bulk Operations](#bulk-operations)
+- [Query DSL](#query-dsl)
+  - [Term Query](#term-query)
+    - [If Field Exist: exist](#if-field-exist-exist)
+    - [Search _id: ids](#search-_id-ids)
+    - [Search Prefix: prefix](#search-prefix-prefix)
+    - [Precise Search: term](#precise-search-term)
+    - [Multiple Precise Serach: terms](#multiple-precise-serach-terms)
+    - [Minimum Number of Multiple Precise Search: terms_set](#minimum-number-of-multiple-precise-search-terms_set)
+    - [Wildcard Query: wildcard](#wildcard-query-wildcard)
+    - [Range Query: range](#range-query-range)
+    - [Regular Expression Query: regexp](#regular-expression-query-regexp)
+    - [Fuzzy Query: fuzzy](#fuzzy-query-fuzzy)
 
 # What is Elasticsearch?
 
@@ -59,7 +71,7 @@ Elasticsearch 是基於 `Restful API`, 使用 `Java` 開發的 search engine, �
 - Cluster: 一個 cluster 有一個 unique identifier, default 為 `elasticsearch`, 具有相同 cluster name 的 nodes 才會組成一個 cluster
 - Node: 儲存 cluster data, 參與 cluster 索引和搜尋功能, node name default 為啟動時以一個隨機的 UUID 前七個字符, 通過 cluster name 在網絡中發現 member 並組成 cluster, single node 也可以為 cluster
 - Index: 一個 index 為一個 document 集合, 每個 index 有 unique name, 一個 cluster 中可以有任意多個 index
-- Document: 被索引的一筆資料, 索引的基本資料單元, 以 `JSON` 格式表示
+- Document: 被索引的一筆資料, 索引的基本資料單元, 以 `sh` 格式表示
 - Shard: 在創建一個 index 時可以指定分成多少個 shard 來儲存, 每個 shard 本身也是一個功能完善且獨立的 `"index"`, 可以被放置在 cluster 的任意 node 上
 
 | RDBMS               | Elasticserach          |
@@ -98,7 +110,7 @@ Elasticsearch 是基於 `Restful API`, 使用 `Java` 開發的 search engine, �
 
 ## Elasticsearch
 
-`Elasticsearch` 可對資料進行搜尋, 分析和儲存, 其是基於 `JSON` 的分散式搜尋和分析引擎, 專門為了實現水平擴展性, 高可用性及管理便攜性而設計
+`Elasticsearch` 可對資料進行搜尋, 分析和儲存, 其是基於 `sh` 的分散式搜尋和分析引擎, 專門為了實現水平擴展性, 高可用性及管理便攜性而設計
 
 其實現原理主要分為以下幾個步驟:
 - 將資料提交到 Elasticsearch 中
@@ -120,7 +132,7 @@ Kibana 最早是基於 Logstash 創建的工具, 後被 Elastic 公司於 2013 �
 在之前新增 document 時, 使用下面的方式會動態創建一個 customer 的 index:
 
 ```shell
-curl -X POST "localhost:9200/customer/_doc/1?pretty" -H 'Content-Type: application/json' -d'
+curl -X POST "localhost:9200/customer/_doc/1?pretty" -H 'Content-Type: application/sh' -d'
 {
   "name": "John Doe"
 }
@@ -129,7 +141,7 @@ curl -X POST "localhost:9200/customer/_doc/1?pretty" -H 'Content-Type: applicati
 
 這個 index 實際上已經自動創建了一個 mapping:
 
-```json
+```sh
 {
   "mappings": {
     "_doc": {
@@ -163,7 +175,7 @@ action.auto_create_index: false
 
 在 request body 中添加設置或是型別 mapping, 如下所示:
 
-```json
+```sh
 PUT /my_index
 {
     "settings": { ... any settings ... },
@@ -179,7 +191,7 @@ PUT /my_index
 
 ## Create Index
 
-```json
+```sh
 # create index test_index
 PUT /test_index?pretty
 {
@@ -217,7 +229,7 @@ PUT /test_index?pretty
 
 output:
 
-```json
+```sh
 {
   "acknowledged": true, # 是否在 cluster 中成功創建 index
   "shards_acknowledged": true,
@@ -227,7 +239,7 @@ output:
 
 ## Search Index
 
-```json
+```sh
 # 查看 index
 GET /test_index
 
@@ -240,7 +252,7 @@ GET /_cat/indices?v
 
 output:
 
-```json
+```sh
 {
   "test_index": {
     "aliases": {},
@@ -282,7 +294,7 @@ output:
 
 > ES 提供了一系列針對 index 修改的語法, 包括 replication 數量, 新增 field, refresh_interval, index parser, aliases 等配置的修改
 
-```json
+```sh
 # 修改 replication
 PUT /test_index/_settings
 {
@@ -312,7 +324,7 @@ PUT /teset_index/_mapping/_doc
 
 修改完成後再次查看 index config:
 
-```json
+```sh
 GET /test_index
 {
   "test_index": {
@@ -357,7 +369,7 @@ GET /test_index
 
 ## Delete Index
 
-```json
+```sh
 # 刪除 index
 DELETE /test_index
 
@@ -370,13 +382,13 @@ return: 404 - Not Found
 
 一旦 index 被關閉, 則此 index 只能顯示 metadata, 無法進行任何讀寫操作:
 
-```json
+```sh
 POST /test-index-users/_close
 ```
 
 關閉 index 後再插入資料:
 
-```json
+```sh
 POST /test-index-users/_doc
 {
     "name" : "test user2",
@@ -389,13 +401,13 @@ POST /test-index-users/_doc
 
 再打開 index:
 
-```json
+```sh
 POST /test-index-users/_open
 ```
 
 output:
 
-```json
+```sh
 {
     "acknowledged" : true,
     "shards_acknowledged" : true
@@ -403,7 +415,7 @@ output:
 
 此時又可以重新寫入資料:
 
-```json
+```sh
 POST /test-index-users/_doc
 {
     "name" : "test user2",
@@ -418,7 +430,7 @@ POST /test-index-users/_doc
 
 ## Create Document
 
-```json
+```sh
 # 新增單筆資料並指定 document id 為 1
 PUT /test_index/_doc/1?pretty
 {
@@ -441,7 +453,7 @@ PUT test_index/_doc/1?op_type=create
 
 此時可以查詢資料:
 
-```json
+```sh
 GET /test_index/_doc/_search
 {
   "took": 1,
@@ -481,7 +493,7 @@ GET /test_index/_doc/_search
 
 ## Search Document
 
-```json
+```sh
 # 根據 id 查詢單筆資料
 GET /test_index/_doc/1
 
@@ -587,7 +599,7 @@ GET /test_index/_doc/_search
 
 ## Update Document
 
-```json
+```sh
 # 根據 id 修改單筆資料
 PUT /test_index/_doc/1?pretty
 {
@@ -615,7 +627,7 @@ POST test_index/_update_by_query
 
 ## Delete Document
 
-```json
+```sh
 # 根據 id 刪除單筆資料
 DELETE /test_index/_doc/1
 
@@ -632,7 +644,7 @@ POST test_index/_delete_by_query
 
 ## Bulk Operations
 
-```json
+```sh
 POST _bulk
 { "index" : { "_index" : "test_test1", "_type" : "_doc", "_id" : "1" } }
 { "this_is_field1" : "this_is_index_value" }
@@ -690,3 +702,213 @@ GET /test_test1/_doc/_search
 - 更新 id=1 document
 
 > 實際環境中 bulk operation 使用較多, 其可大幅縮減 IO 以提升效率
+
+# Query DSL
+
+## Term Query
+
+`Term-level queries` 即根據結構化資料中的精確值來查找 document, 與 `Full text queries` 的不同之處在於, `Term-level queries` 不會對查詢值進行分詞, 直接於 `Inverted Index` 中進行精準查詢
+
+而 `Full text queries` 則會先對查詢的詞進行分詞, 並對分詞結果一一於 `Inverted Index` 進行模糊查詢
+
+以下設計一個測試資料集以範例說明:
+
+```sh
+PUT /test-dsl-term-level
+{
+  "mappings": {
+    "properties": {
+      "name": {
+        "type": "keyword"
+      },
+      "programming_languages": {
+        "type": "keyword"
+      },
+      "required_matches": {
+        "type": "long"
+      }
+    }
+  }
+}
+
+POST /test-dsl-term-level/_bulk
+{ "index": { "_id": 1 }}
+{"name": "Jane Smith", "programming_languages": [ "c++", "java" ], "required_matches": 2}
+{ "index": { "_id": 2 }}
+{"name": "Jason Response", "programming_languages": [ "java", "php" ], "required_matches": 2}
+{ "index": { "_id": 3 }}
+{"name": "Dave Pdai", "programming_languages": [ "java", "c++", "php" ], "required_matches": 3, "remarks": "hello world"}
+```
+
+### If Field Exist: exist
+
+由於種種原因, document field 的值可能不存在:
+- 原 sh 中 field 為 `null` 或 `[]`
+- 該 field 在 mapping 中被設置為 `"index": false`
+- field length 超出 mapping 中 `ignore_above` 設置長度
+- field 格式錯誤, 且 mapping 中定義 `ignore_malformed`
+
+可使用 `exist` 來查詢 field 是否存在:
+
+```sh
+GET /test-dsl-term-level/_search
+{
+  "query": {
+    "exists": {
+      "field": "remarks"
+    }
+  }
+}
+```
+
+### Search _id: ids
+
+`ids` 即為 search id:
+
+```sh
+GET /test-dsl-term-level/_search
+{
+  "query": {
+    "ids": {
+      "values": [3, 1]
+    }
+  }
+}
+```
+
+### Search Prefix: prefix
+
+通過 `prefix` 查找某個 field:
+
+```sh
+GET /test-dsl-term-level/_search
+{
+  "query": {
+    "prefix": {
+      "name": {
+        "value": "Jan"
+      }
+    }
+  }
+}
+```
+
+### Precise Search: term
+
+`term` 根據 `Postings lists` 進行精準查詢:
+
+```sh
+GET /test-dsl-term-level/_search
+{
+  "query": {
+    "term": {
+      "programming_languages": "php"
+    }
+  }
+}
+```
+
+### Multiple Precise Serach: terms
+
+依照每個查詢值進行 `term query`, 每個查詢值之間為 `OR` 關係:
+
+```sh
+GET /test-dsl-term-level/_search
+{
+  "query": {
+    "terms": {
+      "programming_languages": ["php","c++"]
+    }
+  }
+}
+```
+
+###  Minimum Number of Multiple Precise Search: terms_set
+
+The `terms_set` query is the same as the terms query, except you can define the number of matching terms required to return a document.
+
+```sh
+GET /test-dsl-term-level/_search
+{
+  "query": {
+    "terms_set": {
+      "programming_languages": {
+        "terms": [ "java", "php" ],
+        "minimum_should_match_field": "required_matches"
+      }
+    }
+  }
+}
+```
+
+### Wildcard Query: wildcard
+
+Returns documents that contain terms matching a wildcard pattern.
+
+```sh
+GET /test-dsl-term-level/_search
+{
+  "query": {
+    "wildcard": {
+      "name": {
+        "value": "D*ai",
+        "boost": 1.0,
+        "rewrite": "constant_score"
+      }
+    }
+  }
+}
+```
+
+### Range Query: range
+
+Returns documents that contain terms within a provided range.
+
+```sh
+GET /test-dsl-term-level/_search
+{
+  "query": {
+    "range": {
+      "required_matches": {
+        "gte": 3,
+        "lte": 4
+      }
+    }
+  }
+}
+```
+
+### Regular Expression Query: regexp
+
+Returns documents that contain terms matching a regular expression.
+
+```sh
+GET /test-dsl-term-level/_search
+{
+  "query": {
+    "regexp": {
+      "name": {
+        "value": "Ja.*",
+        "case_insensitive": true
+      }
+    }
+  }
+}
+```
+
+### Fuzzy Query: fuzzy
+
+Returns documents that contain terms similar to the search term, as measured by a Levenshtein edit distance.
+
+```sh
+GET /test-dsl-term-level/_search
+{
+  "query": {
+    "fuzzy": {
+      "remarks": {
+        "value": "hell"
+      }
+    }
+  }
+}
+```
