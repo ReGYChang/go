@@ -1,5 +1,11 @@
 - [What is Elasticsearch?](#what-is-elasticsearch)
 - [Elasticsearch Basic Concept](#elasticsearch-basic-concept)
+- [What is Lucene?](#what-is-lucene)
+  - [Inverted Index](#inverted-index)
+  - [Stored Field](#stored-field)
+  - [Document Values](#document-values)
+  - [When Search Occur](#when-search-occur)
+  - [Caching](#caching)
 - [Elastic Stack](#elastic-stack)
   - [Beats](#beats)
   - [Logstash](#logstash)
@@ -86,6 +92,126 @@ Elasticsearch 是基於 `Restful API`, 使用 `Java` 開發的 search engine, �
 | SELECT * FROM table | GET http://...         |
 | UPDATE table SET    | PUT http://...         |
 | DELETE              | DELETE http://...      |
+
+這邊先提出以下問題, 介紹完 ElasticSearch 底層工作原理再回來一一解答:
+- 為什麼搜尋 `*foo-bar*` 無法匹配 `foo-bar`?
+- 為什麼增加更多的 document 會壓縮 index?
+- 為什麼 ElasticSearch 需要佔用很大的記憶體空間?
+
+`Cluster` in the cloud:
+
+![es_concept_1](img/es_concept_1.png)
+
+Cloud 中每個正方形都代表一個 es `node`:
+
+![es_concept_2](img/es_concept_2.png)
+
+在一個或多個 node 之間, 多個綠色方塊組合成一個 `index`:
+
+![es_concept_3](img/es_concept_3.png)
+
+在一個 `index` 中, 分布在多個 `node` 裡的綠色方塊稱為 `shard`:
+
+![es_concept_4](img/es_concept_4.png)
+
+一個 `Elasticsearch Shard` 本質上為一個 `Lucene Index`
+
+![es_concept_5](img/es_concept_5.png)
+
+> `Lucene` 為一個 search library, Elasticsearch 是基於 Lucene 建立的, 接下來的故事要說明 Elasticsearch 是如何基於 Lucene 工作
+
+# What is Lucene?
+
+Lucene 中有許多小的 `segment`, 可以將其看成 Lucene 內部的 mini-index:
+
+![es_concept_6](img/es_concept_6.png)
+
+Segment 中有許多種類的資料結構: `Inverted Index`, `Stored Fields`, `Document Values`, `Cache`:
+
+![es_concept_7](img/es_concept_7.png)
+
+## Inverted Index
+
+最重要的 `Inverted Index`:
+
+![es_concept_8](img/es_concept_8.png)
+
+`Inverted Index` 主要包含兩部分:
+- 有序的 `Dictionary` (包含 term & frequency)
+- 與 `Term` 對應的 `Postings` (即存在這個 term 的文件)
+
+搜尋時會先將搜尋的內容分解, 然後在 `Dictionary` 中找到對應的 `Term`, 進而查找到與搜尋內容相關的文件內容:
+
+![es_concept_9](img/es_concept_9.png)
+
+查詢 `the fury`:
+
+![es_concept_10](img/es_concept_10.png)
+
+`AutoCompletion-Prefix`: 若想查找以字母 `c` 開頭的 term, 可以簡單地通過 `Binary Search` 在 `Inverted Index` 中找到如 `choice`, `coming` 這樣的 term
+
+![es_concept_11](img/es_concept_11.png)
+
+昂貴搜尋: 若想要搜尋所有包含 `our` 的 term, 則需要 scan 整個 `Inverted Index`
+
+![es_concept_12](img/es_concept_12.png)
+
+這種情況若想優化, 可以思考如何生成合適的 term:
+
+![es_concept_13](img/es_concept_13.png)
+
+1. 若想以 `postfix` 作為查詢條件, 可以為 term 做反向處理:
+
+    `* suffix -> xiffus *`
+2. 可以將 `GEO` 資訊轉換為 `GEO Hash`:
+   
+    `(60.6384, 6.5017) -> u4u8gyykk`
+3. 對於簡單數字可以為其生成多種形式的 term:
+    
+    `123 -> {1-hundreds, 12-tens, 123}`
+
+## Stored Field
+
+若想要搜尋包含某個特定內容的文件時, `Inverted Index` 就無法很好的解決問題, 因此 `Lucene` 另外提供了一種資料結構 `Stored Fields` 來解決這個問題
+
+本質上 `Stored Fields` 是一個簡單的 `key-value`, 默認情況下 Elasticsearch 會儲存整個文件的 JSON source
+
+## Document Values
+
+上述兩種資料結構仍無法解決如排序, 聚合, facet 等問題, 因為可能會需要讀取大量不需要使用的資料
+
+`Document Values` 主要被設計來解決以上問題, 其本質上是一個 `Column-oriented Storage`, 高度優化了具有相同型別資料的儲存結構
+
+為了提升效率, Elasticsearch 可以將 index 中某個 document value 全部讀到記憶體中進行操作, 如此一來大大提升訪問速度, 但同時也會消耗大量記憶體空間
+
+> 以上資料結構包括 `Inverted Index`, `Stored Fields`, `Document Values` 及其 cache, 都在 `segment` 內部
+
+## When Search Occur
+
+搜尋時 Lucene 會搜尋所有的 segment, 並將每個 segment 的搜尋結果合併返回
+
+Lucene 的一些特性使得這個過程非常重要:
+- Segments are `immutable`
+  - 當刪除 documents 時, Lucene 只是將其標誌為刪除, 但檔案本身不會發生改變
+  - 當更新 documents 時, 本質上 Lucene 是先將 document 刪除, 再 `Re-index`
+- Lucene 非常擅長資料壓縮
+- Cache everything
+
+## Caching
+
+當 Elasticsearch index 一個 document 時, 會為 document 建立對應的 cache, 並定期(s) 刷新資料:
+
+![es_concept_14](img/es_concept_14.png)
+
+segments 會隨著時間越來越多...
+
+![es_concept_15](img/es_concept_15.png)
+
+Elasticsearch 會將這些 segment 合併為新的 segment:
+
+![es_concept_16](img/es_concept_16.png)
+
+
 
 # Elastic Stack
 
