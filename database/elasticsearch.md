@@ -12,6 +12,7 @@
   - [Elasticsearch](#elasticsearch)
   - [Kibana](#kibana)
 - [Index Modules](#index-modules)
+- [Inverted Index](#inverted-index-1)
   - [Index Management](#index-management)
   - [Index Format](#index-format)
   - [Create Index](#create-index)
@@ -252,6 +253,46 @@ Kibana 最早是基於 Logstash 創建的工具, 後被 Elastic 公司於 2013 �
 # Index Modules
 
 > Index Modules are modules created per index and control all aspects related to an index.
+
+# Inverted Index
+
+當一段文字導入到 Elasticsearch 中, 會需要經過一段 `indexing` 的過程
+
+![inverted_index](img/inverted_index.png)
+
+`Inverted Index` 類似於在書結尾處所看到的 index, 其主要負責將 document 中出現過的 term 映射到 document:
+
+![book_index](img/book_index.png)
+
+舉例來說, 可以從以下字符串來構建 `Inverted Index`:
+
+![inverted_index_string_example](img/inverted_index_string_example.png)
+
+Elasticsearch 會根據建立 index 的三個 documents 中來構建 `Inverted Index`:
+
+| Term     | Frequency | Document (postings) |
+| -------- | --------- | ------------------- |
+| choice   | 1         | 3                   |
+| day      | 1         | 2                   |
+| is       | 3         | 1,2,3               |
+| it       | 1         | 1                   |
+| last     | 1         | 2                   |
+| of       | 1         | 2                   |
+| sunday   | 2         | 1,2                 |
+| the      | 3         | 2,3                 |
+| tomorrow | 1         | 1                   |
+| week     | 1         | 2                   |
+| yours    | 1         | 3                   |
+
+與常規的根據 document id 來查詢 term 相反, `Inverted Index` 是根據 term 來查詢對應的 document ids
+
+需注意以下幾點:
+- 刪除符號並小寫後, document 會按照 term 進行細分
+- term 會以字母順序排序
+- `Frequency` 代表該 term 在整個 document set 中出現的次數
+- `Posting list` 主要紀錄該 term 的確切位置 (document offset)
+
+默認情況下 Elasticsearch 會為 document 中所有的 field 構建 `Inverted Index`, 並指向該 field 所在的 document
 
 ## Index Management
 
