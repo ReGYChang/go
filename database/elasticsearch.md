@@ -6,6 +6,7 @@
   - [Document Values](#document-values)
   - [When Search Occur](#when-search-occur)
   - [Caching](#caching)
+  - [Index Structure](#index-structure)
 - [Elastic Stack](#elastic-stack)
   - [Beats](#beats)
   - [Logstash](#logstash)
@@ -211,6 +212,35 @@ segments 會隨著時間越來越多...
 Elasticsearch 會將這些 segment 合併為新的 segment:
 
 ![es_concept_16](img/es_concept_16.png)
+
+## Index Structure
+
+Index structure in Lucene:
+
+![index_structure](img/index_structure.png)
+
+Index structure files:
+
+| Name                | Extension  | Brief Description                                                                                                       |
+| ------------------- | ---------- | ----------------------------------------------------------------------------------------------------------------------- |
+| Segments File       | segments_N | Stores                                                                                                                  | information about a commit point |
+| Lock File           | write.lock | The Write lock prevents multiple IndexWriters from writing to the same file.                                            |
+| Segment Info        | .si        | Stores metadata about a segment                                                                                         |
+| Compound File       | .cfs, .cfe | An optional "virtual" file consisting of all the other index files for systems that frequently run out of file handles. |
+| Fields              | .fnm       | Stores information about the fields                                                                                     |
+| Field Index         | .fdx       | Contains pointers to field data                                                                                         |
+| Field Data          | .fdt       | The stored fields for documents                                                                                         |
+| Term Dictionary     | .tim       | The term dictionary, stores term info                                                                                   |
+| Term Index          | .tip       | The index into the Term Dictionary                                                                                      |
+| Frequencies         | .doc       | Contains the list of docs which contain each term along with frequency                                                  |
+| Positions           | .pos       | Stores position information about where a term occurs in the index                                                      |
+| Payloads            | .pay       | Stores additional per-position metadata information such as character offsets and user payloads                         |
+| Norms               | .nvd, .nvm | Encodes length and boost factors for docs and fields                                                                    |
+| Per-Document Values | .dvd, .dvm | Encodes additional scoring factors or other per-document information.                                                   |
+| Term Vector Index   | .tvx       | Stores offset into the document data file                                                                               |
+| Term Vector Data    | .tvd       | Contains term vector data.                                                                                              |
+| Live Documents      | .liv       | Info about what documents are live                                                                                      |
+| Point values        | .dii, .dim | Holds indexed points, if any                                                                                            |
 
 
 
