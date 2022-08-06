@@ -8,6 +8,7 @@
     - [Goexit](#goexit)
     - [GOMAXPROCS](#gomaxprocs)
     - [Other](#other)
+  - [Return errro with Goroutine: errGroup](#return-errro-with-goroutine-errgroup)
 - [Context](#context)
   - [context Usage](#context-usage)
     - [WithValue](#withvalue)
@@ -407,6 +408,57 @@ func GC()
 
 調用觸發 GC 執行
 
+## Return errro with Goroutine: errGroup
+
+一般在使用 goroutine 時都無法 return 值, 若要將 goroutine 執行後的結果傳送出去則需使用 `channel` 來完成, 而 `errGroup` package 則適用於在 goroutine 執行後遇到 error 則停止的場景, 且需要關注 error value 並處理
+
+使用 `errGroup` 首先需要下載 package:
+
+```go
+go get -u golang.org/x/sync
+```
+
+```go
+package main
+
+import (
+    "fmt"
+    "log"
+    "net/http"
+
+    "golang.org/x/sync/errgroup"
+)
+
+func main() {
+    eg := errgroup.Group{}
+    eg.Go(func() error {
+        return getPage("https:/regy.dev")
+    })
+    eg.Go(func() error {
+        return getPage("https://google.com")
+    })
+    if err := eg.Wait(); err != nil {
+        log.Fatalf("get error: %v", err)
+    }
+}
+
+func getPage(url string) error {
+    resp, err := http.Get(url)
+    if err != nil {
+        return err
+    }
+    if resp.StatusCode != http.StatusOK {
+        return fmt.Errorf("fail to get page: %s, wrong statusCode: %d", url, resp.StatusCode)
+    }
+    log.Printf("success get page %s", url)
+    return nil
+}
+```
+
+- 首先建立 `group struct`, 這個 struct 本身沒有 field 需要設值
+- `group struct` 提供兩個函式, 分別為 `Go` 及 `Wait`, 用法與 `waitGroup` 類似
+- `Go` 函式接受一個 function 作為參數並返回 error
+- `Wait` 會將當前 goroutine block 並等待所開啟的 goroutine 執行完畢才會跳脫
 
 # Context
 
