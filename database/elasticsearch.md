@@ -6,6 +6,9 @@
   - [Document Values](#document-values)
   - [When Search Occur](#when-search-occur)
   - [Caching](#caching)
+  - [Search in Shard](#search-in-shard)
+  - [Scale Out](#scale-out)
+  - [A Real Query](#a-real-query)
   - [Index Structure](#index-structure)
 - [Elastic Stack](#elastic-stack)
   - [Beats](#beats)
@@ -214,6 +217,61 @@ Elasticsearch 會將這些 segment 合併為新的 segment:
 
 ![es_concept_16](img/es_concept_16.png)
 
+## Search in Shard
+
+Elasticsearch 在 shard 中的搜尋過程與 Lucene Segment 搜尋過程類似:
+
+![es_concept_17](img/es_concept_17.png)
+
+與 Lucene Segment 搜尋不同在於, shard 可以分佈在不同的 node 上, 所以在搜尋並返回結果時所有的資料都需通過網絡傳輸
+
+還有一點需要特別注意:
+
+> 一次搜尋查照兩個 shard 等價於兩次分別搜尋 shard
+
+![es_concept_18](img/es_concept_18.png)
+
+## Scale Out
+
+Cluster 擴充時 shard 不會進行更近一步的拆分, 但是可能會被轉移到不同的 node 上:
+
+![es_concept_19](img/es_concept_19.png)
+
+可以為更重要的 index node 分配行能更佳的機器, 並確保每個 shard 都有 replication:
+
+![es_concept_20](img/es_concept_20.png)
+
+## A Real Query
+
+Query request 可能被分發到 cluster 中任意一個 node:
+
+![es_concept_21](img/es_concept_21.png)
+
+此時這個 node 就成為當前 request 的 `coordinator`:
+
+![es_concept_22](img/es_concept_22.png)
+
+`Coordinator` 會根據 index 資訊判斷 request routing 到哪個 node, 及判斷哪個 replication 為可用:
+
+![es_concept_23](img/es_concept_23.png)
+
+Elasticsearch 會將 Query 轉換成 Lucene Query:
+
+![es_concept_24](img/es_concept_24.png)
+
+並在所有的 segment 中執行計算:
+
+![es_concept_25](img/es_concept_25.png)
+
+Lucene 對於 filter 也會產生 cache(`Filter PerSegment Cache`):
+
+![es_concept_26](img/es_concept_26.png)
+
+查詢結束後, 結果會沿著下行路徑向上逐層返回:
+
+![es_concept_27](img/es_concept_27.png)
+
+
 ## Index Structure
 
 Index structure in Lucene:
@@ -242,6 +300,10 @@ Index structure files:
 | Term Vector Data    | .tvd       | Contains term vector data.                                                                                              |
 | Live Documents      | .liv       | Info about what documents are live                                                                                      |
 | Point values        | .dii, .dim | Holds indexed points, if any                                                                                            |
+
+Index files relationship:
+
+![es_files_relationship](img/es_files_relationship.png)
 
 
 
