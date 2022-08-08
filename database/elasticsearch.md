@@ -12,6 +12,7 @@
   - [Logstash](#logstash)
   - [Elasticsearch](#elasticsearch)
   - [Kibana](#kibana)
+  - [X-Pack](#x-pack)
 - [Index Modules](#index-modules)
 - [Inverted Index](#inverted-index-1)
   - [Index Management](#index-management)
@@ -279,6 +280,22 @@ Index structure files:
 `Kibana` 實現資料可視化, 其作用為將 Elasticsearch 中的資料以圖表的形式呈現, 且具有可擴展的使用者介面, 可以配置並管理 Elasticsearch
 
 Kibana 最早是基於 Logstash 創建的工具, 後被 Elastic 公司於 2013 年收購
+
+## X-Pack
+
+![es_x_pack](img/es_x_pack.png)
+
+- Security
+  - Authentication
+  - Authorization
+  - Encryption
+  - Layerd security
+- Alerting
+- Monitoring
+- Reporting
+- Graph analytics
+- dedicated APM UIs
+- Machine Learning
 
 # Index Modules
 
