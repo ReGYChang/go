@@ -1,4 +1,10 @@
 - [What is Elasticsearch?](#what-is-elasticsearch)
+- [Elastic Stack](#elastic-stack)
+  - [Beats](#beats)
+  - [Logstash](#logstash)
+  - [Elasticsearch](#elasticsearch)
+  - [Kibana](#kibana)
+  - [X-Pack](#x-pack)
 - [Elasticsearch Basic Concept](#elasticsearch-basic-concept)
 - [What is Lucene?](#what-is-lucene)
   - [Inverted Index](#inverted-index)
@@ -10,15 +16,9 @@
   - [Scale Out](#scale-out)
   - [A Real Query](#a-real-query)
   - [Index Structure](#index-structure)
-- [Elastic Stack](#elastic-stack)
-  - [Beats](#beats)
-  - [Logstash](#logstash)
-  - [Elasticsearch](#elasticsearch)
-  - [Kibana](#kibana)
-  - [X-Pack](#x-pack)
-- [Index Modules](#index-modules)
 - [Inverted Index](#inverted-index-1)
   - [Finite State Transducer](#finite-state-transducer)
+- [Index Modules](#index-modules)
   - [Index Management](#index-management)
   - [Index Format](#index-format)
   - [Create Index](#create-index)
@@ -77,6 +77,58 @@ Elasticsearch 是基於 `Restful API`, 使用 `Java` 開發的 search engine, �
 - distributed real-time documents storage, 每個 field 都可以被索引及搜尋
 - distributed real-time analytic search engine
 - 能支撐上百個節點擴充, 並支持 PB 級結構化或非結構化資料儲存
+
+# Elastic Stack
+
+> Beats + Logstash + Elasticsearch + Kibana
+
+![elastic_search](img/elastic_stack.png)
+
+## Beats
+
+`Beats` 是一個輕量型採集器平台, 這些採集器可以從 edge mechine 向 `Logstash` 或 `Elasticsearch` 發送資料, 期由 Go 進行開發, 運行效率較高, 不同的 beats 套件針對不同的 data source
+
+## Logstash
+
+`Logstash` 是動態資料收集管道, 擁有可擴充的 plugin 生態, 支持從不同來源收集資料並轉換, 最後將資料發送到不同的資料庫中, 能與 Elasticsearch 產生強大的協同作用, 在 2013 年被 Elastic 公司收購
+
+其具有以下特性:
+- 實時解析與轉化資料
+- 可擴展性
+- 可用性, 會通過持久話隊列來保證至少將運行中的事件送達一次
+- 安全性, 可對資料進行傳輸加密
+- 可監控
+
+## Elasticsearch
+
+`Elasticsearch` 可對資料進行搜尋, 分析和儲存, 其是基於 `sh` 的分散式搜尋和分析引擎, 專門為了實現水平擴展性, 高可用性及管理便攜性而設計
+
+其實現原理主要分為以下幾個步驟:
+- 將資料提交到 Elasticsearch 中
+- 通過分詞器將對應語句分詞
+- 將分詞結果及權重一並存入, 在搜尋資料時根據權重將結果排名並返回
+
+## Kibana
+
+`Kibana` 實現資料可視化, 其作用為將 Elasticsearch 中的資料以圖表的形式呈現, 且具有可擴展的使用者介面, 可以配置並管理 Elasticsearch
+
+Kibana 最早是基於 Logstash 創建的工具, 後被 Elastic 公司於 2013 年收購
+
+## X-Pack
+
+![es_x_pack](img/es_x_pack.png)
+
+- Security
+  - Authentication
+  - Authorization
+  - Encryption
+  - Layerd security
+- Alerting
+- Monitoring
+- Reporting
+- Graph analytics
+- dedicated APM UIs
+- Machine Learning
 
 # Elasticsearch Basic Concept
 
@@ -306,64 +358,6 @@ Index files relationship:
 
 ![es_files_relationship](img/es_files_relationship.png)
 
-
-
-# Elastic Stack
-
-> Beats + Logstash + Elasticsearch + Kibana
-
-![elastic_search](img/elastic_stack.png)
-
-## Beats
-
-`Beats` 是一個輕量型採集器平台, 這些採集器可以從 edge mechine 向 `Logstash` 或 `Elasticsearch` 發送資料, 期由 Go 進行開發, 運行效率較高, 不同的 beats 套件針對不同的 data source
-
-## Logstash
-
-`Logstash` 是動態資料收集管道, 擁有可擴充的 plugin 生態, 支持從不同來源收集資料並轉換, 最後將資料發送到不同的資料庫中, 能與 Elasticsearch 產生強大的協同作用, 在 2013 年被 Elastic 公司收購
-
-其具有以下特性:
-- 實時解析與轉化資料
-- 可擴展性
-- 可用性, 會通過持久話隊列來保證至少將運行中的事件送達一次
-- 安全性, 可對資料進行傳輸加密
-- 可監控
-
-## Elasticsearch
-
-`Elasticsearch` 可對資料進行搜尋, 分析和儲存, 其是基於 `sh` 的分散式搜尋和分析引擎, 專門為了實現水平擴展性, 高可用性及管理便攜性而設計
-
-其實現原理主要分為以下幾個步驟:
-- 將資料提交到 Elasticsearch 中
-- 通過分詞器將對應語句分詞
-- 將分詞結果及權重一並存入, 在搜尋資料時根據權重將結果排名並返回
-
-## Kibana
-
-`Kibana` 實現資料可視化, 其作用為將 Elasticsearch 中的資料以圖表的形式呈現, 且具有可擴展的使用者介面, 可以配置並管理 Elasticsearch
-
-Kibana 最早是基於 Logstash 創建的工具, 後被 Elastic 公司於 2013 年收購
-
-## X-Pack
-
-![es_x_pack](img/es_x_pack.png)
-
-- Security
-  - Authentication
-  - Authorization
-  - Encryption
-  - Layerd security
-- Alerting
-- Monitoring
-- Reporting
-- Graph analytics
-- dedicated APM UIs
-- Machine Learning
-
-# Index Modules
-
-> Index Modules are modules created per index and control all aspects related to an index.
-
 # Inverted Index
 
 當一段文字導入到 Elasticsearch 中, 會需要經過一段 `indexing` 的過程
@@ -433,6 +427,10 @@ Lucene 在資料寫入後會根據原始數據進行分詞, 並生成 `posting l
 - 將每個 block 所有 terms 的公共前綴抽出來(Allen 和 After 公共前綴為 A)
 - 為了加速查詢效能, `FST` 永駐 `heap`, 無法被 `GC`
 - 查詢時先通過 term 查詢 memory 中的 FST, 找到該 term 對應的 block address, 再讀取 disk 上的 term dictionary, 將 block 加載至 memory 遍歷(`O(logN)`), 按照一定排序規則生成 DocID 的 `priority queue`, 並按 `priority queue` 循序讀取 disk 中的 raw data(column/row based)
+
+# Index Modules
+
+> Index Modules are modules created per index and control all aspects related to an index.
 
 ## Index Management
 
