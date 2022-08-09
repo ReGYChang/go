@@ -18,6 +18,7 @@
   - [X-Pack](#x-pack)
 - [Index Modules](#index-modules)
 - [Inverted Index](#inverted-index-1)
+  - [Finite State Transducer](#finite-state-transducer)
   - [Index Management](#index-management)
   - [Index Format](#index-format)
   - [Create Index](#create-index)
@@ -402,6 +403,36 @@ Elasticsearch 會根據建立 index 的三個 documents 中來構建 `Inverted I
 - `Posting list` 主要紀錄該 term 的確切位置 (document offset)
 
 默認情況下 Elasticsearch 會為 document 中所有的 field 構建 `Inverted Index`, 並指向該 field 所在的 document
+
+Lucene 在資料寫入後會根據原始數據進行分詞, 並生成 `posting list`
+
+查詢時會先通過 `inverted index` 找到資料位置(DocID) 再讀取原始資料(column/row based)
+
+![inverted_index_impl](img/inverted_index_impl.png)
+
+由於 Lucene 會為原始資料中每個 term 生成 inverted index, 資料量非常大, 所以 inverted index 對應的 posting list 則會存放在 disk 上
+
+因此若每次查詢都直接讀取 disk 上的 posting list, 會產生大量的 disk I/O 嚴重影響查詢效能
+
+為了解決 disk I/O 的問題, Lucene 引入了 secondary index `FST(Finite State Transducer)`, 不但壓縮了儲存空間, 且大幅提升查詢效能
+
+## Finite State Transducer
+
+`FST` 在 Lucene 中扮演非常重要的角色, 主要用於在龐大的 `term dictionary` 中快速定位 `term` 的位置
+
+`FST` 可以實現 key-value mapping, 相對於 `hashmap` 和 `treemap` 來說, `FST` 在查詢效率上稍遜於兩者, 但在空間效率上則是遠勝於兩者
+
+> `FST` 達到了保證 term 查詢效率的前提下, 盡可能縮減儲存空間的目的
+
+與 `Trie Tree` 不同點在於, `FST` 不僅共享前綴, 還共享後綴:
+
+![trie_vs_fsa](img/trie_vs_fsa.png)
+
+其在 Lucene 中實現原理如下:
+- 將 `term dictionary` 拆分成多個 block, 每個 block 包含 25~48 個 terms(Allen 和 After 組成一個 block)
+- 將每個 block 所有 terms 的公共前綴抽出來(Allen 和 After 公共前綴為 A)
+- 為了加速查詢效能, `FST` 永駐 `heap`, 無法被 `GC`
+- 查詢時先通過 term 查詢 memory 中的 FST, 找到該 term 對應的 block address, 再讀取 disk 上的 term dictionary, 將 block 加載至 memory 遍歷(`O(logN)`), 按照一定排序規則生成 DocID 的 `priority queue`, 並按 `priority queue` 循序讀取 disk 中的 raw data(column/row based)
 
 ## Index Management
 
