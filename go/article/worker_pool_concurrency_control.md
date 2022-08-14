@@ -267,7 +267,7 @@ var (
 
 到目前為止, 已經完成最開始問題所設定的目標, 即在 concurrency control 的前提下完成 parallelization, 最大化執行效能且最小化 memory overhead
 
-但如果日後想在其他場景也能使用 worker pool, 還需要將程式碼進行封裝及抽象, 已讓任何類型的業務邏輯也能輕鬆調用 worker pool
+但如果日後想在其他場景也能使用 worker pool, 還需要將程式碼進行封裝及抽象, 以讓任何類型的業務邏輯都能輕鬆調用 worker pool
 
 # Follow Up
 
