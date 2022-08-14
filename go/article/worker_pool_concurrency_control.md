@@ -1,7 +1,7 @@
-最近在實作數據中台的 service, 由於 service 設計上需要滿足 parallelization 及 high-conccurency 的需求, 軟體架構設計上希望透過 `Worker Pool` 來完成, 也藉此機會精進 `go concurrency control`
+最近在實作數據中台的 service, 由於 service 設計上需要滿足 parallelization 及 high-concurrency 的需求, 軟體架構設計上希望透過 `Worker Pool` 來完成, 也藉此機會精進 `go concurrency control`
 
 偶然間讀到一篇著於 2015 年的文章 [Handling 1 Million Requests per Minute with Go
-](http://marcio.io/2015/07/handling-1-million-requests-per-minute-with-golang/), 文章內容深受啟發, 推薦大家有機會可以讀一下原文
+](http://marcio.io/2015/07/handling-1-million-requests-per-minute-with-golang/), 深受文章內容啟發, 推薦大家有機會可以讀一下原文
 
 本文主要紀錄說明文章精華, 並將程式碼封裝為通用 package component, 簡化所有 service 的 `Worker Pool` 調用流程
 
