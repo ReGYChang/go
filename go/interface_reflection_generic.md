@@ -1,5 +1,6 @@
 - [Interface](#interface)
   - [Relationship between Go and Duck Typing](#relationship-between-go-and-duck-typing)
+  - [Value Receiver vs Pointer Receiver](#value-receiver-vs-pointer-receiver)
   - [Nil Interface](#nil-interface)
   - [Polymorphism with Open Closed Principle](#polymorphism-with-open-closed-principle)
   - [Composition Instead of Inheritance](#composition-instead-of-inheritance)
@@ -195,6 +196,135 @@ Hi, I am PHP!
 
 Go 作為一種靜態語言, 通過 interface 實現了 `Duck Typing`, 實際上為 Go compiler 在其中做了隱式的型別轉換
 
+## Value Receiver vs Pointer Receiver
+
+`method` 能為自定義型別擴展行為, 與 `function` 的差別在於 method 有一個 `receiver`, `receiver` 可以是 `value receiver` 或 `pointer receiver`
+
+在調用 method 時, `value type` 既可以調用 `value receiver method`, 也可以調用 `pointer receiver method`; `pointer type` 亦同
+
+> 不論 method receiver 為什麽型別, 該型別的 value 和 pointer 都可以調用
+
+```go
+package main
+
+import "fmt"
+
+type Person struct {
+	age int
+}
+
+func (p Person) howOld() int {
+	return p.age
+}
+
+func (p *Person) growUp() {
+	p.age += 1
+}
+
+func main() {
+	// qcrao is value type
+	qcrao := Person{age: 18}
+
+	// value type call value receiver method
+	fmt.Println(qcrao.howOld())
+
+	// value type call pointer receiver method
+	qcrao.growUp()
+	fmt.Println(qcrao.howOld())
+
+	// ----------------------
+
+	// stefno is pointer type
+	stefno := &Person{age: 100}
+
+	// pointer type call value receiver method
+	fmt.Println(stefno.howOld())
+
+	// pointer type call pointer receiver method
+	stefno.growUp()
+	fmt.Println(stefno.howOld())
+}
+```
+
+output:
+
+```go
+18
+19
+100
+101
+```
+
+調用 `growUp` method 後, 不論調用者為 `value type` 還是 `pointer type`, 其 `Age` 值都改變了
+
+實際上當型別與 `method receiver` 不同時 compiler 在背後隱式做了一些轉換:
+
+| -                   | value receiver                                                                | pointer receiver                                                                        |
+| ------------------- | ----------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| value type caller   | method 會使用調用者的 copy, 類似 `pass by value`                              | 使用value reference 來調用 method, 上例中 `qcrao.growUp()` 實際上為 `(&qcrao).growUp()` |
+| pointer type caller | pointer dereferencing, 上例中 `stefno.howOld()` 實際上為 `(*stefno).howOld()` | 實際上也是 `pass by value`, value 為 pointer                                            |
+
+前面提到, 不論 `receiver type` 為 `value type` 還是 `pointer type` 都可以通過 `value type` 或 `pointer type` 調用, 底層是通過語法糖作用
+
+> 結論為, implement value type receiver method 相當於 implement pointer type receiver method; 而 implement pointer type receiver method 不會自動 implement value type receiver method
+
+```go
+package main
+
+import "fmt"
+
+type coder interface {
+	code()
+	debug()
+}
+
+type Gopher struct {
+	language string
+}
+
+func (p Gopher) code() {
+	fmt.Printf("I am coding %s language\n", p.language)
+}
+
+func (p *Gopher) debug() {
+	fmt.Printf("I am debuging %s language\n", p.language)
+}
+
+func main() {
+	var c coder = &Gopher{"Go"}
+	c.code()
+	c.debug()
+}
+```
+
+`Gopher struct` 實現了兩個方法, 分別為 `value type receiver` 和 `pointer type receiver`
+
+在 `main` 函式中通過 interface type 的變數調用了定義的兩個 methods:
+
+```go
+I am coding Go language
+I am debuging Go language
+```
+
+但如果將 `&Gopher` 改成 `Gopher`:
+
+```go
+func main() {
+	var c coder = Gopher{"Go"}
+	c.code()
+	c.debug()
+}
+```
+
+則會報錯:
+
+```go
+./main.go:23:6: cannot use Gopher literal (type Gopher) as type coder in assignment:
+	Gopher does not implement coder (debug method has pointer receiver)
+```
+
+報錯原因為 `Gopher` 沒有 implement `coder interface`, 因為 `Gopher struct` 沒有 implement `debug method`; 表面上看 `*Gopher type` 也沒有 implement `code method`, 但是因為 `Gopher` implement 了 `code method`, 所以 `*Gopher type` 也自動 implement 了 `code method`
+ 
 ## Nil Interface
 
 Nil interface (interface{}) 不包含任何 method, 所有的類型都實現了 nil interface. 
