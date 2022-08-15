@@ -73,7 +73,7 @@ func payloadHandler(w http.ResponseWriter, r *http.Request) {
 }
 ```
 
-這種方式簡單易懂, 在一般使用場景下也不會有什麼問題, 但是在 `high-conconcurrency` 場景下, 如果不對 `goroutine` 做 `concurrency control` 可能會面臨 CPU, Memory 竄升直至系統崩潰, 若處理過程涉及 disk 讀寫, 則 system loading 更會呈指數級成長
+這種方式簡單易懂, 在一般使用場景下也不會有什麼問題, 但是在 `high-concurrency` 場景下, 如果不對 `goroutine` 做 `concurrency control` 可能會面臨 CPU, Memory 竄升直至系統崩潰, 若處理過程涉及 disk 讀寫, 則 system loading 更會呈指數級成長
 
 若要面對每分鐘 100 萬的 `POST` requests, 這種實現方式系統可能很快就被打掛了
 
