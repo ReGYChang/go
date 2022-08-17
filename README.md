@@ -49,6 +49,7 @@
   - nginx
   - [traefik](gateway/traefik.md)
   - kong
+  - gRPC-Gateway
 # ORMs
   - Gorm
 # Database
