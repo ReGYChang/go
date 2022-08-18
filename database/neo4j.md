@@ -32,6 +32,29 @@
 
 # Graph Database
 
+隨著社交軟體, 電商平台, 零售供應鏈及物聯網產業的快速發展, 資料之間的關係隨資料量呈幾何式增長, 傳統關係型資料庫很難處理關係之間的運算及查詢, `graph database` 應運而生
+
+許多大型企業應用都使用 `Graph Database` 實現, 如:
+- 社交: Facebook, twitter, linkedin 利用其來管理社交關係, 實現好友推薦
+- 零售: eBay, Walmart 利用其實現商品實時推薦
+- 金融: JPMorgan, Citibank, 瑞銀等銀行利用其實現風控處理
+- 汽車製造: Volvo, Toyota 利用其推動創新製造解決方案
+- 電信: Verizon, Orange, AT&T 利用其管理網絡, 連線控制訪問
+
+主要實作場景如下:
+- `Graph Analysis`
+- Shortest Path
+- Community Detection
+- Centrality
+- Similarity
+- Graph Visualization
+
+那在哪些應用場景不適合使用 graph database 呢?
+- 紀錄大量基於 event 的資料 (log or iot sensor data)
+- 二進制資料儲存
+- 大規模分散式資料處理, 如 hadoop
+- 適合保存於 RDB 的結構化資料
+
 > A graph data structure consists of nodes (discrete objects) that can be connected by relationships.
 
 ![graph_database](img/graph_database.png)
