@@ -1,3 +1,10 @@
+- [Set up Debeizum Connector for Oracle](#set-up-debeizum-connector-for-oracle)
+  - [Run docker compose](#run-docker-compose)
+  - [Obtaining the Oracle JDBC driver file](#obtaining-the-oracle-jdbc-driver-file)
+  - [Debezium Oracle connector configuration](#debezium-oracle-connector-configuration)
+  - [Open kafkaui dashboard](#open-kafkaui-dashboard)
+  - [Consume Kafka Topic Messages](#consume-kafka-topic-messages)
+
 # Set up Debeizum Connector for Oracle
 
 ## Run docker compose

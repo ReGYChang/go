@@ -1,4 +1,8 @@
-
+- [What's zerolog?](#whats-zerolog)
+- [zerolog Usage](#zerolog-usage)
+  - [Installation:](#installation)
+  - [Contextual Logger](#contextual-logger)
+  - [Multi-level Logger](#multi-level-logger)
 
 # What's zerolog?
 

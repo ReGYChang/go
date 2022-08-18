@@ -450,15 +450,13 @@ func Benchmark_Worker_Pool(b *testing.B) {
 
 # Summary
 
-下圖完美詮釋了 `Worker Pool in Go` 的概念:
-
-![worker_pool_in_go](../img/worker_pool_in_go.png)
-
 整個 `Worker Pool` work flow 如下圖:
 
 ![worker_pool_work_flow](../img/worker_pool_work_flow.png)
 
-總結一下這個 worker pool 有以下功能:
+最後總結一下這個 worker pool 實現了以下功能:
 - Execute concurrent job by goroutine
 - Flexibility with the definition of job running
 - Limiting the number of jobs executed over a period of time
+
+完整程式碼: [https://github.com/ReGYChang/zero/blob/main/pkg/utils/worker_pool.go](https://github.com/ReGYChang/zero/blob/main/pkg/utils/worker_pool.go)

@@ -1,0 +1,32 @@
+version: '3'
+
+services:
+  neo4j:
+    image: neo4j:4.4-enterprise
+    container_name: neo4j
+    privileged: true
+    restart: always
+
+    environment:
+      - NEO4J_dbms_memory_heap_maxSize=8G
+      - NEO4J_dbms_memory_heap_heap_initial__size=4G
+      - NEO4J_dbms_memory_heap_pagecache_size=8G
+      - NEO4J_AUTH=neo4j/regy
+      - NEO4J_ACCEPT_LICENSE_AGREEMENT=yes
+      - NEO4J_dbms_security_procedures_unrestricted=apoc.*
+      - NEO4J_apoc_import_file_enabled=true
+      - NEO4J_dbms_shell_enable=true
+      - NEO4J_dbms_connector_http_listen__address=:7474
+      - NEO4J_dbms_connector_https_listen__address=:6477
+      - NEO4J_dbms_connector_bolt_listen__address=:7687
+    
+    ports:
+      - "7474:7474"
+      - "7687:7687"
+
+    volumes:
+      - "./data:/var/lib/neo4j/data"
+      - "./logs:/var/lib/neo4j/logs"
+      - "./import:/var/lib/neo4j/import"
+      - "./plugins:/var/lib/neo4j/plugins"
+      - "./conf:/var/lib/neo4j/conf"

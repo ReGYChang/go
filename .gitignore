@@ -1,1 +1,4 @@
 .idea
+
+database/code/neo4j/*
+!database/code/neo4j/*.yml
