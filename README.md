@@ -53,13 +53,16 @@
 # ORMs
   - Gorm
 # Database
-  - RDB
+  - Relational
       - PostgreSQL
-  - NoSQL
+  - Document
       - [MongoDB](database/mongodb.md)
-      - [Redis](database/redis.md)
-  - Search Engines
+  - Serach Engine
       - [Elasticsearch](database/elasticsearch.md)
+  - Key-value
+      - [Redis](database/redis.md)
+  - Graph
+      - [Neo4j](database/neo4j.md)
 # Message Queue
   - [Kafka](mq/kafka.md)
 # CDC
