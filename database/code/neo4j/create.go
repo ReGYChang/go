@@ -32,12 +32,12 @@ func insertSn(session neo4j.Session, sn string, kpsn string) error {
 		"kpsn": kpsn,
 	}
 	_, err := session.Run(`
-		MERGE (sn { sn: $sn })
+		MERGE (sn { serialNumber: $sn })
 		ON CREATE
 			SET sn: SN
 		ON MATCH
 			SET sn: SN
-		MERGE (kpsn { sn: $kpsn })
+		MERGE (kpsn { serialNumber: $kpsn })
 		ON CREATE
 			SET kpsn: KPSN
 		ON MATCH

@@ -1,10 +1,14 @@
 - [Knowledge Graph](#knowledge-graph)
-- [Neo4j](#neo4j)
 - [Graph Database](#graph-database)
+  - [Native Graph Processing](#native-graph-processing)
+  - [Native Graph Storage](#native-graph-storage)
+    - [Node](#node)
+    - [Relationship](#relationship)
+- [Introduction](#introduction)
   - [Example Graph](#example-graph)
-  - [Node](#node)
+  - [Node](#node-1)
   - [Node Labels](#node-labels)
-  - [Relationship](#relationship)
+  - [Relationship](#relationship-1)
   - [Relationship Type](#relationship-type)
   - [Properties](#properties)
     - [Number](#number)
@@ -26,9 +30,7 @@
 
 `Knowledge graph` 目前主要應用在搜尋, 智能問答, 推薦系統等應用, 其建設一般包括資料擷取, 實體辨識, 抽象關係, 資料存儲及應用等幾個面向, `Neo4j` 主要著眼於資料存儲的部分
 
-# Neo4j
-
-`Knowledge graph` 的資料包含 `entity`, `poperty` 及 `relationship`, 常見的 Relational Database 如 MySQL 無法很好的發揮這類資料的特性, 因此 `knowledge graph` 資料的存儲一般都採用 `Graph Database`, `Neo4j` 為 `Graph Database` 的一種
+`Knowledge graph` 的資料包含 `entity`, `poperty` 及 `relationship`, 常見的 Relational Database 如 MySQL 無法很好的發揮這類資料的特性, 因此 `knowledge graph` 資料的存儲一般都採用 `Graph Database`, 而 `Neo4j` 為 `Graph Database` 的一種
 
 # Graph Database
 
@@ -41,7 +43,19 @@
 - 汽車製造: Volvo, Toyota 利用其推動創新製造解決方案
 - 電信: Verizon, Orange, AT&T 利用其管理網絡, 連線控制訪問
 
-主要實作場景如下:
+為何 graph database 能夠解決大數據趨勢下傳統資料庫在查詢運算時的複雜度問題呢? 先來了解一下 graph database 與一般資料庫在儲存結構上的差異:
+
+![general_database_compersion](img/general_database_compersion.png)
+
+`Relational Database` 結構性最強, 在 `data trasactions` 的效能表現最佳, 能夠完全滿足 `ACID` 應用需求; 但相對上結構不夠彈性, 資料不易擴展且不適合拿來做深度資料分析應用
+
+隨著資料量不斷增長, 單機架構已經無法負荷, 技術發展趨勢逐漸向分散式架構轉移, 於是 `Key-Value NoSQL Database` 就誕生了
+
+相較於 `Relational`, `Key-Value` 在結構上較為彈性, 也較容易進行分散式水平擴展, 但依照 `CAP Theory`, 資料庫設計先天上無法同時滿足 `Consistent`, `Availability` 和 `Partition Tolerance`, 大多 `NoSQL` 資料庫選擇的是 `CP` 的設計, 但其中 `Consistent` 的部分是採用 `Eventually Consistency Model`, 屬於 `Consistent Model` 中最弱的一致性模型, 其結構同樣不適合應用於深度資料分析應用
+
+在 `Graph Database` 中, `Relationship` 是一等公民, 關聯的節點的物理意義為`指向`彼此, 遍歷搜尋時可以直接基於指針直接找到關聯資料, 不需像前兩者依賴 `foreign key relationship` 將兩張 table join search, 免去了 `Index Scan` 的成本, 實現 `O(logn) -> O(1)` 的效能提升, 這種搜尋方式稱為 `Index Free Adjacency(免索引鄰接)`
+
+基於 `Graph database`, 最適合的實作場景如下:
 - `Graph Analysis`
 - Shortest Path
 - Community Detection
@@ -53,11 +67,98 @@
 - 紀錄大量基於 event 的資料 (log or iot sensor data)
 - 二進制資料儲存
 - 大規模分散式資料處理, 如 hadoop
-- 適合保存於 RDB 的結構化資料
+- 強一制性需求高
 
 > A graph data structure consists of nodes (discrete objects) that can be connected by relationships.
 
 ![graph_database](img/graph_database.png)
+
+## Native Graph Processing
+
+上面討論到了用 `index-free adjacency` 的方式來維護節點與相鄰節點之間的關係, 每個節點自身維護其與相鄰節點的 `micro-index`, 成本會遠低於維護 `global index` 來得低, 即意味著查詢時間與全圖大小無關, 取決於局部欲查詢的相關節點
+
+在 `nonnative graph database` 中, 使用 `global index` 來連接節點, 如下圖:
+
+![global_index](img/global_index.png)
+
+每次透過 index look up 的時間複雜度為 `O(log n)`, 若要反查誰把 `Alice` 當作朋友則需進行 m 次遍歷, 時間複雜度為 `O(m log n)`
+
+隨著全局資料量 `n` 的增加及深度關係的查詢, 這種方式會因查詢成本過高導致效能不佳
+
+而以 `neo4j` 代表的 native graph 主要透過 `relationships` 來實現高效遍歷: 
+
+![neo4j_relationship](img/neo4j_relationship.png)
+
+`Relationship` 作為雙邊節點的容器, 儲存了對應 node, relationship, property 的物理地址, 直接進行尋址遍歷, 從而免去 index scan 的開銷
+
+同樣以圖中為例, 要查找圖中 `Alice` 的朋友可直接透過尋址搜尋, 時間複雜度為 `O(1)`
+
+下圖為 `neo4j` 官方釋出的 benchmark 對比圖, 全圖有 `10 million` 節點及 `100 million relationships`, 總資料量 `4 GB`, 參考即可:
+
+![graph_database_benchmark](img/graph_database_benchmark.png)
+
+## Native Graph Storage
+
+![graph_storage](img/graph_storage.png)
+
+將 graph data 儲存到硬碟上的方法有很多種, 常見的主要是 `Edge Cut` 及 `Edge Cut` 兩種
+
+`Edge Cut` 顧名思義即將邊切成兩段, 分別與起點與終點存在一起, 即邊的資料會保存兩份
+
+![neo4j_files](img/neo4j_files.png)
+
+上圖為 `neo4j` 資料目錄下的文件列表, 圖中已經細分出 `metadata`, `label`, `node`, `property`, `relationship` 及 `schema` 等不同類型的文件
+
+### Node
+
+![node_file](img/node_file.png)
+
+每個 node 的儲存空間為固定大小, 這樣做的好處在於能快速定位到每個 node 在 store file 中存儲的位置
+
+俱利來說有個 node id 為 100, 就可以直接推算該筆資料位於 store file 起始位置 1500 bytes 的位置, 成本僅 `O(1)`, 而無需透過 index `O(log n)` 的開銷
+
+Node 主要由以下成員組成:
+
+```java
+// in_use(byte)+next_rel_id(int)+next_prop_id(int)+labels(5)+extra(byte)
+    public static final int RECORD_SIZE = 15;
+```
+
+- `inUse(Byte)`: 存放 in-use flag 及屬性和關係 id 的高位資訊
+  ```java
+  // [    ,   x] in use bit
+    // [    ,xxx ] higher bits for rel id
+    // [xxxx,    ] higher bits for prop id
+  ```
+- `nextRel(Int)`: 存放 node 連結的第一條 relationship ID
+- `nextProp(Int)`: 存放 node 連結的第一個 property ID
+- `labes(5 Bytes)`: 存放 node labels
+- `extra(Byte)`: 紀錄 node 是否為 `dense`, 即 supernode
+
+### Relationship
+
+![relationship](img/relationship_file.png)
+
+相較於 node, relationship 結構要複雜許多
+
+Relationship 主要由以下成員組成:
+
+```java
+// record header size
+    // directed|in_use(byte)+first_node(int)+second_node(int)+rel_type(int)+
+    // first_prev_rel_id(int)+first_next_rel_id+second_prev_rel_id(int)+
+    // second_next_rel_id(int)+next_prop_id(int)+first-in-chain-markers(1)
+    public static final int RECORD_SIZE = 34;
+```
+
+- `inUse(Byte)`: 存放 in-use flage 及關係起點和下一個屬性的高位資訊
+  ```java
+  // [    ,   x] in use flag
+    // [    ,xxx ] first node high order bits
+    // [xxxx,    ] next prop high order bits
+  ```
+
+# Introduction
 
 The `Neo4j` property graph database model consists of:
 
