@@ -30,8 +30,8 @@ func findRoot(session neo4j.Session, sn string) error {
 	_, err := session.Run(`
 		MATCH (n)
 		WHERE n.sn = $sn
-		WITH n, [(n) - [:BELONGS*] -> (x:MO) | x] AS ancestors
-		RETURN n, ancestors
+		WITH n, [(n) - [:BELONGS*] -> (x:MO) | x] AS mo
+		RETURN n, mo
 	`, params)
 
 	if err != nil {
