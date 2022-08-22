@@ -21,6 +21,12 @@ func main() {
 	if err := findRoot(session, testSn); err != nil {
 		panic(err)
 	}
+
+	testMo := "513-22040062"
+
+	if err := findSubGraphAll(session, testMo); err != nil {
+		panic(err)
+	}
 }
 
 func findRoot(session neo4j.Session, sn string) error {
@@ -32,6 +38,26 @@ func findRoot(session neo4j.Session, sn string) error {
 		WHERE n.sn = $sn
 		WITH n, [(n) - [:BELONGS*] -> (x:MO) | x] AS mo
 		RETURN n, mo
+	`, params)
+
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func findSubGraphAll(session neo4j.Session, mo string) error {
+	params := map[string]interface{}{
+		"mo": mo,
+	}
+	_, err := session.Run(`
+		MATCH (m:MO {mo: $mo})
+		CALL apoc.path.subgraphAll(m, {
+			relationshipFilter: "BELONGS"
+		})
+		YIELD nodes
+		RETURN nodes;
 	`, params)
 
 	if err != nil {
