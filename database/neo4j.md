@@ -1,5 +1,10 @@
 - [Knowledge Graph](#knowledge-graph)
 - [Graph Database](#graph-database)
+  - [Where is Graph Database Used?](#where-is-graph-database-used)
+    - [Graph Traversal](#graph-traversal)
+    - [Community Detection](#community-detection)
+    - [Centrality](#centrality)
+    - [Similarity](#similarity)
   - [Native Graph Processing](#native-graph-processing)
   - [Native Graph Storage](#native-graph-storage)
     - [Node](#node)
@@ -17,8 +22,29 @@
   - [Traversals & Paths](#traversals--paths)
   - [Schema](#schema)
   - [Naming Conventions](#naming-conventions)
+  - [Edition Comparison](#edition-comparison)
 - [Cypher](#cypher)
   - [Usage](#usage)
+- [Index](#index)
+  - [B-Tree Indexes [deprecated]](#b-tree-indexes-deprecated)
+    - [Predicate Compatibility](#predicate-compatibility)
+    - [Limitations for queries using CONTAINS and ENDS WITH](#limitations-for-queries-using-contains-and-ends-with)
+    - [Limitations on key size](#limitations-on-key-size)
+  - [Text Indexes](#text-indexes)
+    - [Predicate Compatibility](#predicate-compatibility-1)
+    - [Limitations](#limitations)
+  - [Full-text Indexes](#full-text-indexes)
+  - [Token Lookup Indexes](#token-lookup-indexes)
+  - [Future Indexes](#future-indexes)
+- [Query Tuning](#query-tuning)
+  - [Cypher Query Options](#cypher-query-options)
+    - [Cypher Runtime](#cypher-runtime)
+- [Constraints](#constraints)
+  - [Type of Constraints](#type-of-constraints)
+    - [Unique node property constraints](#unique-node-property-constraints)
+    - [Node property existence constraints](#node-property-existence-constraints)
+    - [Relationship property existence constraints](#relationship-property-existence-constraints)
+    - [Node key constraints](#node-key-constraints)
 
 # Knowledge Graph
 
@@ -43,25 +69,29 @@
 - 汽車製造: Volvo, Toyota 利用其推動創新製造解決方案
 - 電信: Verizon, Orange, AT&T 利用其管理網絡, 連線控制訪問
 
+> A graph data structure consists of nodes (discrete objects) that can be connected by relationships.
+
+![graph_database](img/graph_database.png)
+
 為何 graph database 能夠解決大數據趨勢下傳統資料庫在查詢運算時的複雜度問題呢? 先來了解一下 graph database 與一般資料庫在儲存結構上的差異:
 
 ![general_database_compersion](img/general_database_compersion.png)
 
-`Relational Database` 結構性最強, 在 `data trasactions` 的效能表現最佳, 能夠完全滿足 `ACID` 應用需求; 但相對上結構不夠彈性, 資料不易擴展且不適合拿來做深度資料分析應用
+`Relational Database` 結構性最強, 在 `data trasactions` 的效能表現最佳, 能夠完全滿足 `ACID` 應用需求
 
-隨著資料量不斷增長, 單機架構已經無法負荷, 技術發展趨勢逐漸向分散式架構轉移, 於是 `Key-Value NoSQL Database` 就誕生了
+但結構性太強也使得結構不夠彈性, 會導致資料不易擴展, 且對於關聯型資料的效果不佳, 當關聯查詢逐漸複雜時會發生查詢性能不符預期, 因此不適合拿來做深度資料分析應用
+
+隨著資料量不斷增長, 單機架構已經無法負荷系統運作, 技術發展趨勢逐漸向分散式架構轉移, 於是 `Key-Value NoSQL Database` 就誕生了
 
 相較於 `Relational`, `Key-Value` 在結構上較為彈性, 也較容易進行分散式水平擴展, 但依照 `CAP Theory`, 資料庫設計先天上無法同時滿足 `Consistent`, `Availability` 和 `Partition Tolerance`, 大多 `NoSQL` 資料庫選擇的是 `CP` 的設計, 但其中 `Consistent` 的部分是採用 `Eventually Consistency Model`, 屬於 `Consistent Model` 中最弱的一致性模型, 其結構同樣不適合應用於深度資料分析應用
 
 在 `Graph Database` 中, `Relationship` 是一等公民, 關聯的節點的物理意義為`指向`彼此, 遍歷搜尋時可以直接基於指針直接找到關聯資料, 不需像前兩者依賴 `foreign key relationship` 將兩張 table join search, 免去了 `Index Scan` 的成本, 實現 `O(logn) -> O(1)` 的效能提升, 這種搜尋方式稱為 `Index Free Adjacency(免索引鄰接)`
 
-基於 `Graph database`, 最適合的實作場景如下:
-- `Graph Analysis`
-- Shortest Path
-- Community Detection
-- Centrality
-- Similarity
-- Graph Visualization
+下圖為 `Neo4j` 官方釋出的 `Multi-Level Query Results`:
+
+![multi_level_query](img/multi_level_query.png)
+
+可以看到在 `Relational Database` 中隨著關聯的數量及深度增加會導致關聯查詢效率急遽下降, 甚至崩潰; 而 `Graph Database` 性能幾乎不會隨著資料量增加而改變
 
 那在哪些應用場景不適合使用 graph database 呢?
 - 紀錄大量基於 event 的資料 (log or iot sensor data)
@@ -69,9 +99,41 @@
 - 大規模分散式資料處理, 如 hadoop
 - 強一制性需求高
 
-> A graph data structure consists of nodes (discrete objects) that can be connected by relationships.
+## Where is Graph Database Used?
 
-![graph_database](img/graph_database.png)
+> 當然沒有技術是銀彈, 其都有各自適當發揮最大化效益的場景
+
+接下來介紹一些適合 `Graph Database` 的一些應用場景
+
+### Graph Traversal
+
+從給定連通圖的某一節點出發, 沿著邊訪問途中所有節點, 且使每個節點僅被訪問一次即稱為 `Graph Traversal`, 大家熟知的 `Tree Traversal` 也是一種特殊的 `Graph Traversal`
+
+其最經典應用包含 `Minimum Spanning Tree`, `Find Shortest Path`, `Topological Ordering`, `Critical path method` 等
+
+### Community Detection
+
+`Community Detection` 是指在 `Graph` 資料結構中發現密集連接的 sub network
+
+如在蛋白質網絡中發現具有相似生物學功能的蛋白質; 在企業網絡中, 通過研究公司內部關係將員工分組為社群; 在 Twitter 或 Facebook 等社交網絡中具有相同興趣或共同朋友的使用者可能是同一社群的成員等
+
+利用 `Graph` 結構資訊及節點特徵進行歸因及聚類演算, 以實現將大網絡分成兩個以上不同的社群, 進而達成分類/分群的目的:
+
+![community_detection](img/community_detection.png)
+
+### Centrality
+
+`Centrality` 是社交網絡分析(Social Network Analysis, SNA) 中用以衡量網絡中一個個體在整個網絡中接近中心程度的一個概念, 這個程度量化後的數字即被稱作 `Centrality`
+
+因此可以通過判斷一個節點的 centrality, 從而判斷這個節點在網絡中所佔據的重要性
+
+在圖論和網絡分析中, `Centrality` 可以判斷圖中最重要的節點, 其應用包含識別社交網絡中最具影響力的人, 城市網絡中最關鍵的基礎設施或是病毒的超級傳播者等
+
+### Similarity
+
+即資料集的相似度計算, 在現有的 AI 演算法中, 大多數為基於概率的近似計算, 然後取最大可能性的近似值
+
+`Similarity` 在現實中有著極高的應用需求, 如社群網絡中的好友推薦, 電商平台的商品推薦, 人臉辨識或語音辨識等都是類似的應用
 
 ## Native Graph Processing
 
@@ -331,11 +393,15 @@ Neo4j is often described as schema optional, meaning that it is not necessary to
 
 The following naming conventions are recommended:
 
-| Graph entity      | Recommended style                                       | Example                                 |
-| ----------------- | ------------------------------------------------------- | --------------------------------------- |
+| Graph entity      | Recommended style                                       | Example                                     |
+| ----------------- | ------------------------------------------------------- | ------------------------------------------- |
 | Node label        | Camel case, beginning with an upper-case character      | `:VehicleOwner` rather than `:vehice_owner` |
 | Relationship type | Upper case, using underscore to separate words          | `:OWNS_VEHICLE` rather than `:ownsVehicle`  |
 | Property          | Lower camel case, beginning with a lower-case character | `firstName` rather than `first_name`        |
+
+## Edition Comparison
+
+![edition_comparison](img/community_enterprise.png)
 
 # Cypher
 
@@ -511,3 +577,118 @@ MATCH (a:Location {city:'Portland'}) DELETE a
 ```cypher
 MATCH (a:Person {name:'Todd'})-[rel]-(b:Person) DELETE a,b,rel
 ```
+
+# Index
+
+## B-Tree Indexes [deprecated]
+
+B-tree indexes are good for exact look-ups on all types of values, range scans, full scans, and prefix searches. They can be backed by two different index providers, native-btree-1.0 and lucene+native-3.0. If not explicitly set, native-btree-1.0 will be used.
+
+```cypher
+CREATE INDEX node_index_name IF NOT EXISTS FOR (n:Person) ON (n.surname)
+```
+
+### Predicate Compatibility
+
+`BTREE` indexes support all types of predicates:
+
+| Predicate             | Syntax             |
+| --------------------- | ------------------ |
+| equality check        | n.prop = value     |
+| list membership check | n.prop IN list     |
+| existence check       | n.prop IS NOT NULL |
+| range search          | n.prop > value     |
+| prefix search         | STARTS WITH        |
+| suffix search         | ENDS WITH          |
+| substring search      | CONTAINS           |
+
+### Limitations for queries using CONTAINS and ENDS WITH
+
+### Limitations on key size
+
+## Text Indexes
+
+Text indexes are a type of **single-property index** and **only index properties with string values**, unlike b-tree indexes. They are specifically designed to deal with ENDS WITH or CONTAINS queries efficiently. They are used through Cypher and they support a smaller set of string queries. Even though text indexes do support other text queries, **ENDS WITH or CONTAINS queries are the only ones for which this index type provides an advantage over a b-tree index**.
+
+```cypher
+CREATE TEXT INDEX node_index_name FOR (n:Person) ON (n.nickname)
+```
+
+### Predicate Compatibility
+
+`TEXT` indexes support the following predicates:
+
+| Predicate             | Syntax                    |
+| --------------------- | ------------------------- |
+| equality check        | n.prop = "string"         |
+| list membership check | n.prop IN ["a", "b", "c"] |
+| range search          | n.prop > "string"         |
+| prefix search         | STARTS WITH               |
+| suffix search         | ENDS WITH                 |
+| substring search      | CONTAINS                  |
+
+### Limitations
+
+Text indexes only index **single property strings**. If the property to index can contain several value types, but string-specific queries are also performed, it is possible to have both a b-tree and a text index on the same schema.
+
+The index has a key size limit for **single property strings of around 32kB**. If a transaction reaches the key size limit for one or more of its changes, that transaction fails before committing any changes. If the limit is reached during index population, the resulting index is in a failed state, and as such is not usable for any queries.
+
+## Full-text Indexes
+
+## Token Lookup Indexes
+
+## Future Indexes
+
+# Query Tuning
+
+## Cypher Query Options
+
+### Cypher Runtime
+
+> Interpreted
+
+In this runtime, the operators in the execution plan are chained together in a tree, where each non-leaf operator feeds from one or two child operators. The tree thus comprises nested iterators, and the records are streamed in a pipelined manner from the top iterator, which pulls from the next iterator and so on.
+
+> Slotted
+
+This is very similar to the interpreted runtime, except that there are additional optimizations regarding the way in which the records are streamed through the iterators. This results in improvements to both the performance and memory usage of the query. In effect, this can be thought of as the 'faster interpreted' runtime.
+
+> Pipelined
+
+The pipelined runtime was introduced in Neo4j 4.0 as a replacement for the older compiled runtime used in the Neo4j 3.x versions. It combines some of the advantages of the compiled runtime in a new architecture that allows for support of a wider range of queries.
+
+Algorithms are employed to intelligently group the operators in the execution plan in order to generate new combinations and orders of execution which are optimised for performance and memory usage. While this should lead to superior performance in most cases (over both the interpreted and slotted runtimes), it is still under development and does not support all possible operators or queries (the slotted runtime covers all operators and queries).
+
+# Constraints
+
+## Type of Constraints
+
+The following constraint types are available:
+
+### Unique node property constraints
+
+Unique property constraints ensure that property values are unique for all nodes with a specific label. For unique property constraints on multiple properties, the combination of the property values is unique. Unique constraints do not require all nodes to have a unique value for the properties listed — nodes without all properties are not subject to this rule.
+
+### Node property existence constraints
+
+Node property existence constraints ensure that a property exists for all nodes with a specific label. Queries that try to create new nodes of the specified label, but without this property, will fail. The same is true for queries that try to remove the mandatory property.
+
+### Relationship property existence constraints
+
+Property existence constraints ensure that a property exists for all relationships with a specific type. All queries that try to create relationships of the specified type, but without this property, will fail. The same is true for queries that try to remove the mandatory property.
+
+### Node key constraints
+
+Node key constraints ensure that, for a given label and set of properties:
+
+- All the properties exist on all the nodes with that label.
+
+- The combination of the property values is unique.
+
+Queries attempting to do any of the following will fail:
+
+- Create new nodes without all the properties or where the combination of property values is not unique.
+
+- Remove one of the mandatory properties.
+
+- Update the properties so that the combination of property values is no longer unique.
