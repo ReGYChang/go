@@ -25,7 +25,7 @@
   - [HTTP / HTTPS](general/http_https.md)
   - Data Structures and Algorithms
   - Scrum, Kanban or other project strategies
-  - Basic Authentication, OAuth, JWT, etc
+  - [Basic Authentication, OAuth, JWT, etc](general/authentication.md)
   - SOLIC, YAGNI, KISS
   - [System Design](general/system_design.md)
   - [Design Pattern](general/design_pattern.md)
