@@ -45,6 +45,7 @@
     - [Node property existence constraints](#node-property-existence-constraints)
     - [Relationship property existence constraints](#relationship-property-existence-constraints)
     - [Node key constraints](#node-key-constraints)
+- [Stream](#stream)
 
 # Knowledge Graph
 
@@ -692,3 +693,20 @@ Queries attempting to do any of the following will fail:
 - Remove one of the mandatory properties.
 
 - Update the properties so that the combination of property values is no longer unique.
+
+# Stream
+
+Many user and customers want to integrate Kafka and other streaming solutions with Neo4j. Either to ingest data into the graph from other sources. Or to send update events (change data capture - CDC) to the event log for later consumption.
+
+This extension was developed to satisfy all these use-cases and more to come.
+
+Neo4j Streams can run in two modes:
+
+- as a Neo4j plugin:
+  - Neo4j Streams Source: a transaction event handler events that sends data to a Kafka topic
+
+  - Neo4j Streams Sink: a Neo4j application that ingest data from Kafka topics into Neo4j via templated Cypher Statements
+
+  - Neo4j Streams Procedures: two procedures streams.publish, which allows custom message streaming from Neo4j to the configured environment, and streams.consume which allows to consume messages from a given topic.
+
+- `as a Kafka-Connect Plugin: a plugin for the Confluent Platform that allows to ingest data into Neo4j, from Kafka topics, via Cypher queries. At the moment it offers only the Sink functionality.
