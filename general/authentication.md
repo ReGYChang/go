@@ -1,20 +1,16 @@
-- [JWT](#jwt)
-  - [What is JWT](#what-is-jwt)
+- [JWT Framework](#jwt-framework)
   - [JWS](#jws)
-      - [JWS Compact](#jws-compact)
-      - [JWS JSON Flattened](#jws-json-flattened)
+    - [JWS Compact](#jws-compact)
+    - [JWS JSON Flattened](#jws-json-flattened)
   - [JWE](#jwe)
     - [JWE Serialization](#jwe-serialization)
   - [JWK](#jwk)
-  - [JWT Principal](#jwt-principal)
-    - [Header](#header)
-    - [Payload](#payload)
-    - [Signature](#signature)
-  - [How does JWT Work](#how-does-jwt-work)
+  - [JWT](#jwt)
+  - [Implement With Gin](#implement-with-gin)
+    - [User Claiim](#user-claiim)
+    - [Generate Token](#generate-token)
 
-# JWT
-
-## What is JWT
+# JWT Framework
 
 `JWT(JSON Web Token)` 是一個非常輕巧的規範, 其允許使用者使用 `JWT` 在 client 及 server 之間傳遞安全可靠的資訊, 利用 `HTTP` 通訊過程中進行身份認證
 
@@ -50,7 +46,7 @@
 
 有兩種序列化格式如下:
 
-#### JWS Compact
+### JWS Compact
 
 最常見的序列化方式, 最終輸出由三個部分組成的字串, 由 `Base64 Url Safe` 編碼並以 `.` 作區隔
 
@@ -68,7 +64,7 @@ output:
 eyJhbGciOiJFUzUxMiJ9.UGF5bG9hZA.AdwMgeerwtHoh-l192l60hp9wAHZFVJbLfD_UxMi70cwnZOYaRI1bKPWROc-mZZqwqT2SI-KGDKB34XO0aw_7XdtAG8GaSwFKdCAPZgoXD2YBJZCPEX3xKpRwcdOO8KpEHwJjyqOgzDO7iKvU8vcnwNrmxYbSW9ERBXukOXolLzeO_Jn
 ```
 
-#### JWS JSON Flattened
+### JWS JSON Flattened
 
 當需要使用未受保護的 header 時使用, 其為一個簡單的 JSON Object, 此種格式並不常使用, 了解即可:
 
@@ -161,79 +157,83 @@ JWK 也可以為一個 array, 此時稱作 JWKs, 提供一組私鑰, 並通過 `
   - x5xxx: X.509 相關
 - 演算法相關參數
 
-## JWT Principal
+## JWT
 
-`JWT` 由三個部分組成, 其之間使用 `.` 連接, 分別為:
+`JWS` 用於對指定 payload 進行簽名, `JWE` 用於對普通文本進行加密, 而 `JWT` 則是基於二者:
 
-- Header
-- Payload
-- Signature
+- JWT 主體內容為 `Claim`, 其為 JSON 形式的 key-value pair
+- JWT 在網絡中傳輸時需要被 JWS 簽名或是被 JWE 加密, 且使用 `Compact` 的序列化方式
 
-一個典型的 `JWT` 如下:
+`Claim` 主要包含以下內容:
 
-```
-xxxxx.yyyyy.zzzzz
-```
+- iss: JWT 發布者
+- sub: JWT 主體, 在發布者系統內唯一
+- aud: JWT 目的接收者, 接受此 JWT 的目的端必須驗證此值, 若與預期不符則拒絕此 JWT
+- exp: 過期時間, 時間類型
+- nbf: Not Before, 必須在規定生效時間之後才能處理
+- iat: issue at, JWT 簽發時間
+- jti: JWT ID, 為 JWT 提供 uuid, 用於防止 JWT replay
 
-### Header
+協議規範允許自定義 field, 只要 JWT 收發雙方達成一致即可
 
-`Header` 一般由兩部分組成: token 類型及加密演算法名稱(HMACSHA256 或 RSA)
+>❗️ JWT 在協議上只規範了能夠聲明的內容, 而最終呈現形式是由 JWS 協議提供
 
-如:
+常規的 JWT 認證流程如下圖:
 
-```json
-{
-    'alg': "HS256",
-    'typ': "JWT"
-}
-```
+![jwt_authentication_process](img/jwt_authentication_process.png)
 
-再使用 `BASE64` 對此 JSON 進行編碼後就得到 `JWT` 的第一個部分
-
-### Payload
-
-`Payload` 中包含聲明(要求), 關於實體(通常為使用者)和其他資料的聲明
-
-聲明有三種類型:
-
-- Registered Claims: 有一組預先定義的聲明, 其不為強制, 但推薦, 如: iss(issuer), exp(expiration time), sub(subject), aud(audience) 等
-- Public: 可以隨意定義
-- Private: 用於許可使用點對點之間共享資訊, 且不是註冊或公開的聲明
-
-下面為一個例子:
-
-```json
-{
-    "sub": '1234567890',
-    "name": 'regy',
-    "admin":true
-}
-```
-
-對 `Payload` 進行 `BASE64` 編碼即為 `JWT` 第二部分
-
->❗️ 需注意不要在 JWT Payload 或 Header 中存放敏感資訊, 除非其透過加密
-
-### Signature
-
-> 為了計算出 signature, 必須有編碼後的 Header 和 Payload, 及一個 private key, 並使用 Header 中指定的加密演算法對其簽名即可
-
-如:
-
-```java
-HMACSHA256(base64UrlEncode(header) + "." + base64UrlEncode(payload), secret)
-```
-
-`Signature` 主要用於校驗訊息在傳遞過程中是否遭到竄改, 且對於使用 private key 簽名的 token, 還可以驗證 JWT 的發送方是否偽造身份
-
-## How does JWT Work
-
-- Client 通過 username/password 登陸 Server
-- Server 對 Client 身份進行驗證
-- Server 對該 user 生成 token 並返回 Client
-- Client 發起 request 攜帶此 token
-- Server 收到 request 先驗證 token 正確性再返回資料
-- Client 將 token 保存至本地瀏覽器, 一般保存在 `cookie`
+相較於 `session` 的方式, JWT 節省了 server 儲存使用者資訊的過程
 
 > Server 不需保存 token, 只需對 token 中攜帶的資訊進行驗證即可; 無論 Client 訪問 Server 中的哪台機器, 只需通過使用者資訊驗證即可
 
+## Implement With Gin
+
+在 Go 中可以透過 [golang-jwt](https://github.com/golang-jwt/jwt) package 提供的一些編碼及驗證的工具輕鬆的實現 JWT authentication
+
+另外 `Gin` 也支援 user-defined middleware, 因此可以很好的將 JWT 相關邏輯封裝於 middleware 中, 並對具體的 interface 進行認證
+
+首先需安裝 `golang-jwt`:
+
+```golang
+go get -u github.com/golang-jwt/jwt/v4
+```
+
+### User Claiim
+
+```golang
+type UserClaim struct {
+	jwt.RegisteredClaims
+	User
+}
+```
+
+自定義一個 `UserClaim`, 除了 `golang-jwt` 中原本的 `RegisteredClaims` 之外還另外儲存了 `User` 資訊
+
+### Generate Token
+
+以下函式主要用於產生認證用的 JWT:
+
+```golang
+func GenerateUserToken(user User, signingKey []byte, expiryDuration time.Duration, issuer string) (string, common.Error) {
+	claim := &UserClaim{
+		jwt.RegisteredClaims{
+			ExpiresAt: &jwt.NumericDate{Time: time.Now().Add(expiryDuration)},
+			Issuer:    issuer,
+			IssuedAt:  &jwt.NumericDate{Time: time.Now()},
+		},
+		user,
+	}
+
+	// Generate Signed JWT token
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claim)
+	signedToken, err := token.SignedString(signingKey)
+	if err != nil {
+		return "", common.NewError(common.ErrorCodeInternalProcess, err, common.WithMsg("failed to generate token"))
+	}
+
+	return signedToken, nil
+}
+```
+
+- 將 `Claim` 使用 `HS256` algo 進行加密
+- 最後對 token 進行簽名並返回
