@@ -93,9 +93,7 @@
   - [Docker](virtualization/docker.md)
   - Kubernetes
 # Good to Know Libraries
-  - Cmd
-    - [urfave/cli](cmd/urfave_cli.md)
-  - Logging
+  - [bxcodec/faker](library/bxcodec_faker.md)
   - Encoding/Decoding
   - Input and output
   - Validator
