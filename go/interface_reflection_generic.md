@@ -1,6 +1,8 @@
 - [Interface](#interface)
   - [Relationship between Go and Duck Typing](#relationship-between-go-and-duck-typing)
   - [Value Receiver vs Pointer Receiver](#value-receiver-vs-pointer-receiver)
+  - [Difference Between iface & eface](#difference-between-iface--eface)
+  - [Dynamic Type & Value of Interface](#dynamic-type--value-of-interface)
   - [Nil Interface](#nil-interface)
   - [Polymorphism with Open Closed Principle](#polymorphism-with-open-closed-principle)
   - [Composition Instead of Inheritance](#composition-instead-of-inheritance)
@@ -324,7 +326,202 @@ func main() {
 ```
 
 報錯原因為 `Gopher` 沒有 implement `coder interface`, 因為 `Gopher struct` 沒有 implement `debug method`; 表面上看 `*Gopher type` 也沒有 implement `code method`, 但是因為 `Gopher` implement 了 `code method`, 所以 `*Gopher type` 也自動 implement 了 `code method`
- 
+
+結論為, 當 implement 一個 `value type receiver method`, 就會自動生成一個對應的 `pointer type receiver method`, 因為兩者都不會影響 receiver; 但當 implement `pointer type receiver method`, 若自動生成對應的 `value type receiver method`, 則原本期望對 receiver 的改變(通過 pointer) 則無法實現, 因為 value type 會產生一個副本, 不會真正影響調用者
+
+> 若實現了 `value type receiver method`, 會自動隱式實現 `pointer type receiver method`
+
+那兩者分別在何時使用?
+
+若方法的 receiver 為 value type, 無論調用者為物件還是物件指針, 修改的都是物件的副本, 不會影響調用者; 若方法的 receiver 為 pointer type, 則調用者修改的為指針指向的物件本身
+
+使用 `pointer type receiver method` 的理由:
+
+- 方法能夠修改 receiver 指向的值
+- 避免在每次調用方法時複製該值, 在值類型為大型結構體時這樣做更為高效
+
+是使用 `value type receiver` 還是 `pointer type receiver` 不是由該方法是否修改調用者(receiver) 決定, 而是應該基於該型別的**本質**
+
+若型別具備**初始的本質**, 即其成員都是 Go 內置的初始型別, 如 string, interger 等, 那就定義 `value type receiver method`; 若是內置的引用型別, 如 slice, map, interface, channel 則較特殊, 聲明時實際上是創建了一個 `header`, 對於其也是直接定義 `value type receiver method`, 這樣調用函式時是直接 copy 了這些型別的 `header`, 而 `header` 本身就是為了複製而設計
+
+若型別具備`非初始的本質`, 無法被安全的複製, 這種型別應該總是被共享, 那就定義 `pointer type receiver method`, 如 Go 中的 `struct File` 就不應該被複製, 應只有一份 entity
+
+## Difference Between iface & eface
+
+`iface` 和 `eface` 都是 Go 中用來描述 interface 的底層 struct, 區別在於 `iface` 描述的 interface 包含方法, 而 `eface` 則是不包含任何方法的空接口 `interface{}`
+
+先看一下 source code:
+
+```go
+type iface struct {
+	tab  *itab
+	data unsafe.Pointer
+}
+
+type itab struct {
+	inter *interfacetype
+	_type *_type
+	hash  uint32 // copy of _type.hash. Used for type switches.
+	_     [4]byte
+	fun   [1]uintptr // variable sized. fun[0]==0 means _type does not implement inter.
+}
+```
+
+`iface` 內部維護兩個指針, `tab` 指向一個 `itab` 實體, **其表示 interface 型別以及賦予這個 interface 的實體型別**; `data` 則指向 interface 具體的值, 一般而言是一個指向 heap memory 的指針
+
+再來看 `itab` struct: `_type` 描述了實體的型別, 包括記憶體對其的方式, 大小等; `inter` 描述了 interface 型別, `fun` 放置與 interface methods 對應的具體資料型別的方法地址, 實現 interface 調用方法的動態分發, 一般在每次為 interface 賦值發生轉換時會更新此表, 或者直接拿 cache 的 `itab`
+
+另外有一點需要注意, 為何 `fun` array 大小為 1, 要是 interface 定義了多個 methods 怎麼辦? 實際上這裡存的是第一個方法的函式指針, 如果有更多的方法則在其之後的記憶體空間中繼續儲存
+
+從組合語言的角度來看, 通過增加地址就能獲取到這些函式指針, 這些方法是按照函式名稱的 `Lexicographic order` 進行排列
+
+再來看下 `interfacetype`, 其描述的是 interface 型別:
+
+```go
+type interfacetype struct {
+	typ     _type
+	pkgpath name
+	mhdr    []imethod
+}
+```
+
+可以看到其包裝了 `_type` 型別, `_type` 實際上是描述 Go 中各種資料型別的 struct
+
+這裡還包含一個 `mhdr`, 表示 interface 所定義的函式列表, `pkgpath` 紀錄定義了 interface package 名稱
+
+通過下圖來欣賞 `iface` struct 的全貌:
+
+![iface](img/iface.png)
+
+再來看一下 `eface` source code:
+
+```go
+type eface struct {
+	_type *_type
+	data  unsafe.Pointer
+}
+```
+
+相比 `iface`, `eface` 就簡單多了, 僅維護一個 `_type` field, 表示空接口所乘載的具體實體型別, `data` 描述具體的值
+
+來看個例子:
+
+```go
+package main
+
+import "fmt"
+
+func main() {
+	x := 200
+	var any interface{} = x
+	fmt.Println(any)
+
+	g := Gopher{"Go"}
+	var c coder = g
+	fmt.Println(c)
+}
+
+type coder interface {
+	code()
+	debug()
+}
+
+type Gopher struct {
+	language string
+}
+
+func (p Gopher) code() {
+	fmt.Printf("I am coding %s language\n", p.language)
+}
+
+func (p Gopher) debug() {
+	fmt.Printf("I am debuging %s language\n", p.language)
+}
+```
+
+運行程式並打印出組合語言:
+
+```go
+go tool compile -S ./src/main.go
+```
+
+可以看到 `main` 函式中調用了兩個函式:
+
+```go
+func convT2E64(t *_type, elem unsafe.Pointer) (e eface)
+func convT2I(tab *itab, elem unsafe.Pointer) (i iface)
+```
+
+上面兩個函式的參數和 `iface` 及 `eface` struct field 可以關聯起來, 兩個函式都是將參數組裝並形成最終的 interface
+
+最後再來看一下 `_type` struct:
+
+```go
+type _type struct {
+	size       uintptr // size of type
+	ptrdata    uintptr // size of memory prefix holding all pointers
+	hash       uint32  // hash value of type
+	tflag      tflag   // related to reflection
+	align      uint8   // memory alignment
+	fieldAlign uint8
+	kind       uint8
+	// function for comparing objects of this type
+	// (ptr to object A, ptr to object B) -> ==?
+	equal func(unsafe.Pointer, unsafe.Pointer) bool
+	// gcdata stores the GC type data for the garbage collector.
+	// If the KindGCProg bit is set in kind, gcdata is a GC program.
+	// Otherwise it is a ptrmask bitmap. See mbitmap.go for details.
+	gcdata    *byte
+	str       nameOff
+	ptrToThis typeOff
+}
+```
+
+Go 中的各種資料型別都是在 `_type` field 基礎上增加一些額外的 fields 來進行管理的:
+
+```go
+type arraytype struct {
+	typ   _type
+	elem  *_type
+	slice *_type
+	len   uintptr
+}
+
+type chantype struct {
+	typ  _type
+	elem *_type
+	dir  uintptr
+}
+
+type slicetype struct {
+	typ  _type
+	elem *_type
+}
+
+type functype struct {
+	typ      _type
+	inCount  uint16
+	outCount uint16
+}
+
+type ptrtype struct {
+	typ  _type
+	elem *_type
+}
+
+type structfield struct {
+	name       name
+	typ        *_type
+	offsetAnon uintptr
+}
+```
+
+> 以上資料型別的結構體定義, 是反射實現的基礎
+
+## Dynamic Type & Value of Interface
+
+
+
 ## Nil Interface
 
 Nil interface (interface{}) 不包含任何 method, 所有的類型都實現了 nil interface. 
