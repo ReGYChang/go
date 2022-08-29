@@ -3,6 +3,9 @@
   - [Value Receiver vs Pointer Receiver](#value-receiver-vs-pointer-receiver)
   - [Difference Between iface & eface](#difference-between-iface--eface)
   - [Dynamic Type & Value of Interface](#dynamic-type--value-of-interface)
+    - [Comparison Between interface{} & nil](#comparison-between-interface--nil)
+    - [Print Dynamic Type & Value of Interface](#print-dynamic-type--value-of-interface)
+  - [Compile-time Check If a Type Satisfies an Interface](#compile-time-check-if-a-type-satisfies-an-interface)
   - [Nil Interface](#nil-interface)
   - [Polymorphism with Open Closed Principle](#polymorphism-with-open-closed-principle)
   - [Composition Instead of Inheritance](#composition-instead-of-inheritance)
@@ -520,7 +523,183 @@ type structfield struct {
 
 ## Dynamic Type & Value of Interface
 
+從 source code 可以看出: `iface` 包含兩個 field, `tab` 為 interface table pointer, 指向型別資訊; `data` 為資料指針, 指向具體的資料位置
 
+它們分別被稱作 `dynamic type` 和 `dynamic value`, interface value 同時包含 `dynamic type` 和 `dynamic value`
+
+### Comparison Between interface{} & nil
+
+> interface value 的零值是指當 `dynamic type` 和 `dynamic value` 皆為 `nil`
+
+舉個例子:
+
+```go
+package main
+
+import "fmt"
+
+type Coder interface {
+	code()
+}
+
+type Gopher struct {
+	name string
+}
+
+func (g Gopher) code() {
+	fmt.Printf("%s is coding\n", g.name)
+}
+
+func main() {
+	var c Coder
+	fmt.Println(c == nil)
+	fmt.Printf("c: %T, %v\n", c, c)
+
+	var g *Gopher
+	fmt.Println(g == nil)
+
+	c = g
+	fmt.Println(c == nil)
+	fmt.Printf("c: %T, %v\n", c, c)
+}
+```
+
+output:
+
+```go
+true
+c: <nil>, <nil>
+true
+false
+c: *main.Gopher, <nil>
+```
+
+一開始 `c` 的 dynamic type 和 dynamic value 皆為 `nil`, 當把 `g` 賦值給 `c` 後, `c` 的 dynamic type 變成 `*main.Gopher`, 雖然 `c` 的 dynamic value 仍為 nil, 但 `c` 與 `nil` 比較時結果為 `false`
+
+再來看一個例子:
+
+```go
+package main
+
+import "fmt"
+
+type MyError struct {}
+
+func (i MyError) Error() string {
+	return "MyError"
+}
+
+func main() {
+	err := Process()
+	fmt.Println(err)
+
+	fmt.Println(err == nil)
+}
+
+func Process() error {
+	var err *MyError = nil
+	return err
+}
+```
+
+output:
+
+```go
+<nil>
+false
+```
+
+這裡先定義一個 `MyError` struct 並實現 `Error` 函式, 即實現 `error` interface
+
+`Process` 函式返回了一個 `error` interface, 這裡隱含了型別轉換, 雖然它的值為 `nil`, 但它的型別為 `*MyError`, 最後與 `nil` 比較時結果為 `false`
+
+### Print Dynamic Type & Value of Interface
+
+```go
+package main
+
+import (
+	"unsafe"
+	"fmt"
+)
+
+type iface struct {
+	itab, data uintptr
+}
+
+func main() {
+	var a interface{} = nil
+
+	var b interface{} = (*int)(nil)
+
+	x := 5
+	var c interface{} = (*int)(&x)
+	
+	ia := *(*iface)(unsafe.Pointer(&a))
+	ib := *(*iface)(unsafe.Pointer(&b))
+	ic := *(*iface)(unsafe.Pointer(&c))
+
+	fmt.Println(ia, ib, ic)
+
+	fmt.Println(*(*int)(unsafe.Pointer(ic.data)))
+}
+```
+
+直接定義一個 `iface` struct, 用兩個 pointer 來描述 `itab` 和 `data`, 再將 a, b, c 在記憶體中的內容強制解釋為自定義的 `iface`, 即可打印出 dynamic type & dynamic value 的位置
+
+output:
+
+```go
+{0 0} {17426912 0} {17426912 842350714568}
+5
+```
+
+## Compile-time Check If a Type Satisfies an Interface
+
+很常看到一些 open source library 會有下面這種奇怪的用法:
+
+```go
+var _ io.Writer = (*myWriter)(nil)
+```
+
+實際上就是讓 compiler 檢查 `*myWriter` 型別是否實現了 `io.Writer` interface
+
+舉個例子:
+
+```go
+package main
+
+import "io"
+
+type myWriter struct {
+
+}
+
+func (w myWriter) Write(p []byte) (n int, err error) {
+	return
+}
+
+func main() {
+    // check if *myWriter type implement io.Writer interface
+    var _ io.Writer = (*myWriter)(nil)
+
+    // check if myWriter type implement io.Writer interface
+    var _ io.Writer = myWriter{}
+}
+```
+
+當註釋掉 `myWriter` 定義的 `Write` 函式後運行程式報錯:
+
+```go
+src/main.go:14:6: cannot use (*myWriter)(nil) (type *myWriter) as type io.Writer in assignment:
+	*myWriter does not implement io.Writer (missing Write method)
+src/main.go:15:6: cannot use myWriter literal (type myWriter) as type io.Writer in assignment:
+	myWriter does not implement io.Writer (missing Write method)
+```
+
+報錯原因即 `*myWriter/myWriter` 未實現 `io.Writer` interface, 即未實現 `Write` 方法
+
+實際上上述賦值語句會發生隱式型別轉換, 轉換過程中 compiler 會檢查等號右邊的型別是否實現了等號左邊的 interface 所定義的函式
 
 ## Nil Interface
 
