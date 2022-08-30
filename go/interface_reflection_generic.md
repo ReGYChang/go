@@ -6,6 +6,9 @@
     - [Comparison Between interface{} & nil](#comparison-between-interface--nil)
     - [Print Dynamic Type & Value of Interface](#print-dynamic-type--value-of-interface)
   - [Compile-time Check If a Type Satisfies an Interface](#compile-time-check-if-a-type-satisfies-an-interface)
+  - [Deference Between Type Conversion & Assertion](#deference-between-type-conversion--assertion)
+    - [Type Conversion](#type-conversion)
+    - [Type Assertion](#type-assertion)
   - [Nil Interface](#nil-interface)
   - [Polymorphism with Open Closed Principle](#polymorphism-with-open-closed-principle)
   - [Composition Instead of Inheritance](#composition-instead-of-inheritance)
@@ -700,6 +703,194 @@ src/main.go:15:6: cannot use myWriter literal (type myWriter) as type io.Writer 
 報錯原因即 `*myWriter/myWriter` 未實現 `io.Writer` interface, 即未實現 `Write` 方法
 
 實際上上述賦值語句會發生隱式型別轉換, 轉換過程中 compiler 會檢查等號右邊的型別是否實現了等號左邊的 interface 所定義的函式
+
+## Deference Between Type Conversion & Assertion
+
+Go 中不允許隱式型別轉換, 即 `=` 兩邊不允許出現型別不同的變數
+
+`Type conversion` 及 `Type assertion` 本質上都是將一個型別轉換成另一個型別, 不同之處在於 `Type assertion` 對象是 interface 變數
+
+### Type Conversion
+
+對於 `Type conversion` 而言, 轉換前後的兩個型別必須互相兼容, 其語法為:
+
+```go
+<result type> := <target type> (<expression>)
+```
+
+舉例如下:
+
+```go
+package main
+
+import "fmt"
+
+func main() {
+	var i int = 9
+
+	var f float64
+	f = float64(i)
+	fmt.Printf("%T, %v\n", f, f)
+
+	f = 10.8
+	a := int(f)
+	fmt.Printf("%T, %v\n", a, a)
+
+	// s := []int(i)
+}
+```
+
+上述程式碼定義了 `int` 和 `float64` 型別的變數, 並嘗試在其之間相互轉換, 成功代表其是相互兼容的
+
+若將最後一行程式碼註釋去除, compiler 會報型別不兼容的錯誤:
+
+```go
+cannot convert i (type int) to type []int
+```
+
+### Type Assertion
+
+前面提到, 因為空接口 `interface{}` 沒有定義任何函式, 因此 Go 中所有的型別都實現了 `interface{}`
+
+當一個函式的 parameter 為 `interface{}` 時, 在函式中就需要對 parameter 進行斷言, 從而得到它的真實型別
+
+Assertion syntax:
+
+```go
+<target type value>, <bool> := <expression>.(target type)
+<target type value> := <expression>.(target type)
+```
+
+`Type assertion` 與 `Type conversion` 有些相似, 不同之處在於 `Type assertion` 是針對 interface 進行操作
+
+再看一個例子:
+
+```go
+package main
+
+import "fmt"
+
+type Student struct {
+	Name string
+	Age int
+}
+
+func main() {
+	var i interface{} = new(Student)
+	s := i.(Student)
+	
+	fmt.Println(s)
+}
+```
+
+運行後直接報 `panic`:
+
+```go
+panic: interface conversion: interface {} is *main.Student, not main.Student
+```
+
+因為 `i` 是 `*Student` 型別而非 `Student`, 斷言失敗則觸發 `panic`, 一般不適合這樣做, 可以帶上 bool 參數進行斷言:
+
+```go
+func main() {
+	var i interface{} = new(Student)
+	s, ok := i.(Student)
+	if ok {
+		fmt.Println(s)
+	}
+}
+```
+
+如此一來就算斷言失敗也不會觸發 `panic`
+
+斷言的另一種形式則是利用 `switch` 語句判斷 interface 型別, 每一個 `case` 會被循序考慮, 因此 `case` 語句順序極為重要, 因為可能出現同時多個 `case` 匹配的情況
+
+```go
+func main() {
+	//var i interface{} = new(Student)
+	//var i interface{} = (*Student)(nil)
+	var i interface{}
+
+	fmt.Printf("%p %v\n", &i, i)
+
+	judge(i)
+}
+
+func judge(v interface{}) {
+	fmt.Printf("%p %v\n", &v, v)
+
+	switch v := v.(type) {
+	case nil:
+		fmt.Printf("%p %v\n", &v, v)
+		fmt.Printf("nil type[%T] %v\n", v, v)
+
+	case Student:
+		fmt.Printf("%p %v\n", &v, v)
+		fmt.Printf("Student type[%T] %v\n", v, v)
+
+	case *Student:
+		fmt.Printf("%p %v\n", &v, v)
+		fmt.Printf("*Student type[%T] %v\n", v, v)
+
+	default:
+		fmt.Printf("%p %v\n", &v, v)
+		fmt.Printf("unknow\n")
+	}
+}
+
+type Student struct {
+	Name string
+	Age int
+}
+```
+
+`main` 函式中有三行不同聲明, 每次運行一行並註釋另外兩行, 最後得到三組運行結果:
+
+```go
+// --- var i interface{} = new(Student)
+0xc4200701b0 [Name: ], [Age: 0]
+0xc4200701d0 [Name: ], [Age: 0]
+0xc420080020 [Name: ], [Age: 0]
+*Student type[*main.Student] [Name: ], [Age: 0]
+
+// --- var i interface{} = (*Student)(nil)
+0xc42000e1d0 <nil>
+0xc42000e1f0 <nil>
+0xc42000c030 <nil>
+*Student type[*main.Student] <nil>
+
+// --- var i interface{}
+0xc42000e1d0 <nil>
+0xc42000e1e0 <nil>
+0xc42000e1f0 <nil>
+nil type[<nil>] <nil>
+```
+
+對於第一行語句:
+
+```go
+var i interface{} = new(Student)
+```
+
+`i` 為一個 `*Student` 型別, 匹配到第三個 `case`, 從印出的三個位置來看, 這三個變數實際上都是不同的
+
+分別在調用函式時和斷言後生成了一份新的拷貝, 所以最終印出的三個變數位置都不一樣
+
+對於第二行語句:
+
+```go
+var i interface{} = (*Student)(nil)
+```
+
+這邊想說明的是 `i` 在這裡 `dynamic type` 為 `(*Student)`, `dynamic data` 為 `nil`, 因此其與 `nil` 比較時得到的結果也不為 `nil`
+
+對於第三行語句:
+
+```go
+var i interface{}
+```
+
+因 `dynamic type` & `dynamic data` 皆為 `nil`, `i` 才為 `nil`
 
 ## Nil Interface
 
