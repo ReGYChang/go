@@ -70,7 +70,7 @@
 # Caching
   - GCache
   - Distributed Cache
-      - [Go-Redis](go_redis.md)
+      - [go-redis](go_redis.md)
   - [GeeCache](caching/gee_cache.md)
 # Logging
   - [zerolog](logging/zerolog.md)
@@ -84,9 +84,9 @@
 # Testing
   - [Unit Testing](testing/unit_test.md)
       - Mocking
-          - GoMock
+          - [gomock](testing/gomock.md)
       - Frameworks
-          - Testify
+          - testify
       - Assertion
   - Benchmarking
 # Virtualizaion
