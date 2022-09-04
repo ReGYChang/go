@@ -1,4 +1,4 @@
-｀｀- [Git](#git)
+- [Git](#git)
 - [Installation](#installation)
 - [Create Repository](#create-repository)
   - [[git init]](#git-init)
@@ -32,6 +32,8 @@
   - [Adding Remote Repositories](#adding-remote-repositories)
     - [[git remote]](#git-remote)
     - [[git push]](#git-push)
+- [Working Tree](#working-tree)
+  - [[git worktree]](#git-worktree)
 
 # Git
 
@@ -961,3 +963,19 @@ Your branch is up to date with 'origin/main'.
 `Your branch is up to date with 'origin/main'.` 表示目前 local `main` branch 與 remote branch 內容是一致的
 
 > ❗️ 注意如果創建 repository 時選了 `Add a README file`, 後續直接 `git push` 會出現 `failed to push some refs to https://github.com/ReGYChang/gitflow.git` 的錯誤, 因為新創建的 `README.md` 並不在 local repo 中導致, 需要先使用 `git pull --rebase origin master` 同步 remote repo 才能 `git push` 成功
+
+# Working Tree
+
+在實際開發過程中會時常需要切到其他 branch, 無論是需要對照, 修 bug 還是開發一個插件的新功能等
+
+類似這種情況通常會先 `git stash` 目前的更動, 等處理完其他事情再 `git stash apply`(或是先 commit 回來再 reset) 恢復變更
+
+## [git worktree]
+
+Git v2.5 之後新增了 `git worktree` 指令, 可以減少 branch 之間切換的成本, 這裡 worktree 指的是 `Working Tree`(工作目錄)
+
+在某個資料夾中進行 `git init` 或是 clone 一個 remote repository 後這個資料夾即成為一個 working tree(由 git 管理的專案資料夾)
+
+`git worktree` 可以為同一個專案創建多個 working tree, 並且其他 working tree 變更在 commit 後會回到原本的 working tree
+
+若是遇到警急上 patch 修 bug 卻又不想 `git stash` 目前的開發進度, 可以透過 `git worktree` 新增新的工作目錄另外處理, 不影響目前的開發狀況
