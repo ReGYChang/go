@@ -94,6 +94,7 @@
   - Kubernetes
 # Good to Know Libraries
   - [bxcodec/faker](library/bxcodec_faker.md)
+  - [golang-migrate/migrate](library/migrate.md)
   - Encoding/Decoding
   - Input and output
   - Validator
