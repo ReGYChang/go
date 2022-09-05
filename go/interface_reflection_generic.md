@@ -9,6 +9,7 @@
   - [Deference Between Type Conversion & Assertion](#deference-between-type-conversion--assertion)
     - [Type Conversion](#type-conversion)
     - [Type Assertion](#type-assertion)
+      - [fmt.Println](#fmtprintln)
   - [Nil Interface](#nil-interface)
   - [Polymorphism with Open Closed Principle](#polymorphism-with-open-closed-principle)
   - [Composition Instead of Inheritance](#composition-instead-of-inheritance)
@@ -339,7 +340,7 @@ func main() {
 
 那兩者分別在何時使用?
 
-若方法的 receiver 為 value type, 無論調用者為物件還是物件指針, 修改的都是物件的副本, 不會影響調用者; 若方法的 receiver 為 pointer type, 則調用者修改的為指針指向的物件本身
+> 若方法的 receiver 為 value type, 無論調用者為物件還是物件指針, 修改的都是物件的副本, 不會影響調用者本身; 若方法的 receiver 為 pointer type, 則調用者修改的為指針指向的物件本身
 
 使用 `pointer type receiver method` 的理由:
 
@@ -891,6 +892,85 @@ var i interface{}
 ```
 
 因 `dynamic type` & `dynamic data` 皆為 `nil`, `i` 才為 `nil`
+
+#### fmt.Println
+
+`fmt.Println` 函式參數為 `interface`, 對於 build-in type, 函式內部會用窮舉法推出其真實型別並轉換為字符串打印;
+
+而對於 custom type, 首先確認該型別是否實現了 `String()` 方法, 若實現則直接打印輸出 `String()` 方法結果; 否則會通過反射來遍歷物件成員進行打印
+
+來看一個簡單的例子:
+
+```go
+package main
+
+import "fmt"
+
+type Student struct {
+	Name string
+	Age int
+}
+
+func main() {
+	var s = Student{
+		Name: "qcrao",
+		Age: 18,
+	}
+
+	fmt.Println(s)
+}
+```
+
+由於 `Student` struct 沒有實現 `String()` 方法, 所以 `fmt.Println` 會利用反射遍歷打印成員變數:
+
+output:
+
+```go
+{qcrao 18}
+```
+
+增加一個 `String()` 方法的實現:
+
+```go
+func (s Student) String() string {
+	return fmt.Sprintf("[Name: %s], [Age: %d]", s.Name, s.Age)
+}
+```
+
+output:
+
+```go
+[Name: qcrao], [Age: 18]
+```
+
+針對上述例子做修改:
+
+```go
+func (s *Student) String() string {
+	return fmt.Sprintf("[Name: %s], [Age: %d]", s.Name, s.Age)
+}
+```
+
+注意這兩個函式的 receiver type 不同, 現在 `Student` struct 只有實現一個 `pointer receiver type` 的 `String()` 方法, output 如下:
+
+```go
+{qcrao 18}
+```
+
+> 型別 `T` 只有 receiver 為 `T` 的方法; 而型別 `*T` 擁有 receiver 為 `T` 和 `*T` 的方法, 在語法上 `T` 能直接調用 `*T` 的方法僅僅是 `Go` 的 syntactic sugar
+
+所以當 `Student` struct 實現了 value type receiver 的 `String()` 方法時, 可以透過
+
+- `fmt.Println(s)`
+- `fmt.Println(&s)`
+
+兩種自定義格式來打印;
+
+若 `Student` struct 實現了 pointer type receiver 的 `String()` 方法時只能通過
+
+- `fmt.Println(&s)`
+
+才能按照自定義格式打印
 
 ## Nil Interface
 
