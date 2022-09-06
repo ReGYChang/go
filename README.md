@@ -91,7 +91,7 @@
   - Benchmarking
 # Virtualizaion
   - [Docker](virtualization/docker.md)
-  - Kubernetes
+  - [Kubernetes](virtualization/k8s.md)
 # Good to Know Libraries
   - [bxcodec/faker](library/bxcodec_faker.md)
   - [golang-migrate/migrate](library/migrate.md)
