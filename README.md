@@ -83,17 +83,14 @@
   - REST
 # Testing
   - [Unit Testing](testing/unit_test.md)
-      - Mocking
-          - [gomock](testing/gomock.md)
-      - Frameworks
-          - testify
-      - Assertion
+  - [gomock](testing/gomock.md)
+  - [testify](testing/testify.md)
+  - [bxcodec/faker](library/bxcodec_faker.md)
   - Benchmarking
 # Virtualizaion
   - [Docker](virtualization/docker.md)
   - [Kubernetes](virtualization/k8s.md)
 # Good to Know Libraries
-  - [bxcodec/faker](library/bxcodec_faker.md)
   - [golang-migrate/migrate](library/migrate.md)
   - Encoding/Decoding
   - Input and output
