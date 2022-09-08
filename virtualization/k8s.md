@@ -1,6 +1,7 @@
 - [Introduction](#introduction)
   - [Docker Container](#docker-container)
   - [Kubernetes Introduction](#kubernetes-introduction)
+  - [Kubernetes Architecture](#kubernetes-architecture)
 
 # Introduction
 
@@ -52,3 +53,42 @@ Kubernetes 內建有非常多優秀的特性使得開發者能更專注於業務
 - Secret and configuration management: 私鑰配置管理, 對於敏感資訊通過 secret 儲存, 應用的配置文件通過 configmap 儲存, 避免將配置文件寫死於鏡像中以增加容器編排靈活性
 - Batch execution: 通過 job 和 cornjob 提供單次批次處理任務和循環計畫任務功能
 - Horizontal scaling: 水平擴充功能, 包含 HPA 和 AS, 即應用基於 CPU Usage 的彈性伸縮和基於平台級的彈性伸縮, 如自動增刪 node 節點
+
+## Kubernetes Architecture
+
+![k8s_architecture](img/k8s_architecture.png)
+
+`Kubernetes` 包含兩種角色: master node & worker node
+
+`Master node` 為負責 cluster 中控制管理的節點, 為 k8s cluster 的核心:
+
+- kube-apiserver: 負責處理集群所有 requests, 為 cluster 入口
+- kube-controller-scheduler: 負責集群資源調度, 通過 `watch` 監控 `pod` 的創建, 負責將 `pod` 調度到合適的 worker node
+- kube-controller-manager: 通過多種控制器確保集群一致性, 如 `Node Controller`, `Replication Controller`, `Endpoints Controller` 等
+- etcd: metadata storage, 負責儲存集群中 `node`, `pod`, `rc`, `service` 等資料
+
+`Woker node` 為實際的工作節點, 負責集群負載的實際運行, 即 `pod` 運行的載體, 通常包含三個組件: `Container`, `Runtime`, `kubelet` 和 `kube-proxy`
+
+- `Container Runtime` 主要負責實現 container 生命週期管理, 如 `docker`, `containerd`, `rktlet` 等
+- `kubelet` 負責 image 和 pod 的管理
+- `kube-proxy` 為 service 實現的抽象, 負責維護和轉發 pod 的 routing, 實現集群內部和外部網絡的訪問
+
+其他組件還包括:
+
+- cloud-controller-manager: 用於 public cloud interface, 提供節點管理, 路由管理, 服務管理, 存儲管理等功能, 需由 public cloud 廠商實現具體細節
+- DNS: `kube-dns` 或 `coredns` 實現集群內的 domain name parsing
+- `kubernetes-dashboard`: 提供 GUI 管理介面
+- `kubectl`: 與集群進行交互
+- 服務外部接口, 通過 `ingress` 實現第七層接口, 由多種 `controller` 組成:
+  - traefik
+  - nginx ingress controller
+  - haproxy ingress controller
+  - public cloud ingress controller
+- Methics Monitor:
+  - metric-server
+  - prometheus
+- Log
+  - Fluentd
+  - Elasticsearch
+  - Kibana
+
