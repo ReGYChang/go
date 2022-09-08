@@ -2,6 +2,7 @@
   - [Docker Container](#docker-container)
   - [Kubernetes Introduction](#kubernetes-introduction)
   - [Kubernetes Architecture](#kubernetes-architecture)
+  - [Kubernetes High Availability](#kubernetes-high-availability)
 
 # Introduction
 
@@ -92,3 +93,13 @@ Kubernetes 內建有非常多優秀的特性使得開發者能更專注於業務
   - Elasticsearch
   - Kibana
 
+## Kubernetes High Availability
+
+K8s HA cluster 通常由 3 ~ 5 個節點組成, 需要保障各個節點的高可用性
+
+- etcd: 內建集群機制, 保障資料持久化儲存
+- kube-apiserver: stateless api service, 有 loading balancer 做負載均衡, 如 `haproxy` 或 `nginx`
+- kube-scheduler: 內建選舉機制, 保障 scheduler HA, 確保同個時間只有一個 Master Node 運作, 其他處於 blocking 以防止腦裂
+- kube-controller-manager: 內建選舉機制保障 controller HA, 機制同 `kube-scheduler`
+
+![k8s_ha](img/k8s_ha.png)
