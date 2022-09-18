@@ -6,6 +6,10 @@
   - [Multi Dimensional Array](#multi-dimensional-array)
 - [Slice](#slice)
   - [Create Slice](#create-slice)
+    - [Declare Slice](#declare-slice)
+    - [Literal](#literal)
+    - [Make](#make)
+    - [Reslice](#reslice)
   - [Modification in Slice](#modification-in-slice)
   - [Length and capacity of slice](#length-and-capacity-of-slice)
   - [Create Slice With make](#create-slice-with-make)
@@ -291,48 +295,181 @@ func main() {
 
 # Slice
 
-slice 是由 array 建立的一種方便, 靈活且功能強大的 wrapper
+`slice` 是由 array 建立的一種方便, 靈活且功能強大的 wrapper
 
 其本身不擁有任何資料, 它們只是對現有 array 的 reference
 
+`slice` source code 如下:
+
+```go
+// runtime/slice.go
+type slice struct {
+	array unsafe.Pointer
+	len   int
+	cap   int
+}
+```
+
+`slice` 有三個屬性:
+
+- `pointer`: 指向底層 `array`
+- `len`: 表示 `slice` 可用元素的個數, 即使用 index 對 `slice` 元素進行訪問時, index 不能超出 `slice` 的長度
+- `cap`: 表示底層 `array` 的元素個數, `cap` >= `len`, 在底層 `array` 不進行擴容的情況下 `cap` 即是 `slice` 可以擴展的上限
+
+![slice_struct](img/slice_struct.png)
+
+>❗️底層 array 可以同時被多個 slice 同時指向, 因此對一個 slice 元素進行操作有可能影響到其他 slice
+
 ## Create Slice
 
-帶有 `T` 類型元素的 slice 由 `[]T` 表示
+創建 `slice` 的方式有以下幾種:
+
+| method  | sample                                           |
+| ------- | ------------------------------------------------ |
+| declare | var slice []int                                  |
+| new     | slice := *new([]int)                             |
+| literal | slice := []int{1,2,3}                            |
+| make    | slice := make([]int, 5, 10)                      |
+| reslice | slice := array[1:5] or slice := sourceSlice[1:5] |
+
+### Declare Slice
+
+直接聲明創建出來的 slice 其實為一個 `nil slice`, 其長度及容量皆為 0, 與 `nil` 比較結果為 `true`
+
+`nil slice` 很容易與 `empty slice` 混淆, `empty slice` 長度及容量也皆為 0, 但是所有的 `empty slice` 的資料指針都指向同一個位置 `0xc42003bda0`, `empty slice` 與 `nil` 比較結果為 `false`
+
+其內部構造比較如下:
+
+![nil_empty_slice](img/nil_slice_empty_slice.png)
+
+其創建方法分別如下:
+
+| type        | method                                    | len | cap | compare to nil |
+| ----------- | ----------------------------------------- | --- | --- | -------------- |
+| nil slice   | var s1 []int; var s2 = *new([]int)        | 0   | 0   | true           |
+| empty slice | var s3 = []int{}; var s4 = make([]int, 0) | 0   | 0   | false          |
+
+>💡兩者很相似, 長度和容量皆為 0, 官方建議盡量使用 `nil slice`
+
+### Literal
+
+直接使用初始化表達式創建:
 
 ```go
 package main
 
-import (
-    "fmt"
-)
+import "fmt"
 
 func main() {
-    a := [5]int{76, 77, 78, 79, 80}
-    var b []int = a[1:4] // creates a slice from a[1] to a[3]
-    fmt.Println(b)
+	s1 := []int{0, 1, 2, 3, 8: 100}
+	fmt.Println(s1, len(s1), cap(s1))
 }
 ```
 
-使用語法 `a[start:end]` 創建一個從 `a` array index `start` 開始到 `end - 1` 結束的 slice
+>❗️需要注意的是上述程式碼中使用了索引號直接賦值, 其他為註明元素默認為 0
 
-因此上述程式碼 `a[1:4]` 從 index 1 - 3 創建了 `a` array 的一個 slice `b`, `b` 值為 `[77 78 79]`
+### Make
 
-另一種創建 slice 的方式：
+使用 `make` 函式創建 slice 需要傳入三個參數: slice 型別, 長度, 容量; 容量可以不傳, 默認與長度相等
 
 ```go
 package main
 
-import (  
-    "fmt"
-)
+import "fmt"
 
-func main() {  
-    c := []int{6, 7, 8} // creates and array and returns a slice reference
-    fmt.Println(c)
+func main() {
+	slice := make([]int, 5, 10)
+	slice[2] = 2
+	fmt.Println(slice)
 }
 ```
 
-`c := []int{6, 7, 8}` 創建一個有 3 個 int 元素的 array 並返回一個儲存在 `c` 中的 slice reference
+### Reslice
+
+`Reslice` 也是比較常見的一種創建 slice 的方法, 可以從現有的 array 或 slice 直接擷取, 當然需要指定起止索引的位置
+
+新的 slice 和老的 slice 共用底層 array, 新老 slice 對底層 array 的修改都會影響彼此; 基於 array 亦同
+
+>💡新老 slice 或新 slice 老 array 相互影響的前提為兩者共用底層 array, 若因為執行 `append` 使得新的 slice 底層 array 擴容並轉移到新位置, 則兩者就不會相互影響
+
+```go
+ data := [...]int{0, 1, 2, 3, 4, 5, 6, 7, 8, 9}
+ slice := data[2:4:6] // data[low, high, max]
+```
+
+上述程式碼對 `data` 使用三個索引進行 `reslice` 並創建出新的 `slice`, 這裡的 `data` 可以為 slice or array
+
+`low` 為最低索引值, 表示第一個元素為 `data` 位於 `low` 索引處的元素; `high` 表示最後一個元素只能為索引 `high-1` 的元素; 而最大容量則只能為索引 `max-1` 的元素
+
+```
+max >= high >= low
+```
+
+當 `high == low` 時新的 `slice` 為空; 另外 `high` 和 `max` 必須在老 array 或老 slice 的容量(`cap`)範圍內
+
+舉個例子:
+
+```go
+package main
+
+import "fmt"
+
+func main() {
+	slice := []int{0, 1, 2, 3, 4, 5, 6, 7, 8, 9}
+	s1 := slice[2:5]
+	s2 := s1[2:6:7]
+
+	s2 = append(s2, 100)
+	s2 = append(s2, 200)
+
+	s1[2] = 20
+
+	fmt.Println(s1)
+	fmt.Println(s2)
+	fmt.Println(slice)
+}
+```
+
+output:
+
+```go
+[2 3 20]
+[4 5 6 7 100 200]
+[0 1 2 3 20 5 6 7 100 9]
+```
+
+初始狀態如下:
+
+```go
+slice := []int{0, 1, 2, 3, 4, 5, 6, 7, 8, 9}
+s1 := slice[2:5]
+s2 := s1[2:6:7]
+```
+
+- `s1` 從 `slice` 索引 2 - 索引 5, 長度為 3, 容量默認到 array 尾端, 為 8
+- `s2` 從 `s1` 索引 2 - 索引 6, 容量到索引 7, 為 5
+
+![reslice_sample_1](img/reslice_sample_1.png)
+
+再來向 `s2` 尾部追加一個 100:
+
+```go
+s2 = append(s2, 100)
+```
+
+`s2` 容量剛好夠, 不需擴容直接追加; 不過這會修改原始 array 對應位置的元素, 因此會影響到 `slice` 及 `s1`:
+
+![reslice_sample_2](img/reslice_sample_2.png)
+
+再次向 `s2` 追加元素 200:
+
+```go
+s2 = append(s2, 200)
+```
+
+此時 `s2` 容量不足會觸發擴容, 將原來的元素複製到新的記憶體位置以擴大容量, 且為了應對未來再次擴容的需求, `s2` 會在擴容時多留一些 buffer, 將新的容量擴大為初始容量的 2 倍, 即 10
+
+![reslice_sample_3](img/reslice_sample_3.png)
 
 ## Modification in Slice
 
