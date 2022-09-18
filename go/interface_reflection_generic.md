@@ -10,6 +10,8 @@
     - [Type Conversion](#type-conversion)
     - [Type Assertion](#type-assertion)
       - [fmt.Println](#fmtprintln)
+  - [Interface Conversion Principle](#interface-conversion-principle)
+  - [Implement Polymorphism with Interface](#implement-polymorphism-with-interface)
   - [Nil Interface](#nil-interface)
   - [Polymorphism with Open Closed Principle](#polymorphism-with-open-closed-principle)
   - [Composition Instead of Inheritance](#composition-instead-of-inheritance)
@@ -971,6 +973,157 @@ func (s *Student) String() string {
 - `fmt.Println(&s)`
 
 才能按照自定義格式打印
+
+## Interface Conversion Principle
+
+上述提及 `iface` source code 可以觀察到, 其包含了 interface 型別 `interfacetype` 和實體型別 `_type`, 兩者皆為 `iface` field `itab` 的 member, 即生成一個 `itab` 同時需要有 interface 型別及實體型別
+
+> <interface 型別, 實體型別> -> itable
+
+當判斷某種型別是否滿足某個 interface 時, Go 使用型別的方法集合和 interface 所需的方法集合進行匹配, 若型別的方法集合完全包含 interface 的方法集合, 則可認為該型別實現了該 interface
+
+如某型別有 `m` 個方法, 某 interface 有 `n` 個方法, 則判斷的時間複雜度為 `O(mn)`, 但 Go 會對方法集合的函式按照函式名的字典序進行排序, 所以實際的時間複雜度為 `O(m+n)`
+
+下面來探討一下將一個 interface 轉換為另一個 interface 背後的原理, 當然其必須為型別兼容
+
+舉個例子:
+
+```go
+package main
+
+import "fmt"
+
+type coder interface {
+	code()
+	run()
+}
+
+type runner interface {
+	run()
+}
+
+type Gopher struct {
+	language string
+}
+
+func (g Gopher) code() {
+	return
+}
+
+func (g Gopher) run() {
+	return
+}
+
+func main() {
+	var c coder = Gopher{}
+
+	var r runner
+	r = c
+	fmt.Println(c, r)
+}
+```
+
+上述程式碼定義了兩個 `interface`: `coder` 和 `runner`; 定義了一個實體型別 `Gopher`, 其實現了兩個方法分別為 `run()` 和 `code()`
+
+`main` 函式中定義了一個 interface variable `c` 並綁定一個 `Gopher` 物件, 之後將 `c` 賦值給另一個 interface variable `r`, 賦值成功的原因為 `c` 中包含 `run()` 方法, 如此兩個 interface variables 完成了轉換
+
+## Implement Polymorphism with Interface
+
+Go 中並沒有設計如 `Virtual function`, `Pure Virtual function`, `Inheritance` 或 `Multiple inheritance` 等概念, 但其通過 interface 非常優雅地支持了物件導向的特性
+
+`Polymorphism` 是一種 runtime 的行為, 其有以下幾個特點:
+
+- 一種型別具有多種型別的能力
+- 允許不同的物件對同一個消息作出靈活反應
+- 以一種通用的方式處理數個使用的物件
+- 非動態語言必須通過 `inheritance` 和 `interface` 來實現
+
+舉個 `polymorphism` 的例子:
+
+```go
+package main
+
+import "fmt"
+
+func main() {
+	qcrao := Student{age: 18}
+	whatJob(&qcrao)
+
+	growUp(&qcrao)
+	fmt.Println(qcrao)
+
+	stefno := Programmer{age: 100}
+	whatJob(stefno)
+
+	growUp(stefno)
+	fmt.Println(stefno)
+}
+
+func whatJob(p Person) {
+	p.job()
+}
+
+func growUp(p Person) {
+	p.growUp()
+}
+
+type Person interface {
+	job()
+	growUp()
+}
+
+type Student struct {
+	age int
+}
+
+func (p Student) job() {
+	fmt.Println("I am a student.")
+	return
+}
+
+func (p *Student) growUp() {
+	p.age += 1
+	return
+}
+
+type Programmer struct {
+	age int
+}
+
+func (p Programmer) job() {
+	fmt.Println("I am a programmer.")
+	return
+}
+
+func (p Programmer) growUp() {
+	p.age += 10
+	return
+}
+```
+
+程式碼中定義了一個 `Person` interface, 其包含兩個函式 `job()`, `growUp()`
+
+再來定義兩個 struct `Student` 和 `Programmer`, 同時 `*Student` 和 `Programmer` 實現了 `Person` interface 定義的兩個函式
+
+>❗️注意 `*Student` 型別實現了 interface, `Student` 則沒有
+
+接著再定義函式參數為 `Person` interface 的兩個函式:
+
+```go
+func whatJob(p Person)
+func growUp(p Person)
+```
+
+`main` 函式中中先生成 `Student` 和 `Programmer` 物件, 再將其分別傳入函式 `whatJob` 和 `growUp` 中; 於函式中直接調用 interface 函式, 實際執行時是看最終傳入的實體型別為何, 並調用實體型別實現的函示, 於是不同物件針對同一個消息就會產生多種表現, 即實現 `Polymorphism`
+
+output:
+
+```go
+I am a student.
+{19}
+I am a programmer.
+{100}
+```
 
 ## Nil Interface
 
