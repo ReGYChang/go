@@ -471,6 +471,16 @@ s2 = append(s2, 200)
 
 ![reslice_sample_3](img/reslice_sample_3.png)
 
+最後修改 `s1` 索引 2 位置的元素:
+
+```go
+s1[2] = 20
+```
+
+這次只會影響原始 array 相應位置的元素, 因為 `s2` 底層的 array 已經使用不同的記憶體位置
+
+>💡當 print `s1` 時只會印出 `s1` 長度以內的元素, 雖然其底層 array 不只有 3 個元素
+
 ## Modification in Slice
 
 Slice 自己不擁有任何資料, 其只是底層 array 的一種表示
