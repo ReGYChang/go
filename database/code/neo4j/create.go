@@ -1,8 +1,9 @@
 package main
 
 import (
+	"time"
+
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j"
-	"github.com/rs/zerolog/log"
 )
 
 func main() {
@@ -26,23 +27,30 @@ func main() {
 	}
 }
 
-func insertSn(session neo4j.Session, sn string, kpsn string) error {
+func insertSn(session neo4j.Session, sn, kpsn, moNumber string, workTime time.Time) error {
 	params := map[string]interface{}{
-		"sn":   sn,
-		"kpsn": kpsn,
+		"master_sn": sn,
+		"slave_sn":  kpsn,
+		"mo_number": moNumber,
+		"work_time": workTime,
 	}
 	_, err := session.Run(`
-		MERGE (sn { serialNumber: $sn })
+		MERGE (mo: MO { moNumber: $mo_number})
 		ON CREATE
-			SET sn: SN
-		ON MATCH
-			SET sn: SN
-		MERGE (kpsn { serialNumber: $kpsn })
+			SET mo.mo = $mo_number
+		MERGE (master { serialNumber: $master_sn, workTime: $work_time })
 		ON CREATE
-			SET kpsn: KPSN
+			SET master: $serial_number_type
 		ON MATCH
-			SET kpsn: KPSN
-		MERGE (kpsn)-[r: BELONGS]->(sn)
+			SET master: $serial_number_type
+		MERGE (slave { serialNumber: $slave_sn, workTime: $work_time })
+		ON CREATE
+			SET slave: $serial_number_type
+		ON MATCH
+			SET slave: $serial_number_type
+		MERGE (slave)-[: BELONGS]->(master)
+		MERGE (slave)-[: BELONGS]->(mo)
+		MERGE (master)-[: BELONGS]->(mo)
 	`, params)
 
 	if err != nil {
