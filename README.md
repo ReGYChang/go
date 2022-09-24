@@ -23,7 +23,7 @@
   - String
   - Array, Linked List
   - Stack, Queue
-  - Tree
+  - [Tree](algo/tree.md)
   - Graph
   - Analyzing Algorithms
   - Searching Algorithm
