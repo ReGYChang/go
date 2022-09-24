@@ -6,7 +6,7 @@
   <a href="https://github.com/ReGYChang/LeetCode"><img src="https://img.shields.io/badge/algo-leetcode-brightgreen.svg" alt="leetcode"></a>
 </p>
 
-# [Go](go/README.md)
+# Go
 - [package, init, tools, repo, dependency](go/pkg_init_tools_repo_dependency.md)
 - [var, const, type, pointer](go/var_const_type_pointer.md)
 - [function, defer, closure](go/function_defer_closure.md)
@@ -19,10 +19,25 @@
 - [goroutine, channel, buffer, select, mutex](go/go_channel_buffer_select_mutex.md)
 - [interview](go/interview.md)
 
-# SQL fundamentals
+# Data Structures And Algorithms
+  - String
+  - Array, Linked List
+  - Stack, Queue
+  - Tree
+  - Graph
+  - Analyzing Algorithms
+  - Searching Algorithm
+  - Sorting Algorithm
+  - Divide and Conquer Algorithm
+  - Greedy Mehtodology
+  - Recursion
+  - Backtracking Algorithm
+  - Dynamic Programming
+
 # General Development Skills
   - [Git](general/git.md)
-  - [HTTP / HTTPS](general/http_https.md)
+  - [HTTP / HTTPyS](general/http_https.md)
+  - SQL Fundamentals
   - Data Structures and Algorithms
   - Scrum, Kanban or other project strategies
   - [Basic Authentication, OAuth, JWT, etc](general/authentication.md)
