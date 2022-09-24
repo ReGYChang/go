@@ -89,6 +89,8 @@
   - Benchmarking
 # Virtualizaion
   - [Docker](virtualization/docker.md)
+    - [Neo4j](virtualization/docker/neo4j-docker-compose.yml)
+    - [Redis](virtualization/docker/redis/docker-compose.yml)
   - [Kubernetes](virtualization/k8s.md)
 # Good to Know Libraries
   - [golang-migrate/migrate](library/migrate.md)
