@@ -10,6 +10,8 @@
     - [Container & Application](#container--application)
     - [Service Access](#service-access)
   - [Create Application](#create-application)
+  - [Access Application](#access-application)
+    - [ClusterIP Access](#clusterip-access)
 
 # Introduction
 
@@ -426,7 +428,7 @@ QoS Class:       BestEffort
 Node-Selectors:  <none> 
 Tolerations:     node.kubernetes.io/not-ready:NoExecute for 300s
                  node.kubernetes.io/unreachable:NoExecute for 300s
-Events:  #事件状态，拉镜像，启动容器
+Events:
   Type    Reason     Age   From               Message
   ----    ------     ----  ----               -------
   Normal  Scheduled  14m   default-scheduler  Successfully assigned default/nginx-app-demo-7bdfd97dcd-7t72x to node-3
@@ -435,3 +437,58 @@ Events:  #事件状态，拉镜像，启动容器
   Normal  Created    14m   kubelet, node-3    Created container nginx-app-demo
   Normal  Started    14m   kubelet, node-3    Started container nginx-app-demo
 ```
+
+## Access Application
+
+K8s 為每個 pod 都分配了一個 ip address, 可以通過此 address 直接 access application, 相當於訪問 RS
+
+一個 application 即為一個整體, 由多個 replications 組成, 需要依賴於 `service` 來實現 application 的 loading balance, 再來探討有關 `service` 的兩種訪問方式: `ClusterIP` 和 `NodePort`
+
+> 首先設置 `pod` 內容, 為方便區分, 設置三個不同 nginx 網頁以觀察 loading balance 效果
+
+```go
+# kubectl get pods
+NAME                              READY   STATUS    RESTARTS   AGE
+nginx-app-demo-7bdfd97dcd-7t72x   1/1     Running   0          28m
+nginx-app-demo-7bdfd97dcd-hsrft   1/1     Running   0          28m
+nginx-app-demo-7bdfd97dcd-qtbzd   1/1     Running   0          28m
+```
+
+進入 `pod` container
+
+```go
+# kubectl exec -it nginx-app-demo-7bdfd97dcd-7t72x /bin/bash
+```
+
+設置網頁內容
+
+```go
+[root@nginx-app-demo-7bdfd97dcd-7t72x:/# echo "web1" >/usr/share/nginx/html/index.html
+
+// 以此類推
+// [root@nginx-app-demo-7bdfd97dcd-hsrft:/# echo web2 >/usr/share/nginx/html/index.html
+// [root@nginx-app-demo-7bdfd97dcd-qtbzd:/# echo web3 >/usr/share/nginx/html/index.html
+```
+
+通過 `-o wide` 參數獲取 `pod ip address`
+
+```go
+# kubectl get pods -o wide 
+NAME                              READY   STATUS    RESTARTS   AGE   IP           NODE     NOMINATED NODE   READINESS GATES
+nginx-app-demo-7bdfd97dcd-7t72x   1/1     Running   0          34m   10.244.2.4   node-3   <none>           <none>
+nginx-app-demo-7bdfd97dcd-hsrft   1/1     Running   0          34m   10.244.1.2   node-2   <none>           <none>
+nginx-app-demo-7bdfd97dcd-qtbzd   1/1     Running   0          34m   10.244.1.3   node-2   <none>           <none>
+```
+
+訪問 `pod ip address` 查看網頁內容
+
+```go
+# curl http://10.244.2.4
+web1
+# curl http://10.244.1.2
+web2
+# curl http://10.244.1.3
+web3
+```
+
+### ClusterIP Access
