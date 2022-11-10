@@ -62,6 +62,13 @@
       - [2. Snapshot Fact Table](#2-snapshot-fact-table)
       - [3. Accumulated Fact Sheet](#3-accumulated-fact-sheet)
   - [Dimension](#dimension)
+  - [ODS(Operation Data Store)[**private**]](#odsoperation-data-storeprivate)
+  - [CDM(Common Data Model)[**public**]](#cdmcommon-data-modelpublic)
+    - [DWD(Data Warehouse Detail)](#dwddata-warehouse-detail)
+    - [DWS(Data Warehouse Service)](#dwsdata-warehouse-service)
+    - [DIM](#dim)
+    - [DWB(Data Warehouse Base)[**optional**]](#dwbdata-warehouse-baseoptional)
+    - [ADS[**product**]](#adsproduct)
 
 # Flink Runtime
 
@@ -258,3 +265,33 @@ For example, we are processing an order. An order remains in the process until i
 - brand dimension
 - category dimension
 - …
+
+## ODS(Operation Data Store)[**private**]
+
+Data Source
+
+## CDM(Common Data Model)[**public**]
+
+### DWD(Data Warehouse Detail)
+
+以業務過程作為建模驅動, 基於每個具體業務過程特點構建最細粒度的 `transaction fact table`, 可以結合企業數據使用特點, 將 `detail fact table` 某些重要維度屬性字段做適當冗余, 即寬表化處理
+
+- Transaction Fact Table
+- Snapshot Fact Table
+- Accumulated Fact Table
+
+### DWS(Data Warehouse Service)
+
+以分析主題對象作為建模驅動, 基於上層應用和產品指標需求, 構建公共粒度的 `snapshot fact table`
+
+### DIM
+
+基於維度建模觀念, 建立整個企業一致性維度, 降低數據計算口徑和算法不統一風險
+
+### DWB(Data Warehouse Base)[**optional**]
+
+儲存大量客觀資料, 一般作為中間層
+
+### ADS[**product**]
+
+存放數據產品統計指標數據, 根據 `CDM` 與 `ODS` 加工而成
