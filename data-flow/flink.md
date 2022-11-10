@@ -54,6 +54,14 @@
   - [Values](#values)
   - [Hadoop Writables](#hadoop-writables)
   - [Special Types](#special-types)
+- [Glossary](#glossary)
+  - [Fact](#fact)
+    - [Types of Facts](#types-of-facts)
+    - [Types of Fact Table](#types-of-fact-table)
+      - [1. Transaction Fact Table](#1-transaction-fact-table)
+      - [2. Snapshot Fact Table](#2-snapshot-fact-table)
+      - [3. Accumulated Fact Sheet](#3-accumulated-fact-sheet)
+  - [Dimension](#dimension)
 
 # Flink Runtime
 
@@ -188,3 +196,65 @@ For example, with an `event-time-based` windowing strategy that creates `non-ove
 ## Hadoop Writables
 
 ## Special Types
+
+# Glossary
+
+## Fact
+
+> **Note**
+> A fact is a value, or measurement, which represents a fact about the managed entity or system.
+
+### Types of Facts
+
+1. **Summative facts:** Summative facts are used with aggregation functions such as **sum (), average ()**, etc.()(sales fact)
+2. **Semi summative facts:** There are small numbers of **quasi-summative** fact aggregation functions that will apply.For example, consider bank account details. We also cannot also apply () for a bank balance which will not have useful results, but the **minimum()** and **maximum()** functions return useful information.
+3. **Non-additive facts:** We cannot use numerical aggregation functions such as **sum (), average (),** on non-additive facts. For non-additive **facts, ratio** or **percentage** is used.
+
+### Types of Fact Table
+
+There are three types of fact tables:
+
+#### 1. Transaction Fact Table
+
+The transaction fact table is a basic approach to operate the businesses. These fact tables represent an event that occurs at the primary point. A line exists in the fact table for the customer or product when the transaction occurs.
+
+Many rows in a fact table connect to a customer or product because they are involved in multiple transactions. Transaction data is often structured quickly in a one-dimensional framework. The lowest-level data is the rawest dimensional data that cannot be done by summarized data.
+
+#### 2. Snapshot Fact Table
+
+The snapshot fact table describes the state of things at a particular time and contains many **semi-additive** and **non-additive** facts.
+
+**Example:** The daily equilibrium fact is expressed by the customer dimension but not by the time dimension.
+
+Periodic snapshots require the performance of the business at regular and estimated time intervals. Unlike a transaction fact table where we load a row for each event, with periodic snapshots, we take a picture of the activity at the end of the day, week, or month, and then another picture at the end of the next period.
+
+**Example:** Performance summary of a salesman during the previous month.
+
+#### 3. Accumulated Fact Sheet
+
+The accumulated fact table is used to show the activity of a process that has a beginning and an end.
+
+For example, we are processing an order. An order remains in the process until it will be processed. As the step towards completing the order is completed, the corresponding row in the fact table is updated.
+
+**Example:**
+
+- order user id
+- order vip level(non-additive)
+- order total amount(additive)
+    - sum of amount of total order
+    - sum of amount of total region
+    - sum of amount of tomorrow
+    - …
+- user account balance(semi additive)
+    - sum of balance of total user
+
+## Dimension
+
+> **Note**
+> Dimensions are companions to facts, and describe the objects in a fact table
+
+- time dimension
+- region dimension
+- brand dimension
+- category dimension
+- …
