@@ -78,6 +78,7 @@
       - [Redis](database/redis.md)
   - Graph
       - [Neo4j](database/neo4j.md)
+      - [NebulaGraph](database/nebula.md)
 # Message Queue
   - [Kafka](mq/kafka.md)
 # CDC
