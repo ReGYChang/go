@@ -44,7 +44,7 @@
       - [Task Chaining and Resource Groups](#task-chaining-and-resource-groups)
       - [Name And Description](#name-and-description)
     - [Event Time](#event-time-1)
-  - [Table API & SQL](#table-api--sql)
+  - [Table API \& SQL](#table-api--sql)
   - [Python API](#python-api)
 - [Flink Data Type](#flink-data-type)
   - [Java Tuples and Scala Case Classes](#java-tuples-and-scala-case-classes)
@@ -54,6 +54,15 @@
   - [Values](#values)
   - [Hadoop Writables](#hadoop-writables)
   - [Special Types](#special-types)
+- [Deployment](#deployment)
+  - [Deployment Modes](#deployment-modes)
+  - [Resource Providers](#resource-providers)
+    - [Standalone](#standalone)
+      - [Deployment Modes](#deployment-modes-1)
+        - [Application Mode](#application-mode)
+        - [Session Mode](#session-mode)
+    - [Native Kubernetes](#native-kubernetes)
+    - [YARN](#yarn)
 - [Glossary](#glossary)
   - [Fact](#fact)
     - [Types of Facts](#types-of-facts)
@@ -62,13 +71,13 @@
       - [2. Snapshot Fact Table](#2-snapshot-fact-table)
       - [3. Accumulated Fact Sheet](#3-accumulated-fact-sheet)
   - [Dimension](#dimension)
-  - [ODS(Operation Data Store)[**private**]](#odsoperation-data-storeprivate)
-  - [CDM(Common Data Model)[**public**]](#cdmcommon-data-modelpublic)
+  - [ODS(Operation Data Store)\[**private**\]](#odsoperation-data-storeprivate)
+  - [CDM(Common Data Model)\[**public**\]](#cdmcommon-data-modelpublic)
     - [DWD(Data Warehouse Detail)](#dwddata-warehouse-detail)
     - [DWS(Data Warehouse Service)](#dwsdata-warehouse-service)
     - [DIM](#dim)
-    - [DWB(Data Warehouse Base)[**optional**]](#dwbdata-warehouse-baseoptional)
-    - [ADS[**product**]](#adsproduct)
+    - [DWB(Data Warehouse Base)\[**optional**\]](#dwbdata-warehouse-baseoptional)
+    - [ADS\[**product**\]](#adsproduct)
 
 # Flink Runtime
 
@@ -203,6 +212,37 @@ For example, with an `event-time-based` windowing strategy that creates `non-ove
 ## Hadoop Writables
 
 ## Special Types
+
+# Deployment
+
+## Deployment Modes
+
+Flink can execute applications in one of three ways:
+
+- in Application Mode,
+- in Session Mode,
+- in a Per-Job Mode (deprecated).
+
+The above modes differ in:
+
+- the cluster lifecycle and resource isolation guarantees
+- whether the application’s main() method is executed on the client or on the cluster.
+
+![deployment_mode](img/deployment_mode.png)
+
+## Resource Providers
+
+### Standalone
+
+#### Deployment Modes
+
+##### Application Mode
+
+##### Session Mode
+
+### Native Kubernetes
+
+### YARN
 
 # Glossary
 
