@@ -4,6 +4,14 @@
 - [VID](#vid)
   - [Features](#features)
   - [VID Operation](#vid-operation)
+- [Architecture](#architecture)
+  - [Meta Service](#meta-service)
+    - [Functions of the Meta Service](#functions-of-the-meta-service)
+  - [Graph Service](#graph-service)
+    - [The Architecture of the Graph Service](#the-architecture-of-the-graph-service)
+  - [Storage Service](#storage-service)
+    - [Advantages](#advantages)
+    - [The Architecture of the Storage Service](#the-architecture-of-the-storage-service)
 
 # Data Modeling
 
@@ -69,7 +77,7 @@ The MERGE statement in openCypher is not supported.
 
 ```info
 In NebulaGraph, a vertex is uniquely identified by its ID, which is called a VID or a Vertex ID.
-```ne
+```
 
 ## Features
 
@@ -90,3 +98,111 @@ NebulaGraph 1.x only supports INT64 while NebulaGraph 2.x supports INT64 and FIX
 id() function can be used to specify or locate a VID.
 LOOKUP or MATCH statements can be used to find a VID via property index.
 Direct access to vertices statements via VIDs enjoys peak performance, such as DELETE xxx WHERE id(xxx) == "player100" or GO FROM "player100". Finding VIDs via properties and then operating the graph will cause poor performance, such as LOOKUP | GO FROM $-.ids, which will run both LOOKUP and | one more time.
+
+# Architecture
+
+NebulaGraph consists of three services: the `Graph Service`, the `Storage Service`, and the `Meta Service`. It applies the separation of storage and computing architecture.
+
+Each service has its executable binaries and processes launched from the binaries. Users can deploy a NebulaGraph cluster on a single machine or multiple machines using these binaries.
+
+The following figure shows the architecture of a typical NebulaGraph cluster:
+
+![nebula_architecture](img/nebula_architecture.png)
+
+NebulaGraph applies the separation of storage and computing architecture. The `Graph Service` is responsible for querying. The `Storage Service` is responsible for storage. They are run by different processes, i.e., nebula-graphd and nebula-storaged. The benefits of the separation of storage and computing architecture are as follows:
+
+- Great scalability
+  The separated structure makes both the Graph Service and the Storage Service flexible and easy to scale in or out.
+
+- High availability
+  If part of the Graph Service fails, the data stored by the Storage Service suffers no loss. And if the rest part of the Graph Service is still able to serve the clients, service recovery can be performed quickly, even unfelt by the users.
+
+- Cost-effective
+  The separation of storage and computing architecture provides a higher resource utilization rate, and it enables clients to manage the cost flexibly according to business demands.
+
+- Open to more possibilities
+  With the ability to run separately, the Graph Service may work with multiple types of storage engines, and the Storage Service may also serve more types of computing engines.
+
+## Meta Service
+
+The Meta Service in the NebulaGraph architecture is run by the nebula-metad processes. It is responsible for `metadata management`, such as `schema operations`, `cluster administration`, and `user privilege management`.
+
+The architecture of the `Meta Service` is as follow:
+
+![meta_service_architecuture](img/nebula_meta_architecture.png)
+
+The Meta Service is run by nebula-metad processes. Users can deploy nebula-metad processes according to the scenario:
+
+- In a test environment, users can deploy one or three nebula-metad processes on different machines or a single machine.
+- In a production environment, we recommend that users deploy three nebula-metad processes on different machines for high availability.
+
+All the nebula-metad processes form a `Raft-based cluster`, with one process as the `leader` and the others as the `followers`.
+
+The leader is elected by the majorities and only the leader can provide service to the clients or other components of NebulaGraph. The followers will be run in a standby way and each has a data replication of the leader. Once the leader fails, one of the followers will be elected as the new leader.
+
+```info
+The data of the leader and the followers will keep consistent through Raft. Thus the breakdown and election of the leader will not cause data inconsistency.
+```
+
+### Functions of the Meta Service
+
+- Manages user accounts
+  The Meta Service stores the information of user accounts and the privileges granted to the accounts. When the clients send queries to the Meta Service through an account, the Meta Service checks the account information and whether the account has the right privileges to execute the queries or not.
+
+- Manages partitions
+  The Meta Service stores and manages the locations of the storage partitions and helps balance the partitions.
+
+- Manages graph spaces
+  NebulaGraph supports multiple graph spaces. Data stored in different graph spaces are securely isolated. The Meta Service stores the metadata of all graph spaces and tracks the changes of them, such as adding or dropping a graph space.
+
+- Manages schema information
+  NebulaGraph is a strong-typed graph database. Its schema contains tags (i.e., the vertex types), edge types, tag properties, and edge type properties.
+
+  The Meta Service stores the schema information. Besides, it performs the addition, modification, and deletion of the schema, and logs the versions of them.
+
+- Manages TTL information
+  The Meta Service stores the definition of TTL (Time to Live) options which are used to control data expiration. The Storage Service takes care of the expiring and evicting processes. For more information, see TTL.
+
+- Manages jobs
+  The Job Management module in the Meta Service is responsible for the creation, queuing, querying, and deletion of jobs.
+
+## Graph Service
+
+```info
+The Graph Service is used to process the query. It has four submodules: Parser, Validator, Planner, and Executor. This topic will describe the Graph Service accordingly.
+```
+
+### The Architecture of the Graph Service
+
+![query_engine](img/nebula_query_engine.png)
+
+After a query is sent to the Graph Service, it will be processed by the following four submodules:
+
+- Parser: Performs lexical analysis and syntax analysis.
+
+- Validator: Validates the statements.
+
+- Planner: Generates and optimizes the execution plans.
+
+- Executor: Executes the plans with operators.
+
+## Storage Service
+
+The persistent data of NebulaGraph have two parts. One is the `Meta Service` that stores the **meta-related data**.
+
+The other is the Storage Service that stores the data, which is run by the nebula-storaged process. This topic will describe the architecture of the Storage Service.
+
+The architecture of the storage service as below:
+
+### Advantages
+
+- High performance (Customized built-in KVStore)
+- Great scalability (Shared-nothing architecture, not rely on NAS/SAN-like devices)
+- Strong consistency (Raft)
+- High availability (Raft)
+- Supports synchronizing with the third party systems, such as Elasticsearch.
+
+### The Architecture of the Storage Service
+
+![storage_architecture](img/nebula_storage_architecture.png)
+
