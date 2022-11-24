@@ -81,6 +81,7 @@
       - [NebulaGraph](database/nebula.md)
 # Message Queue
   - [Kafka](mq/kafka.md)
+  - [RabbitMQ](mq/rabbitmq.md)
 # CDC
   - [Debezium](cdc/debezium.md)
 # Data Flow Engine

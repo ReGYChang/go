@@ -1,9 +1,8 @@
 .idea
 .DS_Store
-
 database/code/neo4j/*
 !database/code/neo4j/*.yml
 !database/code/neo4j/*.go
-
+virtualization/docker/rabbitmq/data
 virtualization/docker/neo4j/*
 !virtualization/docker/neo4j/*.yml
