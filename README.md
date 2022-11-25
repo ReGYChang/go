@@ -108,7 +108,7 @@
   - Benchmarking
 # Virtualizaion
   - [Docker](virtualization/docker.md)
-    - [Neo4j](virtualization/docker/neo4j-docker-compose.yml)
+    - [Neo4j](virtualization/docker/neo4j/docker-compose.yml)
     - [Redis](virtualization/docker/redis/docker-compose.yml)
     - [RabbitMQ](virtualization/docker/rabbitmq/docker-compose.yml)
     - [Kafka(arm64)](virtualization/docker/kafka/arm64/docker-compose.yml)
