@@ -1,0 +1,21 @@
+jobmanager.rpc.address: jobmanager
+jobmanager.rpc.port: 6123
+jobmanager.heap.size: 1024m
+
+taskmanager.heap.size: 32768m
+taskmanager.numberOfTaskSlots: 30
+
+slotmanager.max-total-resource.cpu: 10
+
+parallelism.default: 10
+blob.server.port: 6124
+query.server.port: 6125
+
+metrics.reporter.promgateway.class: org.apache.flink.metrics.prometheus.PrometheusPushGatewayReporter
+metrics.reporter.promgateway.host: 10.13.1.27
+metrics.reporter.promgateway.port: 9091
+metrics.reporter.promgateway.jobName: flinkjob
+metrics.reporter.promgateway.randomJobNameSuffix: false
+metrics.reporter.promgateway.deleteOnShutdown: true
+metrics.latency.interval: 60
+state.backend.latency-track.keyed-state-enabled: true

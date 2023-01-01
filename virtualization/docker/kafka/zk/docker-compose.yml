@@ -1,0 +1,69 @@
+version: "3"
+services:
+  init:
+    image: busybox:latest
+    entrypoint: ["/bin/sh", "-c"]
+    command: |
+      - "chown 1001 /zookeeper
+         chown 1001 /kafka"
+    volumes:
+      - ./data/zookeeper:/zookeeper
+      - ./data/kafka:/kafka
+    restart: 'no'
+    networks:
+      - nexdata_nexdata
+
+  zookeeper:
+    image: docker.io/bitnami/zookeeper:3.8
+    ports:
+      - '2181:2181'
+    environment:
+      - ALLOW_ANONYMOUS_LOGIN=yes
+    volumes:
+      - ./data/zookeeper:/bitnami/zookeeper
+    depends_on:
+      - init
+    networks:
+      - nexdata_nexdata
+
+  kafka:
+    container_name: kafka
+    image: docker.io/bitnami/kafka:3.2
+    ports:
+      - '9092:9092'
+      - '9093:9093'
+    environment:
+      - KAFKA_CFG_ZOOKEEPER_CONNECT=zookeeper:2181
+      - ALLOW_PLAINTEXT_LISTENER=yes
+      - KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP=CLIENT:PLAINTEXT,EXTERNAL:PLAINTEXT
+      - KAFKA_CFG_LISTENERS=CLIENT://:9092,EXTERNAL://:9093
+      - KAFKA_CFG_ADVERTISED_LISTENERS=CLIENT://kafka:9092,EXTERNAL://${IP}:9093
+      - KAFKA_CFG_INTER_BROKER_LISTENER_NAME=CLIENT
+      #- KAFKA_CFG_ADVERTISED_HOST_NAME=${IP} # 禁用
+      - KAFKA_CFG_MAX_POLL_INTERVAL_MS=600000
+    volumes:
+      - ./data/kafka:/bitnami/kafka
+    depends_on:
+      - init
+      - zookeeper
+    networks:
+      - nexdata_nexdata
+
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: kafka-ui
+    depends_on:
+      - init
+      - zookeeper
+      - kafka
+    ports:
+      - 8080:8080
+    environment:
+      - KAFKA_CLUSTERS_0_NAME=nexdata
+      - KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS=kafka:9092
+    networks:
+      - nexdata_nexdata
+
+networks:
+  nexdata_nexdata:
+    external: true

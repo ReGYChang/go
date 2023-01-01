@@ -1,0 +1,45 @@
+version: '3'
+
+services:
+  prometheus:
+    image: prom/prometheus
+    hostname: prometheus0
+    container_name: prometheus0
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus:/prometheus
+    command:
+      - '--config.file=/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus/data'
+      - '--web.console.libraries=/prometheus/console_libraries'
+      - '--web.console.templates=/prometheus/consoles'
+    networks:
+      - nexdata_nexdata
+
+  grafana:
+    image: grafana/grafana
+    hostname: grafana0
+    container_name: grafana0
+    ports:
+      - "3000:3000"
+    networks:
+      - nexdata_nexdata
+    depends_on:
+      - prometheus
+
+  pushgateway:
+    image: prom/pushgateway
+    hostname: pushgateway0
+    container_name: pushgateway0
+    restart: unless-stopped
+    expose:
+      - 9091
+    ports:
+      - "9091:9091"
+    networks:
+      - nexdata_nexdata
+
+networks:
+  nexdata_nexdata:
+    external: true

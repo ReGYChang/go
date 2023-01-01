@@ -1,0 +1,22 @@
+version: '3'
+
+services:
+  rabbit:
+    image: rabbitmq:3.8-management
+    hostname: rabbitmq0
+    container_name: rabbitmq0
+    restart: always
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      - RABBITMQ_DEFAULT_USER=root
+      - RABBITMQ_DEFAULT_PASS=123456
+    volumes:
+      - ./data:/var/lib/rabbitmq
+    networks:
+      - nexdata_nexdata
+
+networks:
+  nexdata_nexdata:
+    external: true
