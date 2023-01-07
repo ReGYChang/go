@@ -3,7 +3,7 @@ jobmanager.rpc.port: 6123
 jobmanager.heap.size: 1024m
 
 taskmanager.heap.size: 32768m
-taskmanager.numberOfTaskSlots: 30
+taskmanager.numberOfTaskSlots: 10
 
 slotmanager.max-total-resource.cpu: 10
 
@@ -11,11 +11,18 @@ parallelism.default: 10
 blob.server.port: 6124
 query.server.port: 6125
 
-metrics.reporter.promgateway.class: org.apache.flink.metrics.prometheus.PrometheusPushGatewayReporter
-metrics.reporter.promgateway.host: 10.13.1.27
-metrics.reporter.promgateway.port: 9091
-metrics.reporter.promgateway.jobName: flinkjob
-metrics.reporter.promgateway.randomJobNameSuffix: false
-metrics.reporter.promgateway.deleteOnShutdown: true
-metrics.latency.interval: 60
-state.backend.latency-track.keyed-state-enabled: true
+#rest.flamegraph.enabled: true
+#rest.flamegraph.cleanup-interval: 10m
+#rest.flamegraph.delay-between-samples: 50ms
+#rest.flamegraph.num-samples: 100
+#rest.flamegraph.refresh-interval: 1m
+#rest.flamegraph.stack-depth: 100
+
+metrics.reporter.promgateway.factory.class: org.apache.flink.metrics.prometheus.PrometheusPushGatewayReporterFactory
+metrics.reporter.promgateway.hostUrl: http://10.13.1.27:9091
+metrics.reporter.promgateway.jobName: convergence
+metrics.reporter.promgateway.randomJobNameSuffix: true
+metrics.reporter.promgateway.deleteOnShutdown: false
+
+#metrics.latency.interval: 60
+#state.backend.latency-track.keyed-state-enabled: true

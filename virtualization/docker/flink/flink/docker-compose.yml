@@ -1,7 +1,7 @@
 version: "2.1"
 services:
   jobmanager:
-    image: flink
+    image: flink:1.16.0-scala_2.12-java11
     expose:
       - "6123"
     ports:
@@ -13,11 +13,8 @@ services:
       - ./job/flink-conf.yaml:/opt/flink/conf/flink-conf.yaml
       - ./log:/opt/flink/log
     restart: always
-    networks:
-      - nexdata_nexdata
-
   taskmanager:
-    image: flink
+    image: flink:1.16.0-scala_2.12-java11
     expose:
       - "6121"
       - "6122"
@@ -32,9 +29,3 @@ services:
       - ./task/flink-conf.yaml:/opt/flink/conf/flink-conf.yaml
       - ./log:/opt/flink/log
     restart: always
-    networks:
-      - nexdata_nexdata
-
-networks:
-  nexdata_nexdata:
-    external: true

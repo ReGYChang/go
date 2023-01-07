@@ -1,9 +1,8 @@
 .idea
 .DS_Store
+
 *.jar
-!database/code/neo4j/*.yml
-!database/code/neo4j/*.go
-database/code/neo4j/*
-!virtualization/docker/neo4j/*.yml
-virtualization/docker/neo4j/*
+
 data
+logs
+log
