@@ -1,7 +1,7 @@
 - [Flink Runtime](#flink-runtime)
 - [Flink API](#flink-api)
   - [DataStream API](#datastream-api)
-    - [Execution Mode](#execution-mode)
+    - [Execution Mode(Batch/Streaming)](#execution-modebatchstreaming)
     - [Data Source API](#data-source-api)
       - [Bounded File Source](#bounded-file-source)
       - [Unbounded Streaming File Source](#unbounded-streaming-file-source)
@@ -87,7 +87,13 @@
 
 ## DataStream API
 
-### Execution Mode
+### Execution Mode(Batch/Streaming)
+
+The `BATCH` execution mode can only be used for Jobs/Flink Programs that are `bounded`. Boundedness is a property of a data source that tells us whether all the input coming from that source is known before execution or whether new data will show up, potentially indefinitely. A job, in turn, is bounded if all its sources are bounded, and unbounded otherwise.
+
+`STREAMING` execution mode, on the other hand, can be used for both `bounded` and `unbounded` jobs.
+
+As a rule of thumb, you should be using `BATCH` execution mode when your program is `bounded` because this will be **more efficient**. You have to use `STREAMING` execution mode when your program is `unbounded` because only this mode is general enough to be able to deal with continuous data streams.
 
 ### Data Source API
 
@@ -116,8 +122,6 @@ Flink document 對於 `watermarks` 定義如下:
 ![watermarks](img/watermarks.png)
 
 真實資料流往往會因為許多不可預期因素產生一定程度的延遲與偏差
-
-
 
 ### Operators
 

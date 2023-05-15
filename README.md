@@ -79,6 +79,8 @@
   - Graph
       - [Neo4j](database/neo4j.md)
       - [NebulaGraph](database/nebula.md)
+  - OLAP
+    - [Doris](database/doris.md)
 # Message Queue
   - [Kafka](mq/kafka.md)
   - [RabbitMQ](mq/rabbitmq.md)
