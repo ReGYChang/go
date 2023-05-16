@@ -7,77 +7,85 @@
     - [**Index Design:**](#index-design)
     - [**Advantages:**](#advantages)
     - [**Disadvantages:**](#disadvantages)
-  - [**Druid**](#druid)
+  - [**Impala**](#impala)
     - [**Overall Ecosystem:**](#overall-ecosystem-1)
     - [**Processing Framework:**](#processing-framework-1)
     - [**Dependency on Storage Systems:**](#dependency-on-storage-systems-1)
     - [**Index Design:**](#index-design-1)
     - [**Advantages:**](#advantages-1)
     - [**Disadvantages:**](#disadvantages-1)
-  - [**Apache Kylin**](#apache-kylin)
+  - [**Presto**](#presto)
     - [**Overall Ecosystem:**](#overall-ecosystem-2)
     - [**Processing Framework:**](#processing-framework-2)
     - [**Dependency on Storage Systems:**](#dependency-on-storage-systems-2)
     - [**Index Design:**](#index-design-2)
     - [**Advantages:**](#advantages-2)
     - [**Disadvantages:**](#disadvantages-2)
-  - [**Presto**](#presto)
+  - [**Druid**](#druid)
     - [**Overall Ecosystem:**](#overall-ecosystem-3)
     - [**Processing Framework:**](#processing-framework-3)
     - [**Dependency on Storage Systems:**](#dependency-on-storage-systems-3)
     - [**Index Design:**](#index-design-3)
     - [**Advantages:**](#advantages-3)
     - [**Disadvantages:**](#disadvantages-3)
-  - [**Impala**](#impala)
+  - [**Apache Kylin**](#apache-kylin)
     - [**Overall Ecosystem:**](#overall-ecosystem-4)
     - [**Processing Framework:**](#processing-framework-4)
     - [**Dependency on Storage Systems:**](#dependency-on-storage-systems-4)
     - [**Index Design:**](#index-design-4)
     - [**Advantages:**](#advantages-4)
     - [**Disadvantages:**](#disadvantages-4)
-  - [**Apache Doris**](#apache-doris)
+  - [**Elasticsearch**](#elasticsearch)
     - [**Overall Ecosystem:**](#overall-ecosystem-5)
     - [**Processing Framework:**](#processing-framework-5)
     - [**Dependency on Storage Systems:**](#dependency-on-storage-systems-5)
     - [**Index Design:**](#index-design-5)
     - [**Advantages:**](#advantages-5)
     - [**Disadvantages:**](#disadvantages-5)
-  - [**ClickHouse**](#clickhouse)
+  - [**Apache Doris**](#apache-doris)
     - [**Overall Ecosystem:**](#overall-ecosystem-6)
     - [**Processing Framework:**](#processing-framework-6)
     - [**Dependency on Storage Systems:**](#dependency-on-storage-systems-6)
     - [**Index Design:**](#index-design-6)
+      - [**Short Key Index**](#short-key-index)
+      - [**Ordinal Index**](#ordinal-index)
+      - [**Zone Map Index**](#zone-map-index)
+      - [**Bitmap Index**](#bitmap-index)
+      - [**BloomFilter Index**](#bloomfilter-index)
+      - [**Invert Index**](#invert-index)
     - [**Advantages:**](#advantages-6)
     - [**Disadvantages:**](#disadvantages-6)
-  - [**Elasticsearch**](#elasticsearch)
+  - [**ClickHouse**](#clickhouse)
     - [**Overall Ecosystem:**](#overall-ecosystem-7)
     - [**Processing Framework:**](#processing-framework-7)
     - [**Dependency on Storage Systems:**](#dependency-on-storage-systems-7)
     - [**Index Design:**](#index-design-7)
+      - [**Primary Index**](#primary-index)
+      - [**Skipping Index**](#skipping-index)
     - [**Advantages:**](#advantages-7)
     - [**Disadvantages:**](#disadvantages-7)
-  - [Apache Doris vs Clickhouse](#apache-doris-vs-clickhouse)
-    - [Deployment \& Maintenance](#deployment--maintenance)
-      - [Deployment \& Maintenance](#deployment--maintenance-1)
-      - [User Management](#user-management)
-      - [Cluster Migration](#cluster-migration)
-      - [Autoscaling](#autoscaling)
-    - [Distributed Capibility](#distributed-capibility)
-      - [Distributed Protocal \& High Availability](#distributed-protocal--high-availability)
-      - [Distributed Transaction](#distributed-transaction)
-    - [Data Import](#data-import)
-    - [Storage Architecture](#storage-architecture)
-      - [Storage Format](#storage-format)
-      - [Table Engine/Model](#table-enginemodel)
-      - [Data Type](#data-type)
-    - [Query](#query)
-      - [Query Architecture](#query-architecture)
-      - [Concurrency Capability](#concurrency-capability)
-      - [SQL Compatibility](#sql-compatibility)
-    - [Storage Architecture](#storage-architecture-1)
-    - [Usage Cost](#usage-cost)
-    - [Benchmark](#benchmark)
-  - [General Comparison Matrix](#general-comparison-matrix)
+  - [**Apache Doris vs Clickhouse**](#apache-doris-vs-clickhouse)
+    - [**Deployment \& Maintenance**](#deployment--maintenance)
+      - [**Deployment \& Maintenance**](#deployment--maintenance-1)
+      - [**User Management**](#user-management)
+      - [**Cluster Migration**](#cluster-migration)
+      - [**Autoscaling**](#autoscaling)
+    - [**Distributed Capibility**](#distributed-capibility)
+      - [**Distributed Protocal \& High Availability**](#distributed-protocal--high-availability)
+      - [**Distributed Transaction**](#distributed-transaction)
+    - [**Data Import**](#data-import)
+    - [**Storage Architecture**](#storage-architecture)
+      - [**Storage Format**](#storage-format)
+      - [**Table Engine/Model**](#table-enginemodel)
+      - [**Data Type**](#data-type)
+    - [**Query**](#query)
+      - [**Query Architecture**](#query-architecture)
+      - [**Concurrency Capability**](#concurrency-capability)
+      - [**SQL Compatibility**](#sql-compatibility)
+    - [**Storage Architecture**](#storage-architecture-1)
+    - [**Usage Cost**](#usage-cost)
+    - [**Benchmark**](#benchmark)
+  - [**General Comparison Matrix**](#general-comparison-matrix)
 
 
 # OLAP Database Comparison: A Technical Guide
@@ -98,6 +106,8 @@
 ## **Hive**
 
 Apache Hive is an open-source data warehouse software project built on top of Apache Hadoop for providing data query and analysis. Hive gives an SQL-like interface to query data stored in various databases and file systems that integrate with Hadoop.
+
+![hive_architecture](img/hive_architecture.png)
 
 ### **Overall Ecosystem:** 
 
@@ -128,110 +138,11 @@ Hive uses several types of indexes to improve the performance of queries. These 
 2. *Limited Real-Time Capabilities*: Hive is designed for batch processing and does not support real-time data processing or transactions.
 3. *Limited Indexing*: While Hive does support indexing, the options and flexibility are not as rich as some other systems.
 
-## **Druid**
-
-Apache Druid is a high-performance, column-oriented, distributed data store. It was designed to quickly ingest massive quantities of event data and provide low-latency queries on top of the data.
-
-### **Overall Ecosystem:** 
-
-Druid is often used in combination with other data processing systems such as Apache Kafka for real-time data ingestion, Hadoop for batch ingestion, and works well with BI tools such as Apache Superset or Pivot. Druid also has a robust, supportive open-source community contributing to its development and support.
-
-### **Processing Framework:** 
-
-Druid follows a hybrid processing model, combining the best of both streaming and batch processing. It processes real-time data streams, but also has capabilities to handle batch processing. 
-
-### **Dependency on Storage Systems:** 
-
-Druid can integrate with deep storage systems for data persistence, including HDFS, Amazon S3, Google Cloud Storage, and more. However, it also maintains its own segment storage format for efficient query processing.
-
-### **Index Design:** 
-
-Druid uses a combination of inverted indexes and bitmap indexes for querying the data. The inverted index provides a lookup from a dimension value to the rows that contain that value. The bitmap index provides a fast way to look up rows in the data. Druid's indexes are designed to optimize time series and OLAP-style queries.
-
-### **Advantages:** 
-
-1. *Real-Time Processing*: Druid is designed to ingest and query data in real-time, making it suitable for use cases with low-latency requirements.
-2. *Scalability*: Druid’s distributed architecture allows it to scale out to handle larger data volumes and query loads.
-3. *Flexibility*: Druid can handle both streaming and batch data, and it can integrate with various storage systems and data processing frameworks.
-4. *High Availability*: Druid uses replication and failover strategies to ensure that the system is always available.
-
-### **Disadvantages:** 
-
-1. *Complexity*: Druid has a complex architecture with multiple node types, which can make it challenging to configure and manage.
-2. *Limited Transaction Support*: Like most OLAP systems, Druid does not support transactions like an OLTP system.
-3. *Hardware Intensive*: Druid can be resource-intensive and may require significant hardware resources to operate effectively, especially for larger datasets.
-
-## **Apache Kylin**
-
-Apache Kylin is an open-source distributed analytical engine designed to provide a SQL interface and multi-dimensional analysis (OLAP) on large-scale data sets in the petabyte range, making "big data" more accessible to public users. It was originally developed by eBay and contributed to the Apache Software Foundation.
-
-### **Overall Ecosystem:** 
-
-Kylin fits into the broader Hadoop ecosystem. It leverages various other Hadoop technologies, such as HBase, MapReduce, and Zookeeper. This allows Kylin to handle large data volumes and utilize the distributed processing capabilities of Hadoop. It is capable of integrating with BI tools that support SQL and MDX for data analysis and visualization. Moreover, it supports a wide range of data sources including Apache Hive, Apache Flink, Apache Kafka, and other JDBC data sources.
-
-### **Processing Framework:** 
-
-Kylin precomputes and stores multi-dimensional cubes (OLAP Cubes) from the underlying large data sets using the distributed processing power of Hadoop. The cubes store aggregated data across multiple dimensions and are built using batch processing jobs run on Hadoop’s MapReduce. Once a cube is built, Kylin can leverage the precomputed data to answer queries quickly.
-
-### **Dependency on Storage Systems:** 
-
-Kylin utilizes Hadoop HDFS for storage of raw data and the intermediate data used during the cube building process. The final OLAP Cubes are stored in HBase, a distributed, scalable, big data store. This design allows Kylin to handle very large data volumes and provide fast query response times.
-
-### **Index Design:** 
-
-Kylin leverages Hadoop's HBase for its storage and indexing. Kylin itself pre-aggregates the data into high-dimensional OLAP cubes during the data ingestion process, which acts as a form of index and allows for rapid query execution on large volumes of data. The cuboids in the OLAP cube can be seen as multi-dimensional indexes.
-
-### **Advantages:** 
-
-1. *Performance*: Kylin provides sub-second query response times on massive datasets thanks to its OLAP Cube technology.
-2. *Scalability*: As part of the Hadoop ecosystem, Kylin can scale to handle extremely large data sets.
-3. *SQL Interface*: Kylin provides a SQL interface, making it easy to use for users familiar with SQL. It also supports MDX for multi-dimensional queries.
-4. *Integration*: It integrates well with common BI tools and supports a variety of data sources.
-
-### **Disadvantages:** 
-
-1. *Cube Build Time*: Building the OLAP cubes can be time-consuming, especially for very large datasets. It can also be resource-intensive.
-2. *Upfront Design*: The OLAP cubes need to be designed upfront, which requires a good understanding of the queries that will be run.
-3. *Not for Real-Time*: While Kylin does have some support for streaming data, it is primarily designed for batch-oriented workloads. Real-time query performance may not be as good as batch performance.
-4. *Complexity*: Kylin and its underlying technologies (Hadoop, HBase, etc.) can be complex to set up and manage.
-
-## **Presto**
-
-Presto is an open-source distributed SQL query engine developed by Facebook, designed to query large data sets distributed over one or many heterogeneous data sources with high performance. It is currently under the auspices of the Presto Foundation, hosted by the Linux Foundation.
-
-### **Overall Ecosystem:** 
-
-Presto operates within a broad and diverse ecosystem. It can query various data sources, including Hadoop's HDFS, Amazon S3, MySQL, PostgreSQL, Cassandra, MongoDB, and many others. This allows Presto to run analytics across these disparate data sources, making it a truly federated querying engine. It can be integrated with various data visualization and reporting tools that support JDBC/ODBC drivers.
-
-### **Processing Framework:** 
-
-Presto is designed for interactive simple and analytical queries. It follows a distributed architecture and uses a custom query and execution engine with operators designed to support SQL semantics. Unlike traditional MapReduce operations in Hadoop, Presto runs queries in memory and pipelines the processing, which allows most queries to return results in seconds.
-
-### **Dependency on Storage Systems:** 
-
-Presto is storage-agnostic. It doesn't manage its own storage and retrieves data from various sources on-demand when a query is executed. It relies on connectors to communicate with the data sources. This design allows Presto to query data where it lives, without needing to move data into a separate analytics system.
-
-### **Index Design:** 
-
-Presto does not have a built-in indexing mechanism, since it does not manage storage and relies on external systems. However, it can leverage indexes provided by the storage systems if they exist, depending on the connector's capabilities. In general, Presto relies more on its ability to execute queries in parallel across a large number of nodes to achieve high performance.
-
-### **Advantages:** 
-
-1. *Versatility*: Presto can query data from multiple sources, making it a versatile tool for analytics.
-2. *Performance*: Presto's in-memory and pipelined processing model can deliver fast query responses.
-3. *SQL Support*: Presto supports standard SQL, including complex queries, aggregations, joins, and window functions.
-4. *Scalability*: Presto can scale out horizontally to accommodate larger data sizes and more complex queries.
-
-### **Disadvantages:** 
-
-1. *No Data Writing*: Presto is designed for reading and querying data, not for writing data.
-2. *Memory Intensive*: Because Presto processes data in memory, it can be resource-intensive for large queries.
-3. *Lack of Built-In Security Features*: Out-of-the-box, Presto doesn't provide robust security features such as role-based access control or data encryption. These features often need to be implemented using additional tools or integrations.
-4. *No Built-in Indexing or Storage*: Presto doesn't manage storage or indexing. It relies on the capabilities of the underlying data sources for these functions.
-
 ## **Impala**
 
 Impala is an open-source, native analytic database for Apache Hadoop. It provides high-performance, low-latency SQL queries on data stored in Hadoop-based platforms. It was developed by Cloudera and is designed to execute SQL queries within the Hadoop ecosystem directly.
+
+![impala_architecture](img/impala_architecture.png)
 
 ### **Overall Ecosystem:** 
 
@@ -263,9 +174,171 @@ Impala does not have a built-in indexing mechanism. It relies on full table scan
 3. *No Built-In Indexing*: The lack of built-in indexing can result in performance degradation for certain types of queries.
 4. *Dependency on the Hadoop Ecosystem*: While this is also an advantage, it can be a limitation for users who do not want to adopt the full Hadoop stack.
 
+## **Presto**
+
+Presto is an open-source distributed SQL query engine developed by Facebook, designed to query large data sets distributed over one or many heterogeneous data sources with high performance. It is currently under the auspices of the Presto Foundation, hosted by the Linux Foundation.
+
+![presto_architecture](img/presto_architecture.png)
+
+### **Overall Ecosystem:** 
+
+Presto operates within a broad and diverse ecosystem. It can query various data sources, including Hadoop's HDFS, Amazon S3, MySQL, PostgreSQL, Cassandra, MongoDB, and many others. This allows Presto to run analytics across these disparate data sources, making it a truly federated querying engine. It can be integrated with various data visualization and reporting tools that support JDBC/ODBC drivers.
+
+### **Processing Framework:** 
+
+Presto is designed for interactive simple and analytical queries. It follows a distributed architecture and uses a custom query and execution engine with operators designed to support SQL semantics. Unlike traditional `MapReduce` operations in Hadoop, Presto runs queries in memory and pipelines the processing, which allows most queries to return results in seconds.
+
+### **Dependency on Storage Systems:** 
+
+Presto is storage-agnostic. It doesn't manage its own storage and retrieves data from various sources on-demand when a query is executed. It relies on connectors to communicate with the data sources. This design allows Presto to query data where it lives, without needing to move data into a separate analytics system.
+
+### **Index Design:** 
+
+Presto does not have a built-in indexing mechanism, since it does not manage storage and relies on external systems. However, it can leverage indexes provided by the storage systems if they exist, depending on the connector's capabilities. In general, Presto relies more on its ability to execute queries in parallel across a large number of nodes to achieve high performance.
+
+### **Advantages:** 
+
+1. *Versatility*: Presto can query data from multiple sources, making it a versatile tool for analytics.
+2. *Performance*: Presto's in-memory and pipelined processing model can deliver fast query responses.
+3. *SQL Support*: Presto supports standard SQL, including complex queries, aggregations, joins, and window functions.
+4. *Scalability*: Presto can scale out horizontally to accommodate larger data sizes and more complex queries.
+
+### **Disadvantages:** 
+
+1. *No Data Writing*: Presto is designed for reading and querying data, not for writing data.
+2. *Memory Intensive*: Because Presto processes data in memory, it can be resource-intensive for large queries.
+3. *Lack of Built-In Security Features*: Out-of-the-box, Presto doesn't provide robust security features such as role-based access control or data encryption. These features often need to be implemented using additional tools or integrations.
+4. *No Built-in Indexing or Storage*: Presto doesn't manage storage or indexing. It relies on the capabilities of the underlying data sources for these functions.
+
+## **Druid**
+
+Apache Druid is a high-performance, column-oriented, distributed data store. It was designed to quickly ingest massive quantities of event data and provide low-latency queries on top of the data.
+
+The features of Druid include:
+
+- Druid achieves real-time data consumption, truly enabling real-time data ingestion and query results.
+- Druid supports the rapid processing of PB-level data and hundreds of billions of events, and can handle thousands of concurrent queries per second.
+- The core of Druid is the time series, which stores data in batches according to the time series, making it very suitable for scenarios involving statistical analysis by time.
+- Druid divides data columns into three categories: timestamp, dimension column, and metric column.
+
+![druid_architecture](img/druid_architecture.png)
+
+### **Overall Ecosystem:** 
+
+Druid is often used in combination with other data processing systems such as Apache Kafka for real-time data ingestion, Hadoop for batch ingestion, and works well with BI tools such as Apache Superset or Pivot. Druid also has a robust, supportive open-source community contributing to its development and support.
+
+### **Processing Framework:** 
+
+Druid follows a hybrid processing model, combining the best of both streaming and batch processing. It processes real-time data streams, but also has capabilities to handle batch processing. 
+
+### **Dependency on Storage Systems:** 
+
+Druid can integrate with deep storage systems for data persistence, including HDFS, Amazon S3, Google Cloud Storage, and more. However, it also maintains its own segment storage format for efficient query processing.
+
+### **Index Design:** 
+
+Druid uses a combination of `inverted indexes` and `bitmap indexes` for querying the data. The inverted index provides a lookup from a dimension value to the rows that contain that value. The bitmap index provides a fast way to look up rows in the data. Druid's indexes are designed to optimize time series and OLAP-style queries.
+
+![druid_index](img/druid_index.png)
+
+![druid_index2](img/druid_index2.png)
+
+### **Advantages:** 
+
+1. *Real-Time Processing*: Druid is designed to ingest and query data in real-time, making it suitable for use cases with low-latency requirements.
+2. *Scalability*: Druid’s distributed architecture allows it to scale out to handle larger data volumes and query loads.
+3. *Flexibility*: Druid can handle both streaming and batch data, and it can integrate with various storage systems and data processing frameworks.
+4. *High Availability*: Druid uses replication and failover strategies to ensure that the system is always available.
+
+### **Disadvantages:** 
+
+1. *Complexity*: Druid has a complex architecture with multiple node types, which can make it challenging to configure and manage.
+2. *Limited Transaction Support*: Like most OLAP systems, Druid does not support transactions like an OLTP system.
+3. *Hardware Intensive*: Druid can be resource-intensive and may require significant hardware resources to operate effectively, especially for larger datasets.
+4. *Poor Query Performance*: Similar to other time series databases, Druid may have performance issues when the query condition hits a large amount of data, and its capabilities in sorting, aggregating, etc., are generally not good. Its flexibility and scalability are insufficient, such as the lack of Join, subqueries, etc. So Druid is not suitable for handling query scenarios where the perspective dimensions are complex and variable.
+
+## **Apache Kylin**
+
+Apache Kylin is an open-source distributed analytical engine designed to provide a SQL interface and multi-dimensional analysis (OLAP) on large-scale data sets in the petabyte range, making "big data" more accessible to public users. It was originally developed by eBay and contributed to the Apache Software Foundation.
+
+![kylin_architecuture](img/kylin_architecture.png)
+
+### **Overall Ecosystem:** 
+
+Kylin fits into the broader `Hadoop` ecosystem. It leverages various other Hadoop technologies, such as HBase, MapReduce, and Zookeeper. This allows Kylin to handle large data volumes and utilize the distributed processing capabilities of Hadoop. It is capable of integrating with BI tools that support SQL and MDX for data analysis and visualization. Moreover, it supports a wide range of data sources including Apache Hive, Apache Flink, Apache Kafka, and other JDBC data sources.
+
+### **Processing Framework:** 
+
+Kylin precomputes and stores multi-dimensional cubes (OLAP Cubes) from the underlying large data sets using the distributed processing power of Hadoop. The cubes store aggregated data across multiple dimensions and are built using batch processing jobs run on Hadoop’s `MapReduce`. Once a cube is built, Kylin can leverage the precomputed data to answer queries quickly.
+
+### **Dependency on Storage Systems:** 
+
+Kylin utilizes Hadoop HDFS for storage of raw data and the intermediate data used during the cube building process. The final OLAP Cubes are stored in HBase, a distributed, scalable, big data store. This design allows Kylin to handle very large data volumes and provide fast query response times.
+
+### **Index Design:** 
+
+Kylin leverages Hadoop's HBase for its storage and indexing. Kylin itself pre-aggregates the data into high-dimensional OLAP cubes during the data ingestion process, which acts as a form of index and allows for rapid query execution on large volumes of data. The cuboids in the OLAP cube can be seen as multi-dimensional indexes.
+
+![kylin_architecture](img/kylin_cube.png)
+
+### **Advantages:** 
+
+1. *Performance*: Kylin provides sub-second query response times on massive datasets thanks to its OLAP Cube technology.
+2. *Scalability*: As part of the Hadoop ecosystem, Kylin can scale to handle extremely large data sets.
+3. *SQL Interface*: Kylin provides a SQL interface, making it easy to use for users familiar with SQL. It also supports MDX for multi-dimensional queries.
+4. *Integration*: It integrates well with common BI tools and supports a variety of data sources.
+
+### **Disadvantages:** 
+
+1. *Cube Build Time*: Building the OLAP cubes can be time-consuming, especially for very large datasets. It can also be resource-intensive.
+2. *Upfront Design*: The OLAP cubes need to be designed upfront, which requires a good understanding of the queries that will be run.
+3. *Not for Real-Time*: While Kylin does have some support for streaming data, it is primarily designed for batch-oriented workloads. Real-time query performance may not be as good as batch performance.
+4. *Complexity*: Kylin and its underlying technologies (Hadoop, HBase, etc.) can be complex to set up and manage.
+
+## **Elasticsearch**
+
+Elasticsearch is an open-source, RESTful, distributed search and analytics engine built on Apache Lucene. It is designed for horizontal scalability, maximum reliability, and easy management. It supports a wide variety of use cases, including log and event data analysis, real-time application monitoring, and clickstream analysis.
+
+![elasticsearch_architecture](img/elasticsearch_architecture.png)
+
+### **Overall Ecosystem:** 
+
+Elasticsearch is part of the Elastic Stack, which also includes Beats for data ingestion, Logstash for centralized logging and data processing, and Kibana for data visualization. These components work together to provide an integrated solution for data ingestion, storage, analysis, and visualization. Elasticsearch also has a strong community and extensive documentation.
+
+### **Processing Framework:** 
+
+Elasticsearch is built around the concept of distributed, near real-time search and analytics. It uses a `scatter-gather` technique to gather the results set. 
+
+### **Dependency on Storage Systems:** 
+
+Elasticsearch uses its own custom storage engine and does not depend on external storage systems. It can be deployed on various types of storage hardware depending on the use case and performance requirements.
+
+### **Index Design:** 
+
+Elasticsearch uses an inverted index for full-text search, where each unique word is associated with all the documents that contain it. By default, Elasticsearch indexes all data in every field and each indexed field has a dedicated, optimized data structure. For example, text fields are stored in inverted indices, and numeric and geo fields are stored in BKD trees.
+
+![elasticsearch_index](img/elasticsearch_index.png)
+
+### **Advantages:** 
+
+1. *Scalability*: Elasticsearch is designed for horizontal scalability, and nodes can be easily added to a cluster to increase capacity.
+2. *Full-Text Search*: Elasticsearch provides powerful and flexible full-text search capabilities.
+3. *Real-Time Analysis*: Elasticsearch supports near real-time search and analytics, making it suitable for use cases that require up-to-the-minute data.
+4. *Integration*: Elasticsearch integrates well with various data ingestion, processing, and visualization tools.
+
+### **Disadvantages:** 
+
+1. *Complexity*: Elasticsearch can be complex to set up and manage, particularly in larger, distributed environments.
+2. *Resource Intensive*: Elasticsearch can be resource-intensive and may require substantial hardware resources to handle large data volumes and complex queries.
+3. *Limited Transaction Support*: While Elasticsearch can handle certain types of updates, it does not support the kind of transactions and consistency guarantees that traditional RDBMS systems do.
+4. *Limited Complex Query*: The issue with the Scatter-Gather model is that if the data volume for Gather/Reduce is large, the operation might be very slow due to the fact that Elasticsearch performs it on a single node. Generally speaking, Elasticsearch sacrifices flexibility to improve the QPS (Queries Per Second) of simple OLAP queries and reduce their latency.
+5. *Write Performance*: Elasticsearch is optimized for read operations. High-volume write operations can cause performance issues. Write-heavy applications may need to consider strategies like buffering and bulk indexing to mitigate this limitation.
+
 ## **Apache Doris**
 
 Apache Doris is an MPP-based interactive SQL data warehousing for reporting and analysis. It was initially developed by Baidu and is now an Apache Software Foundation project.
+
+![doris_architecture](img/doris_partition_architecture.png)
 
 ### **Overall Ecosystem:** 
 
@@ -282,6 +355,30 @@ Doris has its own column-oriented storage engine, which is specifically designed
 ### **Index Design:** 
 
 Doris uses a unique storage model and index structure. It leverages a column-oriented storage model and uses a combination of several indexes to optimize query performance, including Bitmap Indexes, Bloom Filters, and Zone Maps. The Bitmap Index and Bloom Filters help to quickly identify which rows contain a specific value or set of values, while the Zone Maps hold the minimum and maximum values for each page to filter out irrelevant data. These indexes allow Doris to reduce the amount of data that needs to be read from disk, thus improving query performance.
+
+![doris_seek_index_progress](img/doris_seek_index_progress.png)
+
+#### **Short Key Index**
+
+![doris_short_key_index](img/doris_short_key_index.png)
+
+#### **Ordinal Index**
+
+![doris_ordinal_index](img/doris_ordinal_index.png)
+
+#### **Zone Map Index**
+
+![doris_zone_map_index](img/doris_zone_map_index.png)
+
+#### **Bitmap Index**
+
+![doris_bitmap_index](img/doris_bitmap_index.png)
+
+#### **BloomFilter Index**
+
+![doris_bloom_filter_index](img/doris_bloom_filter.png)
+
+#### **Invert Index**
 
 ### **Advantages:** 
 
@@ -302,6 +399,18 @@ In conclusion, Doris is a powerful and flexible OLAP system with a strong focus 
 
 ClickHouse is an open-source column-oriented database management system (DBMS) that allows generating analytical data reports in real time. It is developed by Yandex, a Russian multinational corporation specializing in Internet-related products and services.
 
+ClickHouse is lightweight, its features include:
+
+- Columnar storage database, data compression.
+- Relational, supports SQL.
+- Distributed parallel computing, maximizing the performance of a single machine.
+- High availability.
+- PB-level data volume.
+- Real-time data updates.
+- Indexing.
+
+![clickhouse_architecture](img/clickhouse_architecture.png)
+
 ### **Overall Ecosystem:** 
 
 ClickHouse is part of a larger ecosystem of data processing and analytics tools. It provides connectors and integrations with various systems, including Kafka, Hadoop, and MySQL. ClickHouse also has a vibrant community that contributes to its development and provides support.
@@ -318,6 +427,14 @@ ClickHouse uses its own storage engine and does not have dependencies on externa
 
 ClickHouse supports primary key and secondary index. The primary key index in ClickHouse is a data skipping index that allows the system to avoid scanning irrelevant data during query processing. It also supports creating secondary indexes on table data, which can further enhance query performance.
 
+#### **Primary Index**
+
+![clickhouse_primary_index](img/clickhouse_primary_index.png)
+
+#### **Skipping Index**
+
+![clickhouse_skipping_index](img/clickhouse_skipping_index.png)
+
 ### **Advantages:** 
 
 1. *Performance*: ClickHouse's MPP and column-oriented architecture enable fast query execution, particularly for analytical queries.
@@ -330,46 +447,15 @@ ClickHouse supports primary key and secondary index. The primary key index in Cl
 1. *Complexity*: ClickHouse has a learning curve, and it may require time and experience to get the best performance.
 2. *Limited Transactions Support*: ClickHouse is optimized for OLAP and does not support transactions like an OLTP system.
 3. *Limited Consistency Guarantees*: ClickHouse follows eventual consistency model, which may not be suitable for use cases that require strong consistency guarantees.
-4. *SQL Compatability*: ClickHouse's SQL dialect may be a bit difficult to understand for developers used to standard SQL.
+4. *Limited SQL support*: Limited SQL support, with a distinctive implementation of join.
+5. *SQL Compatability*: ClickHouse's SQL dialect may be a bit difficult to understand for developers used to standard SQL.
+6. *Lack of Data Modification*: ClickHouse's SQL dialect may be a bit difficult to understand for developers used to standard SQL.
 
-## **Elasticsearch**
+## **Apache Doris vs Clickhouse**
 
-Elasticsearch is an open-source, RESTful, distributed search and analytics engine built on Apache Lucene. It is designed for horizontal scalability, maximum reliability, and easy management. It supports a wide variety of use cases, including log and event data analysis, real-time application monitoring, and clickstream analysis.
+### **Deployment & Maintenance**
 
-### **Overall Ecosystem:** 
-
-Elasticsearch is part of the Elastic Stack, which also includes Beats for data ingestion, Logstash for centralized logging and data processing, and Kibana for data visualization. These components work together to provide an integrated solution for data ingestion, storage, analysis, and visualization. Elasticsearch also has a strong community and extensive documentation.
-
-### **Processing Framework:** 
-
-Elasticsearch is built around the concept of distributed, near real-time search and analytics. It uses an inverted index structure, similar to the ones used by major search engines, and supports complex search queries.
-
-### **Dependency on Storage Systems:** 
-
-Elasticsearch uses its own custom storage engine and does not depend on external storage systems. It can be deployed on various types of storage hardware depending on the use case and performance requirements.
-
-### **Index Design:** 
-
-Elasticsearch uses an inverted index for full-text search, where each unique word is associated with all the documents that contain it. By default, Elasticsearch indexes all data in every field and each indexed field has a dedicated, optimized data structure. For example, text fields are stored in inverted indices, and numeric and geo fields are stored in BKD trees.
-
-### **Advantages:** 
-
-1. *Scalability*: Elasticsearch is designed for horizontal scalability, and nodes can be easily added to a cluster to increase capacity.
-2. *Full-Text Search*: Elasticsearch provides powerful and flexible full-text search capabilities.
-3. *Real-Time Analysis*: Elasticsearch supports near real-time search and analytics, making it suitable for use cases that require up-to-the-minute data.
-4. *Integration*: Elasticsearch integrates well with various data ingestion, processing, and visualization tools.
-
-### **Disadvantages:** 
-
-1. *Complexity*: Elasticsearch can be complex to set up and manage, particularly in larger, distributed environments.
-2. *Resource Intensive*: Elasticsearch can be resource-intensive and may require substantial hardware resources to handle large data volumes and complex queries.
-3. *Limited Transaction Support*: While Elasticsearch can handle certain types of updates, it does not support the kind of transactions and consistency guarantees that traditional RDBMS systems do.
-
-## Apache Doris vs Clickhouse
-
-### Deployment & Maintenance
-
-#### Deployment & Maintenance
+#### **Deployment & Maintenance**
 
 Deployment involves setting up the cluster, installing relevant dependencies and core components, modifying configuration files, and ensuring the cluster runs normally. Operations & Maintenance involve daily cluster version updates, configuration file changes, expansion and contraction, and other relevant matters. The components required for the cluster are as follows:
    
@@ -379,25 +465,25 @@ On the right is the deployment architecture diagram of ClickHouse. ClickHouse it
 
 Routine operations and maintenance, such as updating versions and changing configuration files, both require reliance on Ansible or SaltStack for batch updates. Both have some configuration files that can be hot updated without rebooting nodes, and they have session-related parameters that can be set to override configuration files. Doris has more SQL commands to assist in operations and maintenance, such as adding nodes. In Doris, you can just Add Backend, while in ClickHouse you need to modify the configuration file and distribute it to each node.
 
-#### User Management
+#### **User Management**
 
 ClickHouse's permissions and quota granularity are finer, which can conveniently support multi-tenant use of shared clusters. For example, you can set query memory, query thread quantity, query timeout, etc., to limit the size of the query; at the same time, combining query concurrency and a certain number of queries within a certain time window to control the number of queries. The multi-tenant solution is very friendly to developing businesses, because using shared cluster resources can quickly dynamically adjust quotas. If the cluster resources are monopolized, the utilization rate is not high, and expansion is relatively troublesome.
 
-#### Cluster Migration
+#### **Cluster Migration**
 
 Doris achieves data and metadata backup through its built-in backup/restore commands to third-party object storage or HDFS. A backup can fully export consistent data and metadata via a snapshot mechanism, and it can also perform incremental backups according to partitions to reduce backup costs. In Doris, there is an alternative method to migrate clusters. New machines are added to the existing cluster in batches, and then the old machines are gradually decommissioned. The cluster can automatically balance itself, a process that may take several days, depending on the amount of data in the cluster.
 
 ClickHouse has several methods for data migration. For large amounts of data, the built-in Clickhouse-copier tool can be used for inter-cluster data copying to achieve data migration across clusters. This requires a lot of manual configuration, and we have made some improvements and enhancements. For smaller data volumes, SQL commands with the 'remote' keyword can be used to implement cross-cluster data migration. The official recommendation for backup and recovery from other storage media is to use file system snapshots or third-party tools such as [https://github.com/AlexAkulov/clickhouse-backup].
 
-#### Autoscaling
+#### **Autoscaling**
 
 Doris supports online dynamic expansion and reduction of the cluster. This can be done through the built-in SQL command 'alter system add/decommission backends' to expand or reduce nodes. The granularity of data balance is the tablet, each tablet is approximately hundreds of megabytes. After expansion, the tablets of the table will automatically be copied to the new BE node. If you are expanding online, you should add BE in small batches to avoid causing instability in the cluster due to excessive changes.
 
 The expansion and reduction of ClickHouse are complex and cumbersome, and it currently does not support automatic online operations and requires in-house tool support. During expansion, new nodes need to be deployed, new shards and replicas need to be added to the configuration file, and metadata needs to be created on the new nodes. If replicas are being expanded, the data will automatically balance. If shards are being expanded, manual balancing needs to be done, or in-house tools need to be developed to automate the balancing process.
 
-### Distributed Capibility
+### **Distributed Capibility**
 
-#### Distributed Protocal & High Availability
+#### **Distributed Protocal & High Availability**
 
 Doris includes the management capability of metadata in the FrontEnd, it has built-in BerkeleyDB JE HA components, which include election strategies and replica data synchronization, providing a high availability solution for FE. The metadata managed in the FE is very rich, including information about nodes, clusters, libraries, tables and users, as well as partition, Tablet and other data information, and also includes transaction, background task, DDL operation and import-related task information.
 
@@ -411,7 +497,7 @@ ClickHouse does not have centralized metadata management, each node manages sepa
 
 In terms of distributed capabilities, Doris has been implemented on the kernel side, with lower usage cost; whereas ClickHouse needs to rely on external measures to guarantee, with higher usage cost.
 
-#### Distributed Transaction
+#### **Distributed Transaction**
 
 ACID refers to the atomicity, consistency, isolation, and durability of transactions. The transactions of OLAP are reflected in several aspects, one is import, which needs to ensure the atomicity of import, and also the consistency of detailed data and materialized view data; the second is the change of metadata, which needs to ensure the strong consistency of metadata changes on all nodes; the third is to ensure data consistency when balancing data between nodes.
 
@@ -421,7 +507,7 @@ ClickHouse does not support transactions, requiring various checks and validatio
 
 DDL operations in both Doris and ClickHouse are asynchronous, but Doris can ensure the consistency of metadata on all nodes. In contrast, ClickHouse can't guarantee this, which might result in some local nodes having inconsistent metadata compared to other nodes.
 
-### Data Import
+### **Data Import**
 
 - Doris has built-in data import methods such as RoutineLoad, BrokerLoad, and StreamLoad. These features are very practical. Although they can't handle complex ETL logic, they support simple filtering and transformation functions, can tolerate a small amount of data abnormalities, and support ACID and idempotency of imports.
 - RoutineLoad supports consuming real-time data from Kafka. It sets import parameters according to batch size, import interval, and concurrency, and is used for real-time data import.
@@ -431,9 +517,9 @@ DDL operations in both Doris and ClickHouse are asynchronous, but Doris can ensu
 - Due to the fact that ClickHouse can import to local tables and doesn't have transaction restrictions, its import performance is roughly equal to the disk writing performance of the node. Doris, on the other hand, is limited to importing distributed tables, so its import performance is slightly weaker.
 - If the data volume is small, you can use the import in OLAP. If the data volume is large and the logic is complex, usually use external computing engines like Spark/Flink for ETL and import functions, mainly because imports consume cluster resources.
 
-### Storage Architecture
+### **Storage Architecture**
 
-#### Storage Format
+#### **Storage Format**
 
 Both are column stores, and the benefits of column storage are:
 
@@ -447,7 +533,7 @@ ClickHouse is divided into DistributeTable, LocalTable, Partition, Shard, Part, 
 
 By partitioning and bucketing, users can customize the data distribution in the cluster, reducing data query scans, and facilitating cluster management. As a means of data management, Doris supports range partitioning, while ClickHouse can use expressions to customize. Doris can automatically create new partitions over time with dynamic partition configuration, and it can also do tiered storage for cold and hot data. ClickHouse distributes data among multiple nodes through the distribute engine, but because it lacks the bucket layer, it makes cluster migration and expansion more troublesome. Doris can further divide data through bucket configuration, which facilitates data balancing and migration.
 
-#### Table Engine/Model
+#### **Table Engine/Model**
 
 Both have typical table type (engine type) support:
 
@@ -456,25 +542,25 @@ Both have typical table type (engine type) support:
 
 In addition, Doris's newly developed Primary Key model deeply optimizes read performance in real-time update scenarios, supports update semantics while avoiding the sort merge cost of the Unique key. Under the pressure of real-time updates, the query performance is 3-15 times that of the Unique key. Similarly, compared to ClickHouse's ReplicatedMergeTree, it also avoids the problem of select final/optimize final.
 
-#### Data Type
+#### **Data Type**
 
 ClickHouse supports many complex types such as Array/Nested/Map/Tuple/Enum, etc. These types can satisfy some special scenarios and are quite useful.
 
-### Query
+### **Query**
 
-#### Query Architecture
+#### **Query Architecture**
 
 Distributed queries refer to querying data distributed across multiple servers, much like using a single table. Distributed joins are quite complex. Doris's distributed joins include Local join, Broadcast join, Shuffle join, Hash join, etc. ClickHouse only has Local and Broadcast joins. This architecture is relatively simple, but it also limits the flexibility of Join SQL. The workaround is to implement multi-level joins through subqueries and nested queries.
 
 Both Doris and ClickHouse support vectorized execution. Vectorization, simply understood, means executing batches of data at a time, allowing concurrent execution of multiple rows and also increasing CPU Cache hit rate. In the database field, Codegen and Vectorized always coexist. The following chart is five test SQL queries from TPC-H, where the vertical axis is query time, Type is compiled execution, TW is vectorized execution. It shows that the two have different performance in different scenarios.
 
-#### Concurrency Capability
+#### **Concurrency Capability**
 
 Because of MPP architecture in OLAP, every node participates in computation for every SQL, thereby accelerating massive computations. Therefore, the concurrency capability of a cluster is not much different from a single node. So, like a database, OLAP can't handle extremely high concurrency. However, there are solutions, such as increasing the number of replicas to handle larger concurrency. For example, 4 shards and 1 replica can handle 100 QPS. If you need to handle 500 QPS, you just need to expand the number of replicas to 5. Another important point is whether the query can utilize Cache, including ResultCache, Page Cache, and CPU Cache. This can further improve concurrency.
 
 Doris has two advantages: one is that the replica setting is at the table level. You only need to set a larger number of replicas for tables with high concurrency. Of course, the number of replicas can't exceed the number of cluster nodes. ClickHouse's replica setting is at the cluster level.
 
-#### SQL Compatibility
+#### **SQL Compatibility**
 
 Doris is compatible with MySQL syntax, supports SQL99 standards, and some new standards of SQL2003 (such as window functions, Grouping sets).
 
@@ -482,9 +568,9 @@ ClickHouse partially supports the SQL-2011 standard (https://clickhouse.tech/doc
 
 ClickHouse supports ODBC, JDBC, HTTP interfaces, while Doris supports JDBC and ODBC interfaces.
 
-### Storage Architecture
+### **Storage Architecture**
 
-### Usage Cost
+### **Usage Cost**
 
 The cost of using Doris is low. It is a system with strong metadata consistency. The data import functions are comprehensive, the query SQL standards are well compatible without the need for extra work, and the elastic scalability is good. However, ClickHouse requires a lot of work:
 
@@ -498,9 +584,9 @@ The cost of using Doris is low. It is a system with strong metadata consistency.
 
 Therefore, when implementing ClickHouse on a large scale, it is necessary to develop a user-friendly operation and maintenance system to handle most of the daily operation and maintenance tasks.
 
-### Benchmark
+### **Benchmark**
 
-## General Comparison Matrix
+## **General Comparison Matrix**
 
 | Feature \ DB                    | Doris                                                                                           | Hive                                                                                                                                           | Clickhouse                                                                                         | Elasticsearch                                                                                                                                      | Druid                                                                                                   | Kylin                                                                                                                    | Presto                                                                                                                    | Impala                                                                                                                                                |
 | ------------------------------- | ----------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -533,4 +619,4 @@ Therefore, when implementing ClickHouse on a large scale, it is necessary to dev
 | Write Throughput                | Doris has a high write throughput, thanks to its distributed architecture and columnar storage. | Hive's write throughput is dependent on HDFS and the resources of the Hadoop cluster. Generally, it's not optimized for high write throughput. | ClickHouse has a very high write throughput, due to its columnar storage and optimized algorithms. | Elasticsearch has a high write throughput, owing to its distributed nature and efficient indexing.                                                 | Druid's write throughput is high, especially for streaming data, due to its segment-based architecture. | Kylin's write throughput depends on HBase and the Hadoop cluster's resources. Cube processing can be resource-intensive. | Presto is primarily a query engine and does not handle writes; write throughput is managed by the underlying data source. | Impala's write throughput depends on HDFS and the resources of the Hadoop cluster. Like Hive, it's not typically optimized for high write throughput. |
 | **Primary Key Constraint**      | Supports primary keys to some extent.                                                           | No native support for primary keys.                                                                                                            | Some support for primary keys.                                                                     | No native support for primary keys.                                                                                                                | No native support for primary keys.                                                                     | No native support for primary keys.                                                                                      | No native support for primary keys.                                                                                       | No native support for primary keys.                                                                                                                   |
 | **Index**                       | Efficient indexing mechanisms.                                                                  | Indexing via Hadoop MapReduce.                                                                                                                 | Supports primary and secondary indexes.                                                            | Advanced indexing for search.                                                                                                                      | Advanced indexing for multi-dimensional queries.                                                        | Indexing via Hadoop MapReduce.                                                                                           | Depends on the indexing of underlying data sources.                                                                       | Efficient indexing mechanisms.                                                                                                                        |
-| **Distributed Computing Model** | MPP                                                                                             | MapReduce                                                                                                                                      | Scatter-Gather                                                                                                | Scatter-Gather                                                                                                                                     | Scatter-Gather                                                                                          | Scatter-Gather                                                                                                           | MPP                                                                                                                       | MPP                                                                                                                                                   |
+| **Distributed Computing Model** | MPP                                                                                             | MapReduce                                                                                                                                      | Scatter-Gather                                                                                     | Scatter-Gather                                                                                                                                     | Scatter-Gather                                                                                          | Scatter-Gather                                                                                                           | MPP                                                                                                                       | MPP                                                                                                                                                   |
