@@ -1,50 +1,51 @@
 - [OLAP Database Comparison: A Technical Guide](#olap-database-comparison-a-technical-guide)
   - [OLTP vs OLAP](#oltp-vs-olap)
+  - [Processing Framework](#processing-framework)
   - [**Hive**](#hive)
     - [**Overall Ecosystem:**](#overall-ecosystem)
-    - [**Processing Framework:**](#processing-framework)
+    - [**Processing Framework:**](#processing-framework-1)
     - [**Dependency on Storage Systems:**](#dependency-on-storage-systems)
     - [**Index Design:**](#index-design)
     - [**Advantages:**](#advantages)
     - [**Disadvantages:**](#disadvantages)
   - [**Impala**](#impala)
     - [**Overall Ecosystem:**](#overall-ecosystem-1)
-    - [**Processing Framework:**](#processing-framework-1)
+    - [**Processing Framework:**](#processing-framework-2)
     - [**Dependency on Storage Systems:**](#dependency-on-storage-systems-1)
     - [**Index Design:**](#index-design-1)
     - [**Advantages:**](#advantages-1)
     - [**Disadvantages:**](#disadvantages-1)
   - [**Presto**](#presto)
     - [**Overall Ecosystem:**](#overall-ecosystem-2)
-    - [**Processing Framework:**](#processing-framework-2)
+    - [**Processing Framework:**](#processing-framework-3)
     - [**Dependency on Storage Systems:**](#dependency-on-storage-systems-2)
     - [**Index Design:**](#index-design-2)
     - [**Advantages:**](#advantages-2)
     - [**Disadvantages:**](#disadvantages-2)
   - [**Druid**](#druid)
     - [**Overall Ecosystem:**](#overall-ecosystem-3)
-    - [**Processing Framework:**](#processing-framework-3)
+    - [**Processing Framework:**](#processing-framework-4)
     - [**Dependency on Storage Systems:**](#dependency-on-storage-systems-3)
     - [**Index Design:**](#index-design-3)
     - [**Advantages:**](#advantages-3)
     - [**Disadvantages:**](#disadvantages-3)
   - [**Apache Kylin**](#apache-kylin)
     - [**Overall Ecosystem:**](#overall-ecosystem-4)
-    - [**Processing Framework:**](#processing-framework-4)
+    - [**Processing Framework:**](#processing-framework-5)
     - [**Dependency on Storage Systems:**](#dependency-on-storage-systems-4)
     - [**Index Design:**](#index-design-4)
     - [**Advantages:**](#advantages-4)
     - [**Disadvantages:**](#disadvantages-4)
   - [**Elasticsearch**](#elasticsearch)
     - [**Overall Ecosystem:**](#overall-ecosystem-5)
-    - [**Processing Framework:**](#processing-framework-5)
+    - [**Processing Framework:**](#processing-framework-6)
     - [**Dependency on Storage Systems:**](#dependency-on-storage-systems-5)
     - [**Index Design:**](#index-design-5)
     - [**Advantages:**](#advantages-5)
     - [**Disadvantages:**](#disadvantages-5)
   - [**Apache Doris**](#apache-doris)
     - [**Overall Ecosystem:**](#overall-ecosystem-6)
-    - [**Processing Framework:**](#processing-framework-6)
+    - [**Processing Framework:**](#processing-framework-7)
     - [**Dependency on Storage Systems:**](#dependency-on-storage-systems-6)
     - [**Index Design:**](#index-design-6)
       - [**Short Key Index**](#short-key-index)
@@ -57,11 +58,14 @@
     - [**Disadvantages:**](#disadvantages-6)
   - [**ClickHouse**](#clickhouse)
     - [**Overall Ecosystem:**](#overall-ecosystem-7)
-    - [**Processing Framework:**](#processing-framework-7)
+    - [**Processing Framework:**](#processing-framework-8)
     - [**Dependency on Storage Systems:**](#dependency-on-storage-systems-7)
     - [**Index Design:**](#index-design-7)
       - [**Primary Index**](#primary-index)
       - [**Skipping Index**](#skipping-index)
+        - [minmax](#minmax)
+        - [set](#set)
+        - [Bloom Filter Types](#bloom-filter-types)
     - [**Advantages:**](#advantages-7)
     - [**Disadvantages:**](#disadvantages-7)
   - [**Apache Doris vs Clickhouse**](#apache-doris-vs-clickhouse)
@@ -85,6 +89,11 @@
     - [**Storage Architecture**](#storage-architecture-1)
     - [**Usage Cost**](#usage-cost)
     - [**Benchmark**](#benchmark)
+      - [Cold Run](#cold-run)
+      - [Hot Run](#hot-run)
+      - [Load Time](#load-time)
+      - [Storage](#storage)
+      - [ClickBench SQL](#clickbench-sql)
   - [**General Comparison Matrix**](#general-comparison-matrix)
 
 
@@ -102,6 +111,44 @@
 | **Scalability**                    | OLTP systems need to be highly scalable to accommodate increasing transaction volume.                                                                                                       | OLAP systems also need to be scalable, but in terms of handling increasing data volume and complexity of analysis.                                                                    |
 | **Query Complexity**               | OLTP systems handle simple, atomic queries that affect a limited number of records.                                                                                                         | OLAP systems handle complex queries that can scan thousands or millions of records and perform complex calculations.                                                                  |
 | **Suitable Application Scenarios** | OLTP is suitable for any application that requires real-time operational processing like banking, airline reservation, e-commerce, etc.                                                     | OLAP is suitable for data warehousing, business analysis, and decision support systems.                                                                                               |
+
+## Processing Framework
+
+![processing_framework](img/processing_framework.jpg)
+
+**Scatter/Gather**
+
+Scatter/Gather is a fundamental design pattern in parallel computing, which involves the division of a problem into several smaller tasks (Scatter) that are processed concurrently and independently on multiple processors or machines. The results are then collected and consolidated (Gather) to form the final output.
+
+**Design:** The Scatter phase distributes data and tasks across multiple nodes, which can be separate processors in a multicore system or separate machines in a distributed system. The Gather phase collects and combines the results from all nodes. Each node operates independently and concurrently, leading to significant speedups when dealing with large-scale data.
+
+**Advantages:** Scatter/Gather paradigm is well-suited for problems that can be broken down into independent subtasks. It provides high performance, scalability, and fault tolerance as failure in one node does not affect the operation of others.
+
+**Use Cases:** This paradigm is commonly used in data-intensive tasks like search engines, information retrieval systems, and database operations.
+
+**Drawbacks:** However, it is not efficient for tasks that cannot be partitioned into independent subtasks. Also, the overhead of gathering and combining the results may become significant if there are a large number of nodes involved.
+
+**MapReduce**
+
+MapReduce is a programming model for processing large data sets across distributed systems. It works by dividing the task into two phases: Map and Reduce.
+
+**Operational Mechanics:** In the Map phase, input data is divided into independent chunks that are processed by map tasks in a completely parallel manner. Each map task takes a set of input key/value pairs and produces a set of intermediate key/value pairs. In the Reduce phase, these intermediate values are grouped together into sets that share the same intermediate key, and these sets are processed by reduce tasks to produce the final output key/value pairs.
+
+**Examples:** MapReduce is particularly useful for large-scale data processing tasks such as counting words in a document, analyzing log files, and transforming and filtering datasets.
+
+**Limitations:** MapReduce isn’t suitable for interactive analysis or iterative algorithms (such as many machine learning algorithms) because of its high latency. It’s also not a good fit for tasks requiring multiple stages of Map and Reduce, as each stage incurs significant I/O costs.
+
+**Massively Parallel Processing (MPP)**
+
+MPP is a form of computing that utilizes many separate CPUs or servers to perform tasks. The tasks are divided into smaller parts, which are then processed simultaneously.
+
+**Design:** MPP systems typically use a "shared nothing" architecture, where each node has its own memory and disk storage. Data is distributed among all nodes and processed in parallel.
+
+**Applications:** MPP systems are used for complex computations and big data analytics that require high performance and fast data processing. They are often employed in data warehousing and business analytics, where large amounts of data need to be analyzed quickly.
+
+**Strengths:** MPP systems provide excellent performance and scalability. They are also highly reliable, as a failure in one node does not affect the others.
+
+**Constraints:** However, MPP systems can be expensive to set up and maintain. Moreover, they require the problem to be "embarrassingly parallel", i.e., it can be divided into independent subtasks without needing any communication between the tasks. Finally, there can be performance issues if data is not evenly distributed among the nodes, leading to some nodes being overused while others are underused.
 
 ## **Hive**
 
@@ -238,6 +285,8 @@ Druid can integrate with deep storage systems for data persistence, including HD
 ### **Index Design:** 
 
 Druid uses a combination of `inverted indexes` and `bitmap indexes` for querying the data. The inverted index provides a lookup from a dimension value to the rows that contain that value. The bitmap index provides a fast way to look up rows in the data. Druid's indexes are designed to optimize time series and OLAP-style queries.
+
+![durid_index_0](img/druid_index_0.png)
 
 ![druid_index](img/druid_index.png)
 
@@ -435,6 +484,36 @@ ClickHouse supports primary key and secondary index. The primary key index in Cl
 
 ![clickhouse_skipping_index](img/clickhouse_skipping_index.png)
 
+##### minmax
+
+This lightweight index type requires no parameters. It stores the minimum and maximum values of the index expression for each block (if the expression is a tuple, it separately stores the values for each member of the element of the tuple). This type is ideal for columns that tend to be loosely sorted by value. This index type is usually the least expensive to apply during query processing.
+
+This type of index only works correctly with a scalar or tuple expression -- the index will never be applied to expressions that return an array or map data type.
+
+##### set
+
+This lightweight index type accepts a single parameter of the max_size of the value set per block (0 permits an unlimited number of discrete values). This set contains all values in the block (or is empty if the number of values exceeds the max_size). This index type works well with columns with low cardinality within each set of granules (essentially, "clumped together") but higher cardinality overall.
+
+The cost, performance, and effectiveness of this index is dependent on the cardinality within blocks. If each block contains a large number of unique values, either evaluating the query condition against a large index set will be very expensive, or the index will not be applied because the index is empty due to exceeding max_size.
+
+##### Bloom Filter Types
+
+A Bloom filter is a data structure that allows space-efficient testing of set membership at the cost of a slight chance of false positives. A false positive is not a significant concern in the case of skip indexes because the only disadvantage is reading a few unnecessary blocks. However, the potential for false positives does mean that the indexed expression should be expected to be true, otherwise valid data may be skipped.
+
+Because Bloom filters can more efficiently handle testing for a large number of discrete values, they can be appropriate for conditional expressions that produce more values to test. In particular, a Bloom filter index can be applied to arrays, where every value of the array is tested, and to maps, by converting either the keys or values to an array using the mapKeys or mapValues function.
+
+There are three Data Skipping Index types based on Bloom filters:
+
+The basic bloom_filter which takes a single optional parameter of the allowed "false positive" rate between 0 and 1 (if unspecified, .025 is used).
+
+The specialized tokenbf_v1. It takes three parameters, all related to tuning the bloom filter used: (1) the size of the filter in bytes (larger filters have fewer false positives, at some cost in storage), (2) number of hash functions applied (again, more hash filters reduce false positives), and (3) the seed for the bloom filter hash functions. See the calculator here for more detail on how these parameters affect bloom filter functionality. This index works only with String, FixedString, and Map datatypes. The input expression is split into character sequences separated by non-alphanumeric characters. For example, a column value of This is a candidate for a "full text" search will contain the tokens This is a candidate for full text search. It is intended for use in LIKE, EQUALS, IN, hasToken() and similar searches for words and other values within longer strings. For example, one possible use might be searching for a small number of class names or line numbers in a column of free form application log lines.
+
+The specialized ngrambf_v1. This index functions the same as the token index. It takes one additional parameter before the Bloom filter settings, the size of the ngrams to index. An ngram is a character string of length n of any characters, so the string A short string with an ngram size of 4 would be indexed as:
+
+> 'A sh', ' sho', 'shor', 'hort', 'ort ', 'rt s', 't st', ' str', 'stri', 'trin', 'ring'
+
+This index can also be useful for text searches, particularly languages without word breaks, such as Chinese.
+
 ### **Advantages:** 
 
 1. *Performance*: ClickHouse's MPP and column-oriented architecture enable fast query execution, particularly for analytical queries.
@@ -585,6 +664,26 @@ The cost of using Doris is low. It is a system with strong metadata consistency.
 Therefore, when implementing ClickHouse on a large scale, it is necessary to develop a user-friendly operation and maintenance system to handle most of the daily operation and maintenance tasks.
 
 ### **Benchmark**
+
+#### Cold Run
+
+![doris_clickbench_benchmark](img/doris_clickbench_cold_run.jpg)
+
+#### Hot Run
+
+![doris_clickbench_benchmark](img/doris_clickbench_hot_run.jpg)
+
+#### Load Time
+
+![doris_clickbench_benchmark](img/doris_clickbench_load_time.jpg)
+
+#### Storage
+
+![doris_clickbench_benchmark](img/doris_clickbench_storage_size.jpg)
+
+#### ClickBench SQL
+
+![clickbench_sql_benchmark](img/clickbench_sql_benchmark.png)
 
 ## **General Comparison Matrix**
 
